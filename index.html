@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INSPT Document Upload</title>
+<!-- PDF.js for client-side PDF text extraction -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- Zoho Creator Widget SDK -->
+<script src="https://js.zohostatic.com/creator/widgets/version/1/widget-sdk.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  background: #ffffff;
+  color: #111827;
+  padding: 14px;
+  line-height: 1.4;
+}
+
+/* ── Upload Zone ── */
+.upload-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 10px;
+  padding: 22px 16px;
+  text-align: center;
+  cursor: pointer;
+  background: #f9fafb;
+  transition: border-color 0.2s, background 0.2s;
+  user-select: none;
+}
+.upload-zone:hover,
+.upload-zone.drag-over {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+.upload-icon { font-size: 26px; margin-bottom: 6px; }
+.upload-title { font-size: 14px; font-weight: 700; color: #1f2937; margin-bottom: 3px; }
+.upload-sub { font-size: 11px; color: #6b7280; }
+input[type="file"] { display: none; }
+
+/* ── Doc Status Chips ── */
+.doc-chips {
+  display: flex;
+  gap: 7px;
+  margin-top: 11px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #9ca3af;
+}
+.doc-chip.detected  { background: #f0fdf4; border-color: #86efac; color: #166534; }
+.doc-chip.missing   { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+
+/* ── Processing ── */
+.processing {
+  text-align: center;
+  padding: 24px 12px;
+  color: #6b7280;
+}
+.spinner {
+  width: 26px; height: 26px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  margin: 0 auto 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.proc-msg { font-size: 12px; }
+
+/* ── Alerts ── */
+.alert {
+  padding: 9px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.alert-warn  { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+.alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+.alert-ok    { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+
+/* ── Preview Table ── */
+.preview { margin-top: 14px; }
+
+.section-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  padding: 8px 0 4px;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 2px;
+}
+
+.field-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 5px 2px;
+  border-bottom: 1px solid #f9fafb;
+  gap: 8px;
+}
+.field-row:last-child { border-bottom: none; }
+
+.fn {
+  flex: 0 0 152px;
+  font-size: 11.5px;
+  color: #6b7280;
+  padding-top: 1px;
+}
+.fv {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+  word-break: break-all;
+}
+.fv.empty { color: #d1d5db; font-weight: 400; font-style: italic; }
+.fv .hint {
+  display: block;
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 400;
+  font-style: normal;
+  margin-top: 1px;
+}
+
+.badge {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+.badge-auto   { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+.badge-manual { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+
+/* ── Manual note ── */
+.manual-note {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #6b7280;
+  padding: 8px 10px;
+  background: #f9fafb;
+  border-radius: 6px;
+  border-left: 3px solid #d1d5db;
+  line-height: 1.5;
+}
+
+/* ── Buttons ── */
+.btn-row { display: flex; gap: 9px; margin-top: 14px; }
+.btn {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn-primary  { background: #2563eb; color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+.btn-secondary:hover { background: #e5e7eb; }
+
+/* ── Success Banner ── */
+.success-banner {
+  text-align: center;
+  padding: 20px 14px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 10px;
+  color: #166534;
+}
+.success-icon { font-size: 28px; margin-bottom: 6px; }
+.success-title { font-size: 14px; font-weight: 700; }
+.success-sub { font-size: 11px; color: #4ade80; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ① Upload Section -->
+  <div id="secUpload">
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" accept=".pdf" multiple>
+      <div class="upload-icon">📄</div>
+      <div class="upload-title">Upload Policy Documents</div>
+      <div class="upload-sub">Click or drag & drop · Select all 3 PDFs at once</div>
+      <div class="upload-sub" style="margin-top:3px">Tax Invoice (DN) &nbsp;·&nbsp; Credit Note (CN) &nbsp;·&nbsp; Policy Schedule</div>
+    </div>
+    <div class="doc-chips">
+      <div class="doc-chip" id="chip-DN">📋 Tax Invoice (DN)</div>
+      <div class="doc-chip" id="chip-CN">📋 Credit Note (CN)</div>
+      <div class="doc-chip" id="chip-POLICY">📋 Policy Schedule</div>
+    </div>
+  </div>
+
+  <!-- ② Processing Section -->
+  <div id="secProcessing" style="display:none">
+    <div class="processing">
+      <div class="spinner"></div>
+      <div class="proc-msg" id="procMsg">Processing documents…</div>
+    </div>
+  </div>
+
+  <!-- ③ Error Section -->
+  <div id="secError" style="display:none"></div>
+
+  <!-- ④ Preview Section -->
+  <div id="secPreview" style="display:none">
+    <div class="preview">
+      <div id="previewAlerts"></div>
+      <div id="previewContent"></div>
+      <div class="manual-note">
+        ⚠️ Fields marked <strong>Manual</strong> are dropdown/lookup fields and cannot be set automatically.
+        Check the suggested values above and select them in the form.
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="doReset()">🔄 Re-upload</button>
+      <button class="btn btn-primary" id="applyBtn" onclick="applyToForm()">✅ Apply to Form</button>
+    </div>
+  </div>
+
+  <!-- ⑤ Success Section -->
+  <div id="secSuccess" style="display:none">
+    <div class="success-banner">
+      <div class="success-icon">✅</div>
+      <div class="success-title">Fields Applied Successfully</div>
+      <div class="success-sub">Please complete the dropdown fields manually, then save the policy.</div>
+    </div>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="doReset()">Upload New Documents</button>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════════════
+// PDF.js Worker
+// ══════════════════════════════════════════════════════════════
+const pdfjsLib = window['pdfjs-dist/build/pdf'];
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ══════════════════════════════════════════════════════════════
+// Zoho Creator Widget Init
+// ══════════════════════════════════════════════════════════════
+let zohoReady = false;
+try {
+  ZOHO.CREATOR.init()
+    .then(() => { zohoReady = true; })
+    .catch(e => console.warn('[Widget] Zoho init failed (dev mode?):', e));
+} catch (e) {
+  console.warn('[Widget] Running outside Zoho Creator:', e);
+}
+
+// ══════════════════════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════════════════════
+let state = {};
+
+// ══════════════════════════════════════════════════════════════
+// Drag & Drop + File Input
+// ══════════════════════════════════════════════════════════════
+const uploadZone = document.getElementById('uploadZone');
+const fileInput  = document.getElementById('fileInput');
+
+uploadZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadZone.classList.add('drag-over');
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  processFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => processFiles(e.target.files));
+
+// ══════════════════════════════════════════════════════════════
+// PDF Text Extraction
+// ══════════════════════════════════════════════════════════════
+async function extractText(file) {
+  const buf  = await file.arrayBuffer();
+  const pdf  = await pdfjsLib.getDocument({ data: buf }).promise;
+  let full   = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page    = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    let lastY = null;
+    for (const item of content.items) {
+      const y = item.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 3) full += '\n';
+      full += item.str + ' ';
+      lastY = y;
+    }
+    full += '\n';
+  }
+  return full;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Document Detection
+// ══════════════════════════════════════════════════════════════
+function detectType(text) {
+  if (/TAX CREDIT NOTE/i.test(text))                                      return 'CN';
+  if (/TAX INVOICE/i.test(text) && /DEBITED/i.test(text))                 return 'DN';
+  if (/Motor Takaful Policy Schedule/i.test(text)
+    || /Policy Takaful Motor/i.test(text)
+    || /جدول وثيقة/.test(text)) return 'POLICY';
+  return 'UNKNOWN';
+}
+
+// ══════════════════════════════════════════════════════════════
+// Field Extraction — DN (Tax Invoice / Debit Note)
+// ══════════════════════════════════════════════════════════════
+// Based on actual AL MADINA DN text structure:
+//   "Customer No : 101903 - 101903 D.N. No : DNG1-44310"
+//   "Insured : HORIZON LINE CONSTRUCTION SPC Invoice Date : 01/04/2026"
+//   "Policy No. P/004/01/26/2514/000355"
+//   "Supply Dt / Period of Insurance From : 01/04/2026 To 31/03/2027"
+//   "Risk Cover : Comp Ins + TP+ Lib at Site"
+//   "T O T A L : 47.800"
+function parseDN(text) {
+  const d = {};
+
+  // D.N. No
+  const m1 = text.match(/D\.N\.\s*No\s*:\s*(\S+)/);
+  if (m1) d.dnNo = m1[1].replace(/[,.]$/, '');
+
+  // Invoice Date
+  const m2 = text.match(/Invoice Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
+  if (m2) d.invoiceDate = m2[1];
+
+  // Insured Name (stop before "Invoice Date" or 3+ spaces)
+  const m3 = text.match(/Insured\s*:\s*(.+?)(?=\s{3,}|\s+Invoice Date|\n)/);
+  if (m3) d.insuredName = m3[1].trim();
+
+  // Policy Number (first "Policy No." in the description lines)
+  const m4 = text.match(/Policy No\.\s+(P\/[\d\/]+)/);
+  if (m4) d.policyNo = m4[1];
+
+  // Period From & To
+  const m5 = text.match(/Period of Insurance From\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})\s+To\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
+  if (m5) { d.periodFrom = m5[1]; d.periodTo = m5[2]; }
+
+  // Risk Cover (up to newline or the spaced T-O-T-A-L)
+  const m6 = text.match(/Risk Cover\s*:\s*(.+?)(?=\n|T\s*O\s*T\s*A\s*L)/);
+  if (m6) d.riskCover = m6[1].trim();
+
+  // TOTAL (spaced letters: "T O T A L : 47.800")
+  const m7 = text.match(/T\s*O\s*T\s*A\s*L\s*:\s*([\d.]+)/);
+  if (m7) d.total = m7[1];
+
+  return d;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Field Extraction — CN (Tax Credit Note)
+// ══════════════════════════════════════════════════════════════
+// Based on actual AL MADINA CN text:
+//   "Being 12.5% Agent commission for P/004/01/26/2514/000355 5.000"
+//   "Being VAT On Commission at 5 % for Policy No. P/004/01/26/2514/000355. 0.250"
+function parseCN(text) {
+  const d = {};
+
+  // Find line with "commission for" (excluding the VAT line)
+  const lines = text.split('\n');
+  const commLine = lines.find(l => /commission for/i.test(l) && !/VAT/i.test(l));
+  if (commLine) {
+    const nums = commLine.match(/[\d]+\.[\d]+/g);
+    if (nums) d.commission = nums[nums.length - 1]; // last decimal on the line
+  }
+
+  // Find line with "VAT On Commission"
+  const vatLine = lines.find(l => /VAT On Commission/i.test(l));
+  if (vatLine) {
+    const nums = vatLine.match(/[\d]+\.[\d]+/g);
+    if (nums) d.vat = nums[nums.length - 1]; // last decimal on the line
+  }
+
+  return d;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Field Extraction — POLICY (Motor Takaful Policy Schedule)
+// ══════════════════════════════════════════════════════════════
+// Based on actual AL MADINA Policy Schedule text (bilingual):
+//   "Policy Number P/004/01/26/2514/000355 ..."
+//   "Mobile 77384787 ..."
+//   "Registration No TBA/0 ... Make ZOOMLION EXCAVATOR ..."
+//   "Chassis Number ZLHZW151VS0C01246 ..."
+//   "Type of Insurance Third Party liability / Natural Disaster ..."
+function parsePOLICY(text) {
+  const d = {};
+
+  // Policy Number
+  const m1 = text.match(/Policy Number\s+(P\/[\d\/]+)/);
+  if (m1) d.policyNo = m1[1];
+
+  // Mobile (6–10 digits after "Mobile")
+  const m2 = text.match(/\bMobile\s+(\d{6,10})\b/);
+  if (m2) d.mobile = m2[1];
+
+  // Registration No (ASCII only — stops at Arabic chars naturally)
+  const m3 = text.match(/Registration No\s+([A-Za-z0-9\/]+)/);
+  if (m3) d.registrationNo = m3[1];
+
+  // Make — UPPERCASE words after "Make", stop at first non-ASCII char
+  const m4 = text.match(/\bMake\s+([A-Z][A-Z0-9 ]{1,40}?)(?=\s+[^\x00-\x7F]|\n|Engine|Chassis)/);
+  if (m4) d.make = m4[1].trim();
+
+  // Chassis Number
+  const m5 = text.match(/Chassis Number\s+([A-Z0-9]+)/);
+  if (m5) d.chassisNo = m5[1];
+
+  // Type of Insurance (stops at Arabic chars)
+  const m6 = text.match(/Type of Insurance\s+(.+?)(?=\s+[^\x00-\x7F]|\n|Geographical)/);
+  if (m6) d.typeOfInsurance = m6[1].trim();
+
+  return d;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Date Format Conversion
+// dd/MM/yyyy → dd-MMM-yyyy (Zoho Creator format)
+// ══════════════════════════════════════════════════════════════
+function fmtDate(ddmmyyyy) {
+  if (!ddmmyyyy) return '';
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const p = ddmmyyyy.split('/');
+  if (p.length !== 3) return ddmmyyyy;
+  const idx = parseInt(p[1], 10) - 1;
+  if (idx < 0 || idx > 11) return ddmmyyyy;
+  return `${p[0].padStart(2,'0')}-${M[idx]}-${p[2]}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Insurance Type Mapping
+// Maps raw text from policy/DN to INSPT system Insurance_Types display value
+// ══════════════════════════════════════════════════════════════
+function mapInsurType(policyType, riskCover) {
+  // Prefer POLICY document's "Type of Insurance" — it's authoritative
+  const src = (policyType || riskCover || '').toLowerCase();
+  if (!src) return '';
+  if (src.includes('third party') && !src.includes('comprehensive')) return 'Motor Third Party';
+  if (src.includes('comprehensive') || src.includes('comp ins'))     return 'Motor Comprehensive';
+  if (src.includes('third party'))   return 'Motor Third Party';
+  if (src.includes('cpm') || src.includes('contract plant'))         return 'CPM';
+  if (src.includes('fire'))          return 'Fire Policy';
+  if (src.includes('par'))           return 'PAR Policy';
+  if (src.includes('wc') || src.includes('workmen'))                 return 'WC Policy';
+  if (src.includes('group life'))    return 'Group Life Policy';
+  if (src.includes('group medical')) return 'Group Medical';
+  if (src.includes('life'))          return 'Life Policy';
+  if (src.includes('medical'))       return 'Individual Medical';
+  if (src.includes('travel'))        return 'Travel insurance';
+  if (src.includes('domestic'))      return 'Domestic Helper Insurance';
+  return policyType || riskCover;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Main: Process Uploaded Files
+// ══════════════════════════════════════════════════════════════
+async function processFiles(fileList) {
+  const files = Array.from(fileList);
+  if (!files.length) return;
+
+  showSection('secProcessing');
+  resetChips();
+
+  const docs = { DN: null, CN: null, POLICY: null };
+  const errs = [];
+
+  try {
+    for (const file of files) {
+      setMsg(`Reading: ${file.name}…`);
+      const text = await extractText(file);
+      const type = detectType(text);
+
+      if (type === 'UNKNOWN') {
+        errs.push(`"${file.name}" — could not be identified as DN, CN or Policy Schedule.`);
+      } else if (docs[type]) {
+        errs.push(`Two files detected as <strong>${type}</strong>. Please check your selection.`);
+      } else {
+        docs[type] = text;
+        markChip(type, 'detected');
+      }
+    }
+
+    // Check all 3 present
+    const missing = Object.entries(docs)
+      .filter(([, v]) => !v)
+      .map(([k]) => ({ DN: 'Tax Invoice (DN)', CN: 'Credit Note (CN)', POLICY: 'Policy Schedule' }[k]));
+
+    if (missing.length) {
+      missing.forEach(m => markChip(
+        Object.keys({DN:'Tax Invoice (DN)',CN:'Credit Note (CN)',POLICY:'Policy Schedule'})
+          .find(k => ({DN:'Tax Invoice (DN)',CN:'Credit Note (CN)',POLICY:'Policy Schedule'}[k]) === m),
+        'missing'
+      ));
+      showError(
+        `<div class="alert alert-error">❌ Missing: <strong>${missing.join(', ')}</strong>.<br>
+         Make sure you select all 3 correct PDF files.
+         ${errs.length ? '<br><br>' + errs.join('<br>') : ''}</div>`,
+        true
+      );
+      return;
+    }
+
+    setMsg('Extracting fields…');
+    const dn     = parseDN(docs.DN);
+    const cn     = parseCN(docs.CN);
+    const policy = parsePOLICY(docs.POLICY);
+
+    // Cross-validate Policy Number
+    const pNoMismatch = dn.policyNo && policy.policyNo && dn.policyNo !== policy.policyNo;
+
+    const insurTypeSuggestion = mapInsurType(policy.typeOfInsurance, dn.riskCover);
+
+    // Build canonical state object (field link names as keys for auto-fill fields)
+    state = {
+      // ── Auto-fill fields (text / number / date) ──
+      Insured_Name:           dn.insuredName || '',
+      Invoice_Date:           fmtDate(dn.invoiceDate),
+      Insurer_Invoice_Number: dn.dnNo || '',
+      Policy_Number:          dn.policyNo || policy.policyNo || '',
+      Period_From:            fmtDate(dn.periodFrom),
+      Period_To:              fmtDate(dn.periodTo),
+      Premium:                dn.total || '',
+      Commission:             cn.commission || '',
+      VAT:                    cn.vat || '',
+      Contact_Number:         policy.mobile || '',
+      Chassis_Number:         policy.chassisNo || '',
+      Registration_Number:    policy.registrationNo || '',
+
+      // ── Manual / display only ──
+      _insurTypeSuggestion:   insurTypeSuggestion,
+      _insurTypeRaw:          policy.typeOfInsurance || dn.riskCover || '',
+      _vehicleMakeRaw:        policy.make || '',
+      _policyNoMismatch:      pNoMismatch,
+    };
+
+    // Find empty critical fields
+    const criticals = ['Insured_Name','Invoice_Date','Insurer_Invoice_Number','Policy_Number',
+                       'Period_From','Period_To','Premium','Commission'];
+    state._emptyFields = criticals.filter(f => !state[f]);
+
+    showPreview();
+
+  } catch (err) {
+    console.error('[Widget] Processing error:', err);
+    showError(
+      `<div class="alert alert-error">❌ Error reading PDFs: ${err.message || err}</div>`,
+      true
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Build & Show Preview
+// ══════════════════════════════════════════════════════════════
+function showPreview() {
+  const s = state;
+  let alerts = '';
+
+  if (s._policyNoMismatch) {
+    alerts += `<div class="alert alert-warn">⚠️ Policy Number differs between the Invoice and Policy Schedule — please verify before submitting.</div>`;
+  }
+  if (s._emptyFields.length) {
+    alerts += `<div class="alert alert-warn">⚠️ Could not extract: <strong>${s._emptyFields.join(', ')}</strong>. Fill these manually.</div>`;
+  }
+
+  // Section definitions: [heading, [[label, value, isAuto, hint?], ...]]
+  const sections = [
+    ['📄 Tax Invoice (DN) — Auto-filled', [
+      ['Insured Name',          s.Insured_Name,           true],
+      ['Invoice Date',          s.Invoice_Date,           true],
+      ['Invoice No. (D.N. No)', s.Insurer_Invoice_Number, true],
+      ['Policy Number',         s.Policy_Number,          true],
+      ['Period From',           s.Period_From,            true],
+      ['Period To',             s.Period_To,              true],
+      ['Premium (Total)',       s.Premium,                true],
+    ]],
+    ['📄 Credit Note (CN) — Auto-filled', [
+      ['Commission',            s.Commission,             true],
+      ['VAT on Commission',     s.VAT,                    true],
+    ]],
+    ['📄 Policy Schedule — Partial', [
+      ['Contact Number',        s.Contact_Number,         true],
+      ['Chassis Number',        s.Chassis_Number,         true],
+      ['Registration No.',      s.Registration_Number,    true],
+      ['Insurance Type',        s._insurTypeSuggestion,   false, `Detected from: "${s._insurTypeRaw}"`],
+      ['Vehicle Brand (Make)',  s._vehicleMakeRaw,        false, 'Select closest match from Vehicle Brands dropdown'],
+    ]],
+  ];
+
+  let html = '';
+  for (const [heading, fields] of sections) {
+    html += `<div class="section-header">${heading}</div>`;
+    for (const [label, value, isAuto, hint] of fields) {
+      const empty = !value;
+      html += `
+        <div class="field-row">
+          <div class="fn">${label}</div>
+          <div class="fv ${empty ? 'empty' : ''}">
+            ${empty ? '—' : escHtml(value)}
+            ${hint ? `<span class="hint">${escHtml(hint)}</span>` : ''}
+          </div>
+          <div class="badge ${isAuto ? 'badge-auto' : 'badge-manual'}">${isAuto ? '✅ Auto' : '⚠️ Manual'}</div>
+        </div>`;
+    }
+  }
+
+  document.getElementById('previewAlerts').innerHTML  = alerts;
+  document.getElementById('previewContent').innerHTML = html;
+  showSection('secPreview');
+}
+
+// ══════════════════════════════════════════════════════════════
+// Apply Fields to Zoho Creator Form
+// ══════════════════════════════════════════════════════════════
+async function applyToForm() {
+  const btn = document.getElementById('applyBtn');
+  btn.disabled  = true;
+  btn.textContent = 'Applying…';
+
+  // Only auto-fill fields with actual values
+  const toSet = {
+    Insured_Name:           state.Insured_Name,
+    Invoice_Date:           state.Invoice_Date,
+    Insurer_Invoice_Number: state.Insurer_Invoice_Number,
+    Policy_Number:          state.Policy_Number,
+    Period_From:            state.Period_From,
+    Period_To:              state.Period_To,
+    Premium:                state.Premium,
+    Commission:             state.Commission,
+    VAT:                    state.VAT,
+    Contact_Number:         state.Contact_Number,
+    Chassis_Number:         state.Chassis_Number,
+    Registration_Number:    state.Registration_Number,
+  };
+
+  if (!zohoReady) {
+    // Dev / preview mode — log to console
+    console.log('[Widget] DEV MODE — would set these fields:', toSet);
+    showSection('secSuccess');
+    return;
+  }
+
+  const failed = [];
+  for (const [fieldLinkName, value] of Object.entries(toSet)) {
+    if (!value) continue;
+    try {
+      await ZOHO.CREATOR.WIDGET.setFieldValue({ fieldLinkName, value });
+    } catch (e) {
+      failed.push(fieldLinkName);
+      console.error(`[Widget] setFieldValue failed for ${fieldLinkName}:`, e);
+    }
+  }
+
+  if (failed.length) {
+    document.getElementById('previewAlerts').insertAdjacentHTML('afterbegin',
+      `<div class="alert alert-warn">⚠️ Could not auto-set: ${failed.join(', ')}. Fill these manually.</div>`
+    );
+  }
+
+  showSection('secSuccess');
+}
+
+// ══════════════════════════════════════════════════════════════
+// UI Helpers
+// ══════════════════════════════════════════════════════════════
+function showSection(id) {
+  ['secUpload','secProcessing','secError','secPreview','secSuccess'].forEach(s => {
+    document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
+  });
+}
+
+function setMsg(msg) {
+  const el = document.getElementById('procMsg');
+  if (el) el.textContent = msg;
+}
+
+function showError(html, showRetry) {
+  const sec = document.getElementById('secError');
+  sec.innerHTML = html +
+    (showRetry ? `<div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="doReset()">🔄 Try Again</button></div>` : '');
+  showSection('secError');
+}
+
+const CHIP_LABELS = {
+  DN:     '📋 Tax Invoice (DN)',
+  CN:     '📋 Credit Note (CN)',
+  POLICY: '📋 Policy Schedule',
+};
+function resetChips() {
+  ['DN','CN','POLICY'].forEach(t => {
+    const el = document.getElementById(`chip-${t}`);
+    el.className = 'doc-chip';
+    el.textContent = CHIP_LABELS[t];
+  });
+}
+function markChip(type, cls) {
+  if (!type) return;
+  const el = document.getElementById(`chip-${type}`);
+  if (!el) return;
+  el.className = `doc-chip ${cls}`;
+  const icons = { detected: '✅', missing: '❌' };
+  el.textContent = `${icons[cls] || ''} ${CHIP_LABELS[type]}`;
+}
+
+function doReset() {
+  state = {};
+  fileInput.value = '';
+  resetChips();
+  showSection('secUpload');
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// Show upload section by default
+showSection('secUpload');
+</script>
+</body>
+</html>
