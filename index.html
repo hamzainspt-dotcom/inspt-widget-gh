@@ -6,8 +6,8 @@
 <title>INSPT Document Upload</title>
 <!-- PDF.js for client-side PDF text extraction -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<!-- Zoho Creator Widget SDK -->
-<script src="https://js.zohostatic.com/creator/widgets/version/1/widget-sdk.js"></script>
+<!-- Zoho Creator Widget SDK v2 -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -20,7 +20,7 @@ body {
   line-height: 1.4;
 }
 
-/* ── Upload Zone ── */
+/* ââ Upload Zone ââ */
 .upload-zone {
   border: 2px dashed #d1d5db;
   border-radius: 10px;
@@ -41,7 +41,7 @@ body {
 .upload-sub { font-size: 11px; color: #6b7280; }
 input[type="file"] { display: none; }
 
-/* ── Doc Status Chips ── */
+/* ââ Doc Status Chips ââ */
 .doc-chips {
   display: flex;
   gap: 7px;
@@ -64,7 +64,7 @@ input[type="file"] { display: none; }
 .doc-chip.detected  { background: #f0fdf4; border-color: #86efac; color: #166534; }
 .doc-chip.missing   { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
 
-/* ── Processing ── */
+/* ââ Processing ââ */
 .processing {
   text-align: center;
   padding: 24px 12px;
@@ -81,7 +81,7 @@ input[type="file"] { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .proc-msg { font-size: 12px; }
 
-/* ── Alerts ── */
+/* ââ Alerts ââ */
 .alert {
   padding: 9px 12px;
   border-radius: 7px;
@@ -93,7 +93,7 @@ input[type="file"] { display: none; }
 .alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
 .alert-ok    { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
 
-/* ── Preview Table ── */
+/* ââ Preview Table ââ */
 .preview { margin-top: 14px; }
 
 .section-header {
@@ -150,7 +150,7 @@ input[type="file"] { display: none; }
 .badge-auto   { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
 .badge-manual { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
 
-/* ── Manual note ── */
+/* ââ Manual note ââ */
 .manual-note {
   margin-top: 10px;
   font-size: 11px;
@@ -162,7 +162,7 @@ input[type="file"] { display: none; }
   line-height: 1.5;
 }
 
-/* ── Buttons ── */
+/* ââ Buttons ââ */
 .btn-row { display: flex; gap: 9px; margin-top: 14px; }
 .btn {
   flex: 1;
@@ -184,7 +184,7 @@ input[type="file"] { display: none; }
 }
 .btn-secondary:hover { background: #e5e7eb; }
 
-/* ── Success Banner ── */
+/* ââ Success Banner ââ */
 .success-banner {
   text-align: center;
   padding: 20px 14px;
@@ -202,53 +202,53 @@ input[type="file"] { display: none; }
 
 <div id="app">
 
-  <!-- ① Upload Section -->
+  <!-- â  Upload Section -->
   <div id="secUpload">
     <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
       <input type="file" id="fileInput" accept=".pdf" multiple>
-      <div class="upload-icon">📄</div>
+      <div class="upload-icon">ð</div>
       <div class="upload-title">Upload Policy Documents</div>
-      <div class="upload-sub">Click or drag & drop · Select all 3 PDFs at once</div>
-      <div class="upload-sub" style="margin-top:3px">Tax Invoice (DN) &nbsp;·&nbsp; Credit Note (CN) &nbsp;·&nbsp; Policy Schedule</div>
+      <div class="upload-sub">Click or drag & drop Â· Select all 3 PDFs at once</div>
+      <div class="upload-sub" style="margin-top:3px">Tax Invoice (DN) &nbsp;Â·&nbsp; Credit Note (CN) &nbsp;Â·&nbsp; Policy Schedule</div>
     </div>
     <div class="doc-chips">
-      <div class="doc-chip" id="chip-DN">📋 Tax Invoice (DN)</div>
-      <div class="doc-chip" id="chip-CN">📋 Credit Note (CN)</div>
-      <div class="doc-chip" id="chip-POLICY">📋 Policy Schedule</div>
+      <div class="doc-chip" id="chip-DN">ð Tax Invoice (DN)</div>
+      <div class="doc-chip" id="chip-CN">ð Credit Note (CN)</div>
+      <div class="doc-chip" id="chip-POLICY">ð Policy Schedule</div>
     </div>
   </div>
 
-  <!-- ② Processing Section -->
+  <!-- â¡ Processing Section -->
   <div id="secProcessing" style="display:none">
     <div class="processing">
       <div class="spinner"></div>
-      <div class="proc-msg" id="procMsg">Processing documents…</div>
+      <div class="proc-msg" id="procMsg">Processing documentsâ¦</div>
     </div>
   </div>
 
-  <!-- ③ Error Section -->
+  <!-- â¢ Error Section -->
   <div id="secError" style="display:none"></div>
 
-  <!-- ④ Preview Section -->
+  <!-- â£ Preview Section -->
   <div id="secPreview" style="display:none">
     <div class="preview">
       <div id="previewAlerts"></div>
       <div id="previewContent"></div>
       <div class="manual-note">
-        ⚠️ Fields marked <strong>Manual</strong> are dropdown/lookup fields and cannot be set automatically.
+        â ï¸ Fields marked <strong>Manual</strong> are dropdown/lookup fields and cannot be set automatically.
         Check the suggested values above and select them in the form.
       </div>
     </div>
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="doReset()">🔄 Re-upload</button>
-      <button class="btn btn-primary" id="applyBtn" onclick="applyToForm()">✅ Apply to Form</button>
+      <button class="btn btn-secondary" onclick="doReset()">ð Re-upload</button>
+      <button class="btn btn-primary" id="applyBtn" onclick="applyToForm()">â Apply to Form</button>
     </div>
   </div>
 
-  <!-- ⑤ Success Section -->
+  <!-- â¤ Success Section -->
   <div id="secSuccess" style="display:none">
     <div class="success-banner">
-      <div class="success-icon">✅</div>
+      <div class="success-icon">â</div>
       <div class="success-title">Fields Applied Successfully</div>
       <div class="success-sub">Please complete the dropdown fields manually, then save the policy.</div>
     </div>
@@ -262,33 +262,29 @@ input[type="file"] { display: none; }
 <script>
 'use strict';
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PDF.js Worker
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const pdfjsLib = window['pdfjs-dist/build/pdf'];
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// ══════════════════════════════════════════════════════════════
-// Zoho Creator Widget Init
-// ══════════════════════════════════════════════════════════════
-let zohoReady = false;
-try {
-  ZOHO.CREATOR.init()
-    .then(() => { zohoReady = true; })
-    .catch(e => console.warn('[Widget] Zoho init failed (dev mode?):', e));
-} catch (e) {
-  console.warn('[Widget] Running outside Zoho Creator:', e);
-}
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Zoho Creator Widget SDK v2 â no init() required
+// APP / OWNER constants used for addRecord
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+const ZC_APP   = 'inspt-policy-accounting-system';
+const ZC_OWNER = 'mohammadhamza383';
+const ZC_FORM  = 'Policy_Entry';
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // State
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 let state = {};
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Drag & Drop + File Input
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const uploadZone = document.getElementById('uploadZone');
 const fileInput  = document.getElementById('fileInput');
 
@@ -304,9 +300,9 @@ uploadZone.addEventListener('drop', e => {
 });
 fileInput.addEventListener('change', e => processFiles(e.target.files));
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PDF Text Extraction
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function extractText(file) {
   const buf  = await file.arrayBuffer();
   const pdf  = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -326,21 +322,21 @@ async function extractText(file) {
   return full;
 }
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Document Detection
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function detectType(text) {
   if (/TAX CREDIT NOTE/i.test(text))                                      return 'CN';
   if (/TAX INVOICE/i.test(text) && /DEBITED/i.test(text))                 return 'DN';
   if (/Motor Takaful Policy Schedule/i.test(text)
     || /Policy Takaful Motor/i.test(text)
-    || /جدول وثيقة/.test(text)) return 'POLICY';
+    || /Ø¬Ø¯ÙÙ ÙØ«ÙÙØ©/.test(text)) return 'POLICY';
   return 'UNKNOWN';
 }
 
-// ══════════════════════════════════════════════════════════════
-// Field Extraction — DN (Tax Invoice / Debit Note)
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Field Extraction â DN (Tax Invoice / Debit Note)
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Based on actual AL MADINA DN text structure:
 //   "Customer No : 101903 - 101903 D.N. No : DNG1-44310"
 //   "Insured : HORIZON LINE CONSTRUCTION SPC Invoice Date : 01/04/2026"
@@ -382,9 +378,9 @@ function parseDN(text) {
   return d;
 }
 
-// ══════════════════════════════════════════════════════════════
-// Field Extraction — CN (Tax Credit Note)
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Field Extraction â CN (Tax Credit Note)
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Based on actual AL MADINA CN text:
 //   "Being 12.5% Agent commission for P/004/01/26/2514/000355 5.000"
 //   "Being VAT On Commission at 5 % for Policy No. P/004/01/26/2514/000355. 0.250"
@@ -409,9 +405,9 @@ function parseCN(text) {
   return d;
 }
 
-// ══════════════════════════════════════════════════════════════
-// Field Extraction — POLICY (Motor Takaful Policy Schedule)
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Field Extraction â POLICY (Motor Takaful Policy Schedule)
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Based on actual AL MADINA Policy Schedule text (bilingual):
 //   "Policy Number P/004/01/26/2514/000355 ..."
 //   "Mobile 77384787 ..."
@@ -425,15 +421,15 @@ function parsePOLICY(text) {
   const m1 = text.match(/Policy Number\s+(P\/[\d\/]+)/);
   if (m1) d.policyNo = m1[1];
 
-  // Mobile (6–10 digits after "Mobile")
+  // Mobile (6â10 digits after "Mobile")
   const m2 = text.match(/\bMobile\s+(\d{6,10})\b/);
   if (m2) d.mobile = m2[1];
 
-  // Registration No (ASCII only — stops at Arabic chars naturally)
+  // Registration No (ASCII only â stops at Arabic chars naturally)
   const m3 = text.match(/Registration No\s+([A-Za-z0-9\/]+)/);
   if (m3) d.registrationNo = m3[1];
 
-  // Make — UPPERCASE words after "Make", stop at first non-ASCII char
+  // Make â UPPERCASE words after "Make", stop at first non-ASCII char
   const m4 = text.match(/\bMake\s+([A-Z][A-Z0-9 ]{1,40}?)(?=\s+[^\x00-\x7F]|\n|Engine|Chassis)/);
   if (m4) d.make = m4[1].trim();
 
@@ -448,10 +444,10 @@ function parsePOLICY(text) {
   return d;
 }
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Date Format Conversion
-// dd/MM/yyyy → dd-MMM-yyyy (Zoho Creator format)
-// ══════════════════════════════════════════════════════════════
+// dd/MM/yyyy â dd-MMM-yyyy (Zoho Creator format)
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function fmtDate(ddmmyyyy) {
   if (!ddmmyyyy) return '';
   const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -462,12 +458,12 @@ function fmtDate(ddmmyyyy) {
   return `${p[0].padStart(2,'0')}-${M[idx]}-${p[2]}`;
 }
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Insurance Type Mapping
 // Maps raw text from policy/DN to INSPT system Insurance_Types display value
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function mapInsurType(policyType, riskCover) {
-  // Prefer POLICY document's "Type of Insurance" — it's authoritative
+  // Prefer POLICY document's "Type of Insurance" â it's authoritative
   const src = (policyType || riskCover || '').toLowerCase();
   if (!src) return '';
   if (src.includes('third party') && !src.includes('comprehensive')) return 'Motor Third Party';
@@ -486,9 +482,9 @@ function mapInsurType(policyType, riskCover) {
   return policyType || riskCover;
 }
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Main: Process Uploaded Files
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function processFiles(fileList) {
   const files = Array.from(fileList);
   if (!files.length) return;
@@ -501,12 +497,12 @@ async function processFiles(fileList) {
 
   try {
     for (const file of files) {
-      setMsg(`Reading: ${file.name}…`);
+      setMsg(`Reading: ${file.name}â¦`);
       const text = await extractText(file);
       const type = detectType(text);
 
       if (type === 'UNKNOWN') {
-        errs.push(`"${file.name}" — could not be identified as DN, CN or Policy Schedule.`);
+        errs.push(`"${file.name}" â could not be identified as DN, CN or Policy Schedule.`);
       } else if (docs[type]) {
         errs.push(`Two files detected as <strong>${type}</strong>. Please check your selection.`);
       } else {
@@ -527,7 +523,7 @@ async function processFiles(fileList) {
         'missing'
       ));
       showError(
-        `<div class="alert alert-error">❌ Missing: <strong>${missing.join(', ')}</strong>.<br>
+        `<div class="alert alert-error">â Missing: <strong>${missing.join(', ')}</strong>.<br>
          Make sure you select all 3 correct PDF files.
          ${errs.length ? '<br><br>' + errs.join('<br>') : ''}</div>`,
         true
@@ -535,7 +531,7 @@ async function processFiles(fileList) {
       return;
     }
 
-    setMsg('Extracting fields…');
+    setMsg('Extracting fieldsâ¦');
     const dn     = parseDN(docs.DN);
     const cn     = parseCN(docs.CN);
     const policy = parsePOLICY(docs.POLICY);
@@ -547,7 +543,7 @@ async function processFiles(fileList) {
 
     // Build canonical state object (field link names as keys for auto-fill fields)
     state = {
-      // ── Auto-fill fields (text / number / date) ──
+      // ââ Auto-fill fields (text / number / date) ââ
       Insured_Name:           dn.insuredName || '',
       Invoice_Date:           fmtDate(dn.invoiceDate),
       Insurer_Invoice_Number: dn.dnNo || '',
@@ -561,7 +557,7 @@ async function processFiles(fileList) {
       Chassis_Number:         policy.chassisNo || '',
       Registration_Number:    policy.registrationNo || '',
 
-      // ── Manual / display only ──
+      // ââ Manual / display only ââ
       _insurTypeSuggestion:   insurTypeSuggestion,
       _insurTypeRaw:          policy.typeOfInsurance || dn.riskCover || '',
       _vehicleMakeRaw:        policy.make || '',
@@ -578,29 +574,29 @@ async function processFiles(fileList) {
   } catch (err) {
     console.error('[Widget] Processing error:', err);
     showError(
-      `<div class="alert alert-error">❌ Error reading PDFs: ${err.message || err}</div>`,
+      `<div class="alert alert-error">â Error reading PDFs: ${err.message || err}</div>`,
       true
     );
   }
 }
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Build & Show Preview
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function showPreview() {
   const s = state;
   let alerts = '';
 
   if (s._policyNoMismatch) {
-    alerts += `<div class="alert alert-warn">⚠️ Policy Number differs between the Invoice and Policy Schedule — please verify before submitting.</div>`;
+    alerts += `<div class="alert alert-warn">â ï¸ Policy Number differs between the Invoice and Policy Schedule â please verify before submitting.</div>`;
   }
   if (s._emptyFields.length) {
-    alerts += `<div class="alert alert-warn">⚠️ Could not extract: <strong>${s._emptyFields.join(', ')}</strong>. Fill these manually.</div>`;
+    alerts += `<div class="alert alert-warn">â ï¸ Could not extract: <strong>${s._emptyFields.join(', ')}</strong>. Fill these manually.</div>`;
   }
 
   // Section definitions: [heading, [[label, value, isAuto, hint?], ...]]
   const sections = [
-    ['📄 Tax Invoice (DN) — Auto-filled', [
+    ['ð Tax Invoice (DN) â Auto-filled', [
       ['Insured Name',          s.Insured_Name,           true],
       ['Invoice Date',          s.Invoice_Date,           true],
       ['Invoice No. (D.N. No)', s.Insurer_Invoice_Number, true],
@@ -609,11 +605,11 @@ function showPreview() {
       ['Period To',             s.Period_To,              true],
       ['Premium (Total)',       s.Premium,                true],
     ]],
-    ['📄 Credit Note (CN) — Auto-filled', [
+    ['ð Credit Note (CN) â Auto-filled', [
       ['Commission',            s.Commission,             true],
       ['VAT on Commission',     s.VAT,                    true],
     ]],
-    ['📄 Policy Schedule — Partial', [
+    ['ð Policy Schedule â Partial', [
       ['Contact Number',        s.Contact_Number,         true],
       ['Chassis Number',        s.Chassis_Number,         true],
       ['Registration No.',      s.Registration_Number,    true],
@@ -631,10 +627,10 @@ function showPreview() {
         <div class="field-row">
           <div class="fn">${label}</div>
           <div class="fv ${empty ? 'empty' : ''}">
-            ${empty ? '—' : escHtml(value)}
+            ${empty ? 'â' : escHtml(value)}
             ${hint ? `<span class="hint">${escHtml(hint)}</span>` : ''}
           </div>
-          <div class="badge ${isAuto ? 'badge-auto' : 'badge-manual'}">${isAuto ? '✅ Auto' : '⚠️ Manual'}</div>
+          <div class="badge ${isAuto ? 'badge-auto' : 'badge-manual'}">${isAuto ? 'â Auto' : 'â ï¸ Manual'}</div>
         </div>`;
     }
   }
@@ -644,16 +640,19 @@ function showPreview() {
   showSection('secPreview');
 }
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Apply Fields to Zoho Creator Form
-// ══════════════════════════════════════════════════════════════
+// Uses ZOHO.CREATOR.DATA.addRecord (SDK v2) to create the record
+// with all extracted fields, then navigates to the edit view so
+// the employee can review, fill remaining dropdowns, and save.
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function applyToForm() {
   const btn = document.getElementById('applyBtn');
-  btn.disabled  = true;
-  btn.textContent = 'Applying…';
+  btn.disabled    = true;
+  btn.textContent = 'Creating recordâ¦';
 
-  // Only auto-fill fields with actual values
-  const toSet = {
+  // Build data object â only include fields that have a value
+  const raw = {
     Insured_Name:           state.Insured_Name,
     Invoice_Date:           state.Invoice_Date,
     Insurer_Invoice_Number: state.Insurer_Invoice_Number,
@@ -668,36 +667,49 @@ async function applyToForm() {
     Registration_Number:    state.Registration_Number,
   };
 
-  if (!zohoReady) {
-    // Dev / preview mode — log to console
-    console.log('[Widget] DEV MODE — would set these fields:', toSet);
-    showSection('secSuccess');
-    return;
+  const data = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (v) data[k] = v;
   }
 
-  const failed = [];
-  for (const [fieldLinkName, value] of Object.entries(toSet)) {
-    if (!value) continue;
-    try {
-      await ZOHO.CREATOR.WIDGET.setFieldValue({ fieldLinkName, value });
-    } catch (e) {
-      failed.push(fieldLinkName);
-      console.error(`[Widget] setFieldValue failed for ${fieldLinkName}:`, e);
+  console.log('[Widget] Creating record with data:', data);
+
+  try {
+    const resp = await ZOHO.CREATOR.DATA.addRecord({
+      appLinkName:  ZC_APP,
+      formLinkName: ZC_FORM,
+      data:         { data }
+    });
+
+    console.log('[Widget] addRecord response:', resp);
+
+    if (resp && resp.code === 3000) {
+      const recordId = resp.data && resp.data.ID;
+      if (recordId) {
+        // Navigate parent to the record's edit view
+        const editUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/record-edit/${ZC_FORM}/${recordId}`;
+        console.log('[Widget] Navigating to edit view:', editUrl);
+        await ZOHO.CREATOR.WIDGET.navigateParentURL({ url: editUrl });
+      } else {
+        showSection('secSuccess');
+      }
+    } else {
+      const msg = (resp && resp.message) ? resp.message : JSON.stringify(resp);
+      showError(`<div class="alert alert-error">â Could not create record: ${escHtml(msg)}</div>`, true);
+      btn.disabled    = false;
+      btn.textContent = 'â Apply to Form';
     }
+  } catch (e) {
+    console.error('[Widget] addRecord error:', e);
+    showError(`<div class="alert alert-error">â Error: ${escHtml(String(e.message || e))}</div>`, true);
+    btn.disabled    = false;
+    btn.textContent = 'â Apply to Form';
   }
-
-  if (failed.length) {
-    document.getElementById('previewAlerts').insertAdjacentHTML('afterbegin',
-      `<div class="alert alert-warn">⚠️ Could not auto-set: ${failed.join(', ')}. Fill these manually.</div>`
-    );
-  }
-
-  showSection('secSuccess');
 }
 
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // UI Helpers
-// ══════════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function showSection(id) {
   ['secUpload','secProcessing','secError','secPreview','secSuccess'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
@@ -713,14 +725,14 @@ function showError(html, showRetry) {
   const sec = document.getElementById('secError');
   sec.innerHTML = html +
     (showRetry ? `<div class="btn-row" style="margin-top:12px">
-      <button class="btn btn-secondary" onclick="doReset()">🔄 Try Again</button></div>` : '');
+      <button class="btn btn-secondary" onclick="doReset()">ð Try Again</button></div>` : '');
   showSection('secError');
 }
 
 const CHIP_LABELS = {
-  DN:     '📋 Tax Invoice (DN)',
-  CN:     '📋 Credit Note (CN)',
-  POLICY: '📋 Policy Schedule',
+  DN:     'ð Tax Invoice (DN)',
+  CN:     'ð Credit Note (CN)',
+  POLICY: 'ð Policy Schedule',
 };
 function resetChips() {
   ['DN','CN','POLICY'].forEach(t => {
@@ -734,7 +746,7 @@ function markChip(type, cls) {
   const el = document.getElementById(`chip-${type}`);
   if (!el) return;
   el.className = `doc-chip ${cls}`;
-  const icons = { detected: '✅', missing: '❌' };
+  const icons = { detected: 'â', missing: 'â' };
   el.textContent = `${icons[cls] || ''} ${CHIP_LABELS[type]}`;
 }
 
