@@ -6,8 +6,8 @@
 <title>INSPT Document Upload</title>
 <!-- PDF.js for client-side PDF text extraction -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<!-- Zoho Creator Widget SDK v2 -->
-<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<!-- Zoho Creator Widget SDK v2 (official CDN) -->
+<script src="https://js.zohostatic.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -20,7 +20,7 @@ body {
   line-height: 1.4;
 }
 
-/* ââ Upload Zone ââ */
+/* Upload Zone */
 .upload-zone {
   border: 2px dashed #d1d5db;
   border-radius: 10px;
@@ -41,7 +41,7 @@ body {
 .upload-sub { font-size: 11px; color: #6b7280; }
 input[type="file"] { display: none; }
 
-/* ââ Doc Status Chips ââ */
+/* Doc Status Chips */
 .doc-chips {
   display: flex;
   gap: 7px;
@@ -64,7 +64,7 @@ input[type="file"] { display: none; }
 .doc-chip.detected  { background: #f0fdf4; border-color: #86efac; color: #166534; }
 .doc-chip.missing   { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
 
-/* ââ Processing ââ */
+/* Processing */
 .processing {
   text-align: center;
   padding: 24px 12px;
@@ -81,7 +81,7 @@ input[type="file"] { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .proc-msg { font-size: 12px; }
 
-/* ââ Alerts ââ */
+/* Alerts */
 .alert {
   padding: 9px 12px;
   border-radius: 7px;
@@ -93,7 +93,7 @@ input[type="file"] { display: none; }
 .alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
 .alert-ok    { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
 
-/* ââ Preview Table ââ */
+/* Preview Table */
 .preview { margin-top: 14px; }
 
 .section-header {
@@ -150,7 +150,7 @@ input[type="file"] { display: none; }
 .badge-auto   { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
 .badge-manual { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
 
-/* ââ Manual note ââ */
+/* Manual note */
 .manual-note {
   margin-top: 10px;
   font-size: 11px;
@@ -162,7 +162,7 @@ input[type="file"] { display: none; }
   line-height: 1.5;
 }
 
-/* ââ Buttons ââ */
+/* Buttons */
 .btn-row { display: flex; gap: 9px; margin-top: 14px; }
 .btn {
   flex: 1;
@@ -184,7 +184,7 @@ input[type="file"] { display: none; }
 }
 .btn-secondary:hover { background: #e5e7eb; }
 
-/* ââ Success Banner ââ */
+/* Success Banner */
 .success-banner {
   text-align: center;
   padding: 20px 14px;
@@ -202,53 +202,53 @@ input[type="file"] { display: none; }
 
 <div id="app">
 
-  <!-- â  Upload Section -->
+  <!-- Upload Section -->
   <div id="secUpload">
     <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
       <input type="file" id="fileInput" accept=".pdf" multiple>
-      <div class="upload-icon">ð</div>
+      <div class="upload-icon">&#128193;</div>
       <div class="upload-title">Upload Policy Documents</div>
-      <div class="upload-sub">Click or drag & drop Â· Select all 3 PDFs at once</div>
-      <div class="upload-sub" style="margin-top:3px">Tax Invoice (DN) &nbsp;Â·&nbsp; Credit Note (CN) &nbsp;Â·&nbsp; Policy Schedule</div>
+      <div class="upload-sub">Click or drag &amp; drop &middot; Select all 3 PDFs at once</div>
+      <div class="upload-sub" style="margin-top:3px">Tax Invoice (DN) &nbsp;&middot;&nbsp; Credit Note (CN) &nbsp;&middot;&nbsp; Policy Schedule</div>
     </div>
     <div class="doc-chips">
-      <div class="doc-chip" id="chip-DN">ð Tax Invoice (DN)</div>
-      <div class="doc-chip" id="chip-CN">ð Credit Note (CN)</div>
-      <div class="doc-chip" id="chip-POLICY">ð Policy Schedule</div>
+      <div class="doc-chip" id="chip-DN">&#128196; Tax Invoice (DN)</div>
+      <div class="doc-chip" id="chip-CN">&#128196; Credit Note (CN)</div>
+      <div class="doc-chip" id="chip-POLICY">&#128196; Policy Schedule</div>
     </div>
   </div>
 
-  <!-- â¡ Processing Section -->
+  <!-- Processing Section -->
   <div id="secProcessing" style="display:none">
     <div class="processing">
       <div class="spinner"></div>
-      <div class="proc-msg" id="procMsg">Processing documentsâ¦</div>
+      <div class="proc-msg" id="procMsg">Processing documents&hellip;</div>
     </div>
   </div>
 
-  <!-- â¢ Error Section -->
+  <!-- Error Section -->
   <div id="secError" style="display:none"></div>
 
-  <!-- â£ Preview Section -->
+  <!-- Preview Section -->
   <div id="secPreview" style="display:none">
     <div class="preview">
       <div id="previewAlerts"></div>
       <div id="previewContent"></div>
       <div class="manual-note">
-        â ï¸ Fields marked <strong>Manual</strong> are dropdown/lookup fields and cannot be set automatically.
+        &#9888;&#65039; Fields marked <strong>Manual</strong> are dropdown/lookup fields and cannot be set automatically.
         Check the suggested values above and select them in the form.
       </div>
     </div>
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="doReset()">ð Re-upload</button>
-      <button class="btn btn-primary" id="applyBtn" onclick="applyToForm()">â Apply to Form</button>
+      <button class="btn btn-secondary" onclick="doReset()">&#128260; Re-upload</button>
+      <button class="btn btn-primary" id="applyBtn" onclick="applyToForm()">&#10003; Apply to Form</button>
     </div>
   </div>
 
-  <!-- â¤ Success Section -->
+  <!-- Success Section -->
   <div id="secSuccess" style="display:none">
     <div class="success-banner">
-      <div class="success-icon">â</div>
+      <div class="success-icon">&#10003;</div>
       <div class="success-title">Fields Applied Successfully</div>
       <div class="success-sub">Please complete the dropdown fields manually, then save the policy.</div>
     </div>
@@ -262,29 +262,20 @@ input[type="file"] { display: none; }
 <script>
 'use strict';
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PDF.js Worker
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const pdfjsLib = window['pdfjs-dist/build/pdf'];
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Zoho Creator Widget SDK v2 â no init() required
-// APP / OWNER constants used for addRecord
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Zoho Creator constants
+// SDK v2: ZOHO.CREATOR.API.addRecord is the correct method
 const ZC_APP   = 'inspt-policy-accounting-system';
 const ZC_OWNER = 'mohammadhamza383';
 const ZC_FORM  = 'Policy_Entry';
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// State
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 let state = {};
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Drag & Drop + File Input
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const uploadZone = document.getElementById('uploadZone');
 const fileInput  = document.getElementById('fileInput');
 
@@ -300,9 +291,7 @@ uploadZone.addEventListener('drop', e => {
 });
 fileInput.addEventListener('change', e => processFiles(e.target.files));
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PDF Text Extraction
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function extractText(file) {
   const buf  = await file.arrayBuffer();
   const pdf  = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -322,132 +311,71 @@ async function extractText(file) {
   return full;
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Document Detection
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function detectType(text) {
-  if (/TAX CREDIT NOTE/i.test(text))                                      return 'CN';
-  if (/TAX INVOICE/i.test(text) && /DEBITED/i.test(text))                 return 'DN';
+  if (/TAX CREDIT NOTE/i.test(text))                          return 'CN';
+  if (/TAX INVOICE/i.test(text) && /DEBITED/i.test(text))    return 'DN';
   if (/Motor Takaful Policy Schedule/i.test(text)
-    || /Policy Takaful Motor/i.test(text)
-    || /Ø¬Ø¯ÙÙ ÙØ«ÙÙØ©/.test(text)) return 'POLICY';
+    || /Policy Takaful Motor/i.test(text))                    return 'POLICY';
   return 'UNKNOWN';
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Field Extraction â DN (Tax Invoice / Debit Note)
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Based on actual AL MADINA DN text structure:
-//   "Customer No : 101903 - 101903 D.N. No : DNG1-44310"
-//   "Insured : HORIZON LINE CONSTRUCTION SPC Invoice Date : 01/04/2026"
-//   "Policy No. P/004/01/26/2514/000355"
-//   "Supply Dt / Period of Insurance From : 01/04/2026 To 31/03/2027"
-//   "Risk Cover : Comp Ins + TP+ Lib at Site"
-//   "T O T A L : 47.800"
+// Field Extraction - DN (Tax Invoice / Debit Note)
 function parseDN(text) {
   const d = {};
-
-  // D.N. No
   const m1 = text.match(/D\.N\.\s*No\s*:\s*(\S+)/);
   if (m1) d.dnNo = m1[1].replace(/[,.]$/, '');
-
-  // Invoice Date
   const m2 = text.match(/Invoice Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
   if (m2) d.invoiceDate = m2[1];
-
-  // Insured Name (stop before "Invoice Date" or 3+ spaces)
   const m3 = text.match(/Insured\s*:\s*(.+?)(?=\s{3,}|\s+Invoice Date|\n)/);
   if (m3) d.insuredName = m3[1].trim();
-
-  // Policy Number (first "Policy No." in the description lines)
   const m4 = text.match(/Policy No\.\s+(P\/[\d\/]+)/);
   if (m4) d.policyNo = m4[1];
-
-  // Period From & To
   const m5 = text.match(/Period of Insurance From\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})\s+To\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
   if (m5) { d.periodFrom = m5[1]; d.periodTo = m5[2]; }
-
-  // Risk Cover (up to newline or the spaced T-O-T-A-L)
   const m6 = text.match(/Risk Cover\s*:\s*(.+?)(?=\n|T\s*O\s*T\s*A\s*L)/);
   if (m6) d.riskCover = m6[1].trim();
-
-  // TOTAL (spaced letters: "T O T A L : 47.800")
   const m7 = text.match(/T\s*O\s*T\s*A\s*L\s*:\s*([\d.]+)/);
   if (m7) d.total = m7[1];
-
   return d;
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Field Extraction â CN (Tax Credit Note)
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Based on actual AL MADINA CN text:
-//   "Being 12.5% Agent commission for P/004/01/26/2514/000355 5.000"
-//   "Being VAT On Commission at 5 % for Policy No. P/004/01/26/2514/000355. 0.250"
+// Field Extraction - CN (Tax Credit Note)
 function parseCN(text) {
   const d = {};
-
-  // Find line with "commission for" (excluding the VAT line)
   const lines = text.split('\n');
   const commLine = lines.find(l => /commission for/i.test(l) && !/VAT/i.test(l));
   if (commLine) {
     const nums = commLine.match(/[\d]+\.[\d]+/g);
-    if (nums) d.commission = nums[nums.length - 1]; // last decimal on the line
+    if (nums) d.commission = nums[nums.length - 1];
   }
-
-  // Find line with "VAT On Commission"
   const vatLine = lines.find(l => /VAT On Commission/i.test(l));
   if (vatLine) {
     const nums = vatLine.match(/[\d]+\.[\d]+/g);
-    if (nums) d.vat = nums[nums.length - 1]; // last decimal on the line
+    if (nums) d.vat = nums[nums.length - 1];
   }
-
   return d;
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Field Extraction â POLICY (Motor Takaful Policy Schedule)
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Based on actual AL MADINA Policy Schedule text (bilingual):
-//   "Policy Number P/004/01/26/2514/000355 ..."
-//   "Mobile 77384787 ..."
-//   "Registration No TBA/0 ... Make ZOOMLION EXCAVATOR ..."
-//   "Chassis Number ZLHZW151VS0C01246 ..."
-//   "Type of Insurance Third Party liability / Natural Disaster ..."
+// Field Extraction - POLICY (Motor Takaful Policy Schedule)
 function parsePOLICY(text) {
   const d = {};
-
-  // Policy Number
   const m1 = text.match(/Policy Number\s+(P\/[\d\/]+)/);
   if (m1) d.policyNo = m1[1];
-
-  // Mobile (6â10 digits after "Mobile")
   const m2 = text.match(/\bMobile\s+(\d{6,10})\b/);
   if (m2) d.mobile = m2[1];
-
-  // Registration No (ASCII only â stops at Arabic chars naturally)
   const m3 = text.match(/Registration No\s+([A-Za-z0-9\/]+)/);
   if (m3) d.registrationNo = m3[1];
-
-  // Make â UPPERCASE words after "Make", stop at first non-ASCII char
   const m4 = text.match(/\bMake\s+([A-Z][A-Z0-9 ]{1,40}?)(?=\s+[^\x00-\x7F]|\n|Engine|Chassis)/);
   if (m4) d.make = m4[1].trim();
-
-  // Chassis Number
   const m5 = text.match(/Chassis Number\s+([A-Z0-9]+)/);
   if (m5) d.chassisNo = m5[1];
-
-  // Type of Insurance (stops at Arabic chars)
   const m6 = text.match(/Type of Insurance\s+(.+?)(?=\s+[^\x00-\x7F]|\n|Geographical)/);
   if (m6) d.typeOfInsurance = m6[1].trim();
-
   return d;
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Date Format Conversion
-// dd/MM/yyyy â dd-MMM-yyyy (Zoho Creator format)
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Date Format Conversion: dd/MM/yyyy -> dd-MMM-yyyy (Zoho Creator format)
 function fmtDate(ddmmyyyy) {
   if (!ddmmyyyy) return '';
   const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -458,12 +386,8 @@ function fmtDate(ddmmyyyy) {
   return `${p[0].padStart(2,'0')}-${M[idx]}-${p[2]}`;
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Insurance Type Mapping
-// Maps raw text from policy/DN to INSPT system Insurance_Types display value
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function mapInsurType(policyType, riskCover) {
-  // Prefer POLICY document's "Type of Insurance" â it's authoritative
   const src = (policyType || riskCover || '').toLowerCase();
   if (!src) return '';
   if (src.includes('third party') && !src.includes('comprehensive')) return 'Motor Third Party';
@@ -482,9 +406,7 @@ function mapInsurType(policyType, riskCover) {
   return policyType || riskCover;
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Main: Process Uploaded Files
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function processFiles(fileList) {
   const files = Array.from(fileList);
   if (!files.length) return;
@@ -497,53 +419,43 @@ async function processFiles(fileList) {
 
   try {
     for (const file of files) {
-      setMsg(`Reading: ${file.name}â¦`);
+      setMsg('Reading: ' + file.name + '...');
       const text = await extractText(file);
       const type = detectType(text);
 
       if (type === 'UNKNOWN') {
-        errs.push(`"${file.name}" â could not be identified as DN, CN or Policy Schedule.`);
+        errs.push('"' + file.name + '" could not be identified as DN, CN or Policy Schedule.');
       } else if (docs[type]) {
-        errs.push(`Two files detected as <strong>${type}</strong>. Please check your selection.`);
+        errs.push('Two files detected as <strong>' + type + '</strong>. Please check your selection.');
       } else {
         docs[type] = text;
         markChip(type, 'detected');
       }
     }
 
-    // Check all 3 present
-    const missing = Object.entries(docs)
-      .filter(([, v]) => !v)
-      .map(([k]) => ({ DN: 'Tax Invoice (DN)', CN: 'Credit Note (CN)', POLICY: 'Policy Schedule' }[k]));
+    const LABELS = { DN: 'Tax Invoice (DN)', CN: 'Credit Note (CN)', POLICY: 'Policy Schedule' };
+    const missing = Object.entries(docs).filter(([, v]) => !v).map(([k]) => LABELS[k]);
 
     if (missing.length) {
-      missing.forEach(m => markChip(
-        Object.keys({DN:'Tax Invoice (DN)',CN:'Credit Note (CN)',POLICY:'Policy Schedule'})
-          .find(k => ({DN:'Tax Invoice (DN)',CN:'Credit Note (CN)',POLICY:'Policy Schedule'}[k]) === m),
-        'missing'
-      ));
+      ['DN','CN','POLICY'].forEach(k => { if (!docs[k]) markChip(k, 'missing'); });
       showError(
-        `<div class="alert alert-error">â Missing: <strong>${missing.join(', ')}</strong>.<br>
-         Make sure you select all 3 correct PDF files.
-         ${errs.length ? '<br><br>' + errs.join('<br>') : ''}</div>`,
+        '<div class="alert alert-error">&#10060; Missing: <strong>' + missing.join(', ') + '</strong>.<br>' +
+        'Make sure you select all 3 correct PDF files.' +
+        (errs.length ? '<br><br>' + errs.join('<br>') : '') + '</div>',
         true
       );
       return;
     }
 
-    setMsg('Extracting fieldsâ¦');
+    setMsg('Extracting fields...');
     const dn     = parseDN(docs.DN);
     const cn     = parseCN(docs.CN);
     const policy = parsePOLICY(docs.POLICY);
 
-    // Cross-validate Policy Number
     const pNoMismatch = dn.policyNo && policy.policyNo && dn.policyNo !== policy.policyNo;
-
     const insurTypeSuggestion = mapInsurType(policy.typeOfInsurance, dn.riskCover);
 
-    // Build canonical state object (field link names as keys for auto-fill fields)
     state = {
-      // ââ Auto-fill fields (text / number / date) ââ
       Insured_Name:           dn.insuredName || '',
       Invoice_Date:           fmtDate(dn.invoiceDate),
       Insurer_Invoice_Number: dn.dnNo || '',
@@ -556,15 +468,12 @@ async function processFiles(fileList) {
       Contact_Number:         policy.mobile || '',
       Chassis_Number:         policy.chassisNo || '',
       Registration_Number:    policy.registrationNo || '',
-
-      // ââ Manual / display only ââ
       _insurTypeSuggestion:   insurTypeSuggestion,
       _insurTypeRaw:          policy.typeOfInsurance || dn.riskCover || '',
       _vehicleMakeRaw:        policy.make || '',
       _policyNoMismatch:      pNoMismatch,
     };
 
-    // Find empty critical fields
     const criticals = ['Insured_Name','Invoice_Date','Insurer_Invoice_Number','Policy_Number',
                        'Period_From','Period_To','Premium','Commission'];
     state._emptyFields = criticals.filter(f => !state[f]);
@@ -573,30 +482,24 @@ async function processFiles(fileList) {
 
   } catch (err) {
     console.error('[Widget] Processing error:', err);
-    showError(
-      `<div class="alert alert-error">â Error reading PDFs: ${err.message || err}</div>`,
-      true
-    );
+    showError('<div class="alert alert-error">&#10060; Error reading PDFs: ' + escHtml(err.message || String(err)) + '</div>', true);
   }
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Build & Show Preview
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function showPreview() {
   const s = state;
   let alerts = '';
 
   if (s._policyNoMismatch) {
-    alerts += `<div class="alert alert-warn">â ï¸ Policy Number differs between the Invoice and Policy Schedule â please verify before submitting.</div>`;
+    alerts += '<div class="alert alert-warn">&#9888;&#65039; Policy Number differs between Invoice and Policy Schedule &mdash; please verify.</div>';
   }
   if (s._emptyFields.length) {
-    alerts += `<div class="alert alert-warn">â ï¸ Could not extract: <strong>${s._emptyFields.join(', ')}</strong>. Fill these manually.</div>`;
+    alerts += '<div class="alert alert-warn">&#9888;&#65039; Could not extract: <strong>' + s._emptyFields.join(', ') + '</strong>. Fill these manually.</div>';
   }
 
-  // Section definitions: [heading, [[label, value, isAuto, hint?], ...]]
   const sections = [
-    ['ð Tax Invoice (DN) â Auto-filled', [
+    ['&#128196; Tax Invoice (DN) &mdash; Auto-filled', [
       ['Insured Name',          s.Insured_Name,           true],
       ['Invoice Date',          s.Invoice_Date,           true],
       ['Invoice No. (D.N. No)', s.Insurer_Invoice_Number, true],
@@ -605,33 +508,33 @@ function showPreview() {
       ['Period To',             s.Period_To,              true],
       ['Premium (Total)',       s.Premium,                true],
     ]],
-    ['ð Credit Note (CN) â Auto-filled', [
+    ['&#128196; Credit Note (CN) &mdash; Auto-filled', [
       ['Commission',            s.Commission,             true],
       ['VAT on Commission',     s.VAT,                    true],
     ]],
-    ['ð Policy Schedule â Partial', [
+    ['&#128196; Policy Schedule &mdash; Partial', [
       ['Contact Number',        s.Contact_Number,         true],
       ['Chassis Number',        s.Chassis_Number,         true],
       ['Registration No.',      s.Registration_Number,    true],
-      ['Insurance Type',        s._insurTypeSuggestion,   false, `Detected from: "${s._insurTypeRaw}"`],
+      ['Insurance Type',        s._insurTypeSuggestion,   false, 'Detected from: "' + escHtml(s._insurTypeRaw) + '"'],
       ['Vehicle Brand (Make)',  s._vehicleMakeRaw,        false, 'Select closest match from Vehicle Brands dropdown'],
     ]],
   ];
 
   let html = '';
   for (const [heading, fields] of sections) {
-    html += `<div class="section-header">${heading}</div>`;
+    html += '<div class="section-header">' + heading + '</div>';
     for (const [label, value, isAuto, hint] of fields) {
       const empty = !value;
-      html += `
-        <div class="field-row">
-          <div class="fn">${label}</div>
-          <div class="fv ${empty ? 'empty' : ''}">
-            ${empty ? 'â' : escHtml(value)}
-            ${hint ? `<span class="hint">${escHtml(hint)}</span>` : ''}
-          </div>
-          <div class="badge ${isAuto ? 'badge-auto' : 'badge-manual'}">${isAuto ? 'â Auto' : 'â ï¸ Manual'}</div>
-        </div>`;
+      html += '<div class="field-row">' +
+        '<div class="fn">' + label + '</div>' +
+        '<div class="fv' + (empty ? ' empty' : '') + '">' +
+        (empty ? '&mdash;' : escHtml(value)) +
+        (hint ? '<span class="hint">' + escHtml(hint) + '</span>' : '') +
+        '</div>' +
+        '<div class="badge ' + (isAuto ? 'badge-auto' : 'badge-manual') + '">' +
+        (isAuto ? '&#10003; Auto' : '&#9888; Manual') +
+        '</div></div>';
     }
   }
 
@@ -640,18 +543,14 @@ function showPreview() {
   showSection('secPreview');
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Apply Fields to Zoho Creator Form
-// Uses ZOHO.CREATOR.DATA.addRecord (SDK v2) to create the record
-// with all extracted fields, then navigates to the edit view so
-// the employee can review, fill remaining dropdowns, and save.
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// FIX: Uses ZOHO.CREATOR.API.addRecord (correct SDK v2 namespace)
+// with appName / formName params (not appLinkName / formLinkName)
 async function applyToForm() {
   const btn = document.getElementById('applyBtn');
   btn.disabled    = true;
-  btn.textContent = 'Creating recordâ¦';
+  btn.textContent = 'Creating record...';
 
-  // Build data object â only include fields that have a value
   const raw = {
     Insured_Name:           state.Insured_Name,
     Invoice_Date:           state.Invoice_Date,
@@ -672,44 +571,42 @@ async function applyToForm() {
     if (v) data[k] = v;
   }
 
-  console.log('[Widget] Creating record with data:', data);
+  console.log('[Widget] Creating record with data:', JSON.stringify(data, null, 2));
+  console.log('[Widget] ZOHO.CREATOR namespaces:', Object.keys(ZOHO.CREATOR));
 
   try {
-    const resp = await ZOHO.CREATOR.DATA.addRecord({
-      appLinkName:  ZC_APP,
-      formLinkName: ZC_FORM,
-      data:         { data }
+    const resp = await ZOHO.CREATOR.API.addRecord({
+      appName:  ZC_APP,
+      formName: ZC_FORM,
+      data:     { data: data }
     });
 
-    console.log('[Widget] addRecord response:', resp);
+    console.log('[Widget] addRecord response:', JSON.stringify(resp));
 
     if (resp && resp.code === 3000) {
       const recordId = resp.data && resp.data.ID;
       if (recordId) {
-        // Navigate parent to the record's edit view
-        const editUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/record-edit/${ZC_FORM}/${recordId}`;
+        const editUrl = 'https://creatorapp.zoho.com/' + ZC_OWNER + '/' + ZC_APP + '/record-edit/' + ZC_FORM + '/' + recordId;
         console.log('[Widget] Navigating to edit view:', editUrl);
-        await ZOHO.CREATOR.WIDGET.navigateParentURL({ url: editUrl });
+        ZOHO.CREATOR.UTIL.navigateTo({ url: editUrl, window: 'parent' });
       } else {
         showSection('secSuccess');
       }
     } else {
       const msg = (resp && resp.message) ? resp.message : JSON.stringify(resp);
-      showError(`<div class="alert alert-error">â Could not create record: ${escHtml(msg)}</div>`, true);
+      showError('<div class="alert alert-error">&#10060; Could not create record: ' + escHtml(msg) + '</div>', true);
       btn.disabled    = false;
-      btn.textContent = 'â Apply to Form';
+      btn.textContent = '&#10003; Apply to Form';
     }
   } catch (e) {
     console.error('[Widget] addRecord error:', e);
-    showError(`<div class="alert alert-error">â Error: ${escHtml(String(e.message || e))}</div>`, true);
+    showError('<div class="alert alert-error">&#10060; Error: ' + escHtml(String(e.message || e)) + '</div>', true);
     btn.disabled    = false;
-    btn.textContent = 'â Apply to Form';
+    btn.textContent = '&#10003; Apply to Form';
   }
 }
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // UI Helpers
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function showSection(id) {
   ['secUpload','secProcessing','secError','secPreview','secSuccess'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
@@ -724,30 +621,31 @@ function setMsg(msg) {
 function showError(html, showRetry) {
   const sec = document.getElementById('secError');
   sec.innerHTML = html +
-    (showRetry ? `<div class="btn-row" style="margin-top:12px">
-      <button class="btn btn-secondary" onclick="doReset()">ð Try Again</button></div>` : '');
+    (showRetry
+      ? '<div class="btn-row" style="margin-top:12px"><button class="btn btn-secondary" onclick="doReset()">&#128260; Try Again</button></div>'
+      : '');
   showSection('secError');
 }
 
 const CHIP_LABELS = {
-  DN:     'ð Tax Invoice (DN)',
-  CN:     'ð Credit Note (CN)',
-  POLICY: 'ð Policy Schedule',
+  DN:     '&#128196; Tax Invoice (DN)',
+  CN:     '&#128196; Credit Note (CN)',
+  POLICY: '&#128196; Policy Schedule',
 };
 function resetChips() {
   ['DN','CN','POLICY'].forEach(t => {
-    const el = document.getElementById(`chip-${t}`);
+    const el = document.getElementById('chip-' + t);
     el.className = 'doc-chip';
-    el.textContent = CHIP_LABELS[t];
+    el.innerHTML = CHIP_LABELS[t];
   });
 }
 function markChip(type, cls) {
   if (!type) return;
-  const el = document.getElementById(`chip-${type}`);
+  const el = document.getElementById('chip-' + type);
   if (!el) return;
-  el.className = `doc-chip ${cls}`;
-  const icons = { detected: 'â', missing: 'â' };
-  el.textContent = `${icons[cls] || ''} ${CHIP_LABELS[type]}`;
+  el.className = 'doc-chip ' + cls;
+  const icon = cls === 'detected' ? '&#10003; ' : '&#10007; ';
+  el.innerHTML = icon + CHIP_LABELS[type];
 }
 
 function doReset() {
@@ -765,7 +663,6 @@ function escHtml(str) {
     .replace(/"/g,'&quot;');
 }
 
-// Show upload section by default
 showSection('secUpload');
 </script>
 </body>
