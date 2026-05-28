@@ -568,11 +568,10 @@ function showPreview() {
 // Apply Fields to Zoho Creator Form
 //
 // Strategy (tried in order):
-//   1. ZOHO.CREATOR.WIDGET.updateFields(data)
-//      → correct for form-embedded widgets; fills the current form fields directly
-//   2. ZOHO.CREATOR.API.addRecord(...)
-//      → fallback for standalone/page widgets; creates a new record then navigates
-//   3. Diagnostic error showing available SDK namespaces
+//   1. DATA.updateField  — SDK v2 standard; one call per field
+//   2. WIDGET.updateFields — older SDK v2 path (if WIDGET namespace exists)
+//   3. UTIL.setFieldValue  — alternative utility path
+//   4. Diagnostic — shows all methods inside every namespace for debugging
 // ─────────────────────────────────────────────────────────────────────────────
 async function applyToForm() {
   const btn = document.getElementById('applyBtn');
@@ -609,7 +608,22 @@ async function applyToForm() {
   console.log('[Widget] ZOHO.CREATOR namespaces:', ns);
   console.log('[Widget] data to apply:', JSON.stringify(data, null, 2));
 
-  // ── Strategy 1: WIDGET.updateFields (form-embedded widget) ──────────────────
+  // ── Strategy 1: DATA.updateField — SDK v2 standard for form-embedded widgets ─
+  try {
+    if (ZOHO.CREATOR.DATA && typeof ZOHO.CREATOR.DATA.updateField === 'function') {
+      console.log('[Widget] Using DATA.updateField (SDK v2)');
+      for (const [fieldName, value] of Object.entries(data)) {
+        console.log('[Widget] Updating field:', fieldName, '=', value);
+        await ZOHO.CREATOR.DATA.updateField({ fieldName: fieldName, value: value });
+      }
+      showSection('secSuccess');
+      return;
+    }
+  } catch (e1) {
+    console.warn('[Widget] DATA.updateField failed:', e1.message || e1);
+  }
+
+  // ── Strategy 2: WIDGET.updateFields — alternate SDK v2 path ─────────────────
   try {
     if (ZOHO.CREATOR.WIDGET && typeof ZOHO.CREATOR.WIDGET.updateFields === 'function') {
       console.log('[Widget] Using WIDGET.updateFields');
@@ -617,50 +631,37 @@ async function applyToForm() {
       showSection('secSuccess');
       return;
     }
-  } catch (e1) {
-    console.warn('[Widget] WIDGET.updateFields failed:', e1.message || e1);
-  }
-
-  // ── Strategy 2: API.addRecord (standalone/page widget) ──────────────────────
-  try {
-    if (ZOHO.CREATOR.API && typeof ZOHO.CREATOR.API.addRecord === 'function') {
-      console.log('[Widget] Using API.addRecord');
-      const resp = await ZOHO.CREATOR.API.addRecord({
-        appName:  ZC_APP,
-        formName: ZC_FORM,
-        data:     { data: data }
-      });
-      console.log('[Widget] addRecord response:', JSON.stringify(resp));
-      if (resp && resp.code === 3000) {
-        const recordId = resp.data && resp.data.ID;
-        if (recordId) {
-          const editUrl = 'https://creatorapp.zoho.com/' + ZC_OWNER + '/' + ZC_APP
-            + '/record-edit/' + ZC_FORM + '/' + recordId;
-          console.log('[Widget] Navigating to:', editUrl);
-          ZOHO.CREATOR.UTIL.navigateTo({ url: editUrl, window: 'parent' });
-        } else {
-          showSection('secSuccess');
-        }
-        return;
-      } else {
-        const msg = (resp && resp.message) ? resp.message : JSON.stringify(resp);
-        throw new Error(msg);
-      }
-    }
   } catch (e2) {
-    console.error('[Widget] API.addRecord failed:', e2.message || e2);
+    console.warn('[Widget] WIDGET.updateFields failed:', e2.message || e2);
   }
 
-  // ── Strategy 3: Diagnostic — neither method available ───────────────────────
-  const widgetKeys = (ZOHO.CREATOR.WIDGET) ? Object.keys(ZOHO.CREATOR.WIDGET).join(', ') : 'undefined';
-  const apiKeys    = (ZOHO.CREATOR.API)    ? Object.keys(ZOHO.CREATOR.API).join(', ')    : 'undefined';
+  // ── Strategy 3: UTIL.setFieldValue — utility path ────────────────────────────
+  try {
+    if (ZOHO.CREATOR.UTIL && typeof ZOHO.CREATOR.UTIL.setFieldValue === 'function') {
+      console.log('[Widget] Using UTIL.setFieldValue');
+      for (const [fieldName, value] of Object.entries(data)) {
+        await ZOHO.CREATOR.UTIL.setFieldValue({ fieldName: fieldName, value: value });
+      }
+      showSection('secSuccess');
+      return;
+    }
+  } catch (e3) {
+    console.warn('[Widget] UTIL.setFieldValue failed:', e3.message || e3);
+  }
+
+  // ── Strategy 4: Diagnostic — show all methods in each namespace ───────────────
+  let nsDetail = '';
+  for (const key of ns) {
+    try {
+      const methods = Object.keys(ZOHO.CREATOR[key] || {}).join(', ') || '(empty)';
+      nsDetail += escHtml(key) + ': ' + escHtml(methods) + '<br>';
+    } catch (_) { nsDetail += escHtml(key) + ': (error)<br>'; }
+  }
   showError(
     '<div class="alert alert-error">' +
-    '&#10060; SDK method not found. Please share this with support:<br>' +
+    '&#10060; SDK method not found. Namespace details:<br>' +
     '<code style="font-size:10px;word-break:break-all">' +
-    'ZOHO.CREATOR keys: ' + escHtml(ns.join(', ') || 'none') + '<br>' +
-    'WIDGET keys: ' + escHtml(widgetKeys) + '<br>' +
-    'API keys: '    + escHtml(apiKeys) +
+    (nsDetail || 'No namespaces found') +
     '</code></div>',
     true
   );
