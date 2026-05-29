@@ -236,8 +236,8 @@ input[type="file"] { display: none; }
   <div id="secSuccess" style="display:none">
     <div class="success-banner">
       <div class="success-icon">✅</div>
-      <div class="success-title">Record Created Successfully</div>
-      <div class="success-sub">Redirecting to edit view — complete the dropdown fields and save.</div>
+      <div class="success-title">Opening Form…</div>
+      <div class="success-sub">Fields pre-filled — complete the dropdowns and save.</div>
     </div>
     <div class="btn-row" style="margin-top:12px">
       <button class="btn btn-secondary" onclick="doReset()">Upload New Documents</button>
@@ -557,35 +557,23 @@ async function applyToForm() {
     if (v) data[k] = v;
   }
 
-  console.log('[Widget] Creating record with data:', data);
+  // Build URL params for pre-filling the form's add view.
+  // Zoho Creator supports ?Field_Link_Name=value on the record-add URL.
+  // This avoids API required-field validation entirely — the user fills
+  // dropdowns (Insurer, Insurance Type, etc.) and saves manually.
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(data)) {
+    params.set(k, v);
+  }
+
+  const formUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/record-add/${ZC_FORM}?${params.toString()}`;
+  console.log('[Widget] Navigating to pre-filled form:', formUrl);
 
   try {
-    // SDK v2 method is addRecords (plural), params are snake_case, body goes in payload
-    const resp = await ZOHO.CREATOR.DATA.addRecords({
-      app_name:  ZC_APP,
-      form_name: ZC_FORM,
-      payload:   { data }
-    });
-
-    console.log('[Widget] addRecords response:', resp);
-
-    if (resp && resp.code === 3000) {
-      const recordId = resp.data && resp.data.ID;
-      showSection('secSuccess');
-      if (recordId) {
-        const editUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/record-edit/${ZC_FORM}/${recordId}`;
-        console.log('[Widget] Navigating to edit view:', editUrl);
-        // navigateParentURL requires { action: url }, not { url: url }
-        await ZOHO.CREATOR.UTIL.navigateParentURL({ action: editUrl });
-      }
-    } else {
-      const msg = (resp && resp.message) ? resp.message : JSON.stringify(resp);
-      showError(`<div class="alert alert-error">❌ Could not create record: ${escHtml(msg)}</div>`, true);
-      btn.disabled    = false;
-      btn.textContent = '✅ Apply to Form';
-    }
+    await ZOHO.CREATOR.UTIL.navigateParentURL({ action: formUrl });
+    showSection('secSuccess');
   } catch (e) {
-    console.error('[Widget] addRecords error:', e);
+    console.error('[Widget] Navigation error:', e);
     showError(`<div class="alert alert-error">❌ Error: ${escHtml(String(e.message || e))}</div>`, true);
     btn.disabled    = false;
     btn.textContent = '✅ Apply to Form';
