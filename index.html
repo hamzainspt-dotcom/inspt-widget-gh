@@ -6,8 +6,8 @@
 <title>INSPT Document Upload</title>
 <!-- PDF.js for client-side PDF text extraction -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<!-- Zoho Creator Widget SDK v2 (official CDN) -->
-<script src="https://js.zohostatic.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<!-- Zoho Creator Widget SDK v2 -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -20,7 +20,6 @@ body {
   line-height: 1.4;
 }
 
-/* Upload Zone */
 .upload-zone {
   border: 2px dashed #d1d5db;
   border-radius: 10px;
@@ -41,7 +40,6 @@ body {
 .upload-sub { font-size: 11px; color: #6b7280; }
 input[type="file"] { display: none; }
 
-/* Doc Status Chips */
 .doc-chips {
   display: flex;
   gap: 7px;
@@ -64,7 +62,6 @@ input[type="file"] { display: none; }
 .doc-chip.detected  { background: #f0fdf4; border-color: #86efac; color: #166534; }
 .doc-chip.missing   { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
 
-/* Processing */
 .processing {
   text-align: center;
   padding: 24px 12px;
@@ -81,7 +78,6 @@ input[type="file"] { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .proc-msg { font-size: 12px; }
 
-/* Alerts */
 .alert {
   padding: 9px 12px;
   border-radius: 7px;
@@ -93,7 +89,6 @@ input[type="file"] { display: none; }
 .alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
 .alert-ok    { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
 
-/* Preview Table */
 .preview { margin-top: 14px; }
 
 .section-header {
@@ -150,7 +145,6 @@ input[type="file"] { display: none; }
 .badge-auto   { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
 .badge-manual { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
 
-/* Manual note */
 .manual-note {
   margin-top: 10px;
   font-size: 11px;
@@ -162,7 +156,6 @@ input[type="file"] { display: none; }
   line-height: 1.5;
 }
 
-/* Buttons */
 .btn-row { display: flex; gap: 9px; margin-top: 14px; }
 .btn {
   flex: 1;
@@ -184,7 +177,6 @@ input[type="file"] { display: none; }
 }
 .btn-secondary:hover { background: #e5e7eb; }
 
-/* Success Banner */
 .success-banner {
   text-align: center;
   padding: 20px 14px;
@@ -202,101 +194,71 @@ input[type="file"] { display: none; }
 
 <div id="app">
 
-  <!-- Upload Section -->
   <div id="secUpload">
     <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
       <input type="file" id="fileInput" accept=".pdf" multiple>
-      <div class="upload-icon">&#128193;</div>
+      <div class="upload-icon">📄</div>
       <div class="upload-title">Upload Policy Documents</div>
-      <div class="upload-sub">Click or drag &amp; drop &middot; Select all 3 PDFs at once</div>
-      <div class="upload-sub" style="margin-top:3px">Tax Invoice (DN) &nbsp;&middot;&nbsp; Credit Note (CN) &nbsp;&middot;&nbsp; Policy Schedule</div>
+      <div class="upload-sub">Click or drag &amp; drop · Select all 3 PDFs at once</div>
+      <div class="upload-sub" style="margin-top:3px">Tax Invoice (DN) &nbsp;·&nbsp; Credit Note (CN) &nbsp;·&nbsp; Policy Schedule</div>
     </div>
     <div class="doc-chips">
-      <div class="doc-chip" id="chip-DN">&#128196; Tax Invoice (DN)</div>
-      <div class="doc-chip" id="chip-CN">&#128196; Credit Note (CN)</div>
-      <div class="doc-chip" id="chip-POLICY">&#128196; Policy Schedule</div>
+      <div class="doc-chip" id="chip-DN">📄 Tax Invoice (DN)</div>
+      <div class="doc-chip" id="chip-CN">📄 Credit Note (CN)</div>
+      <div class="doc-chip" id="chip-POLICY">📄 Policy Schedule</div>
     </div>
   </div>
 
-  <!-- Processing Section -->
   <div id="secProcessing" style="display:none">
     <div class="processing">
       <div class="spinner"></div>
-      <div class="proc-msg" id="procMsg">Processing documents&hellip;</div>
+      <div class="proc-msg" id="procMsg">Processing documents…</div>
     </div>
   </div>
 
-  <!-- Error Section -->
   <div id="secError" style="display:none"></div>
 
-  <!-- Preview Section -->
   <div id="secPreview" style="display:none">
     <div class="preview">
       <div id="previewAlerts"></div>
       <div id="previewContent"></div>
       <div class="manual-note">
-        &#9888;&#65039; Fields marked <strong>Manual</strong> are dropdown/lookup fields and cannot be set automatically.
+        ⚠️ Fields marked <strong>Manual</strong> are dropdown/lookup fields and cannot be set automatically.
         Check the suggested values above and select them in the form.
       </div>
     </div>
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="doReset()">&#128260; Re-upload</button>
-      <button class="btn btn-primary" id="applyBtn" onclick="applyToForm()">&#10003; Apply to Form</button>
+      <button class="btn btn-secondary" onclick="doReset()">🔄 Re-upload</button>
+      <button class="btn btn-primary" id="applyBtn" onclick="applyToForm()">✅ Apply to Form</button>
     </div>
   </div>
 
-  <!-- Success Section -->
   <div id="secSuccess" style="display:none">
     <div class="success-banner">
-      <div class="success-icon">&#10003;</div>
-      <div class="success-title">Fields Applied Successfully</div>
-      <div class="success-sub">Please complete the dropdown fields manually, then save the policy.</div>
+      <div class="success-icon">✅</div>
+      <div class="success-title">Record Created Successfully</div>
+      <div class="success-sub">Redirecting to edit view — complete the dropdown fields and save.</div>
     </div>
     <div class="btn-row" style="margin-top:12px">
       <button class="btn btn-secondary" onclick="doReset()">Upload New Documents</button>
     </div>
   </div>
 
-</div><!-- #app -->
+</div>
 
 <script>
 'use strict';
 
-// PDF.js Worker
 const pdfjsLib = window['pdfjs-dist/build/pdf'];
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// Zoho Creator constants
-// SDK v2: ZOHO.CREATOR.API.addRecord is the correct method
 const ZC_APP   = 'inspt-policy-accounting-system';
 const ZC_OWNER = 'mohammadhamza383';
 const ZC_FORM  = 'Policy_Entry';
 
 let state = {};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Zoho Creator SDK v2 — init() MUST be called before any API namespace exists.
-// After init we log and display available namespaces for diagnostics.
-// ─────────────────────────────────────────────────────────────────────────────
-let _zohoInitPromise = null;
-let _zohoNamespaces  = [];
-(function initSDK() {
-  if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && typeof ZOHO.CREATOR.init === 'function') {
-    _zohoInitPromise = ZOHO.CREATOR.init()
-      .then(() => {
-        _zohoNamespaces = Object.keys(ZOHO.CREATOR);
-        console.log('[Widget] ZOHO SDK ready. Namespaces:', _zohoNamespaces);
-      })
-      .catch(err => {
-        console.warn('[Widget] ZOHO SDK init warning:', err);
-      });
-  } else {
-    console.warn('[Widget] ZOHO.CREATOR not found — outside Zoho Creator context?');
-  }
-})();
-
-// Drag & Drop + File Input
 const uploadZone = document.getElementById('uploadZone');
 const fileInput  = document.getElementById('fileInput');
 
@@ -312,7 +274,6 @@ uploadZone.addEventListener('drop', e => {
 });
 fileInput.addEventListener('change', e => processFiles(e.target.files));
 
-// PDF Text Extraction
 async function extractText(file) {
   const buf  = await file.arrayBuffer();
   const pdf  = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -332,16 +293,15 @@ async function extractText(file) {
   return full;
 }
 
-// Document Detection
 function detectType(text) {
-  if (/TAX CREDIT NOTE/i.test(text))                          return 'CN';
-  if (/TAX INVOICE/i.test(text) && /DEBITED/i.test(text))    return 'DN';
+  if (/TAX CREDIT NOTE/i.test(text))                                      return 'CN';
+  if (/TAX INVOICE/i.test(text) && /DEBITED/i.test(text))                 return 'DN';
   if (/Motor Takaful Policy Schedule/i.test(text)
-    || /Policy Takaful Motor/i.test(text))                    return 'POLICY';
+    || /Policy Takaful Motor/i.test(text)
+    || /جدول وثيقة/.test(text)) return 'POLICY';
   return 'UNKNOWN';
 }
 
-// Field Extraction - DN (Tax Invoice / Debit Note)
 function parseDN(text) {
   const d = {};
   const m1 = text.match(/D\.N\.\s*No\s*:\s*(\S+)/);
@@ -361,7 +321,6 @@ function parseDN(text) {
   return d;
 }
 
-// Field Extraction - CN (Tax Credit Note)
 function parseCN(text) {
   const d = {};
   const lines = text.split('\n');
@@ -378,7 +337,6 @@ function parseCN(text) {
   return d;
 }
 
-// Field Extraction - POLICY (Motor Takaful Policy Schedule)
 function parsePOLICY(text) {
   const d = {};
   const m1 = text.match(/Policy Number\s+(P\/[\d\/]+)/);
@@ -396,7 +354,6 @@ function parsePOLICY(text) {
   return d;
 }
 
-// Date Format Conversion: dd/MM/yyyy -> dd-MMM-yyyy (Zoho Creator format)
 function fmtDate(ddmmyyyy) {
   if (!ddmmyyyy) return '';
   const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -407,7 +364,6 @@ function fmtDate(ddmmyyyy) {
   return `${p[0].padStart(2,'0')}-${M[idx]}-${p[2]}`;
 }
 
-// Insurance Type Mapping
 function mapInsurType(policyType, riskCover) {
   const src = (policyType || riskCover || '').toLowerCase();
   if (!src) return '';
@@ -427,7 +383,6 @@ function mapInsurType(policyType, riskCover) {
   return policyType || riskCover;
 }
 
-// Main: Process Uploaded Files
 async function processFiles(fileList) {
   const files = Array.from(fileList);
   if (!files.length) return;
@@ -440,35 +395,40 @@ async function processFiles(fileList) {
 
   try {
     for (const file of files) {
-      setMsg('Reading: ' + file.name + '...');
+      setMsg(`Reading: ${file.name}…`);
       const text = await extractText(file);
       const type = detectType(text);
 
       if (type === 'UNKNOWN') {
-        errs.push('"' + file.name + '" could not be identified as DN, CN or Policy Schedule.');
+        errs.push(`"${file.name}" — could not be identified as DN, CN or Policy Schedule.`);
       } else if (docs[type]) {
-        errs.push('Two files detected as <strong>' + type + '</strong>. Please check your selection.');
+        errs.push(`Two files detected as <strong>${type}</strong>. Please check your selection.`);
       } else {
         docs[type] = text;
         markChip(type, 'detected');
       }
     }
 
-    const LABELS = { DN: 'Tax Invoice (DN)', CN: 'Credit Note (CN)', POLICY: 'Policy Schedule' };
-    const missing = Object.entries(docs).filter(([, v]) => !v).map(([k]) => LABELS[k]);
+    const missing = Object.entries(docs)
+      .filter(([, v]) => !v)
+      .map(([k]) => ({ DN: 'Tax Invoice (DN)', CN: 'Credit Note (CN)', POLICY: 'Policy Schedule' }[k]));
 
     if (missing.length) {
-      ['DN','CN','POLICY'].forEach(k => { if (!docs[k]) markChip(k, 'missing'); });
+      missing.forEach(m => markChip(
+        Object.keys({DN:'Tax Invoice (DN)',CN:'Credit Note (CN)',POLICY:'Policy Schedule'})
+          .find(k => ({DN:'Tax Invoice (DN)',CN:'Credit Note (CN)',POLICY:'Policy Schedule'}[k]) === m),
+        'missing'
+      ));
       showError(
-        '<div class="alert alert-error">&#10060; Missing: <strong>' + missing.join(', ') + '</strong>.<br>' +
-        'Make sure you select all 3 correct PDF files.' +
-        (errs.length ? '<br><br>' + errs.join('<br>') : '') + '</div>',
+        `<div class="alert alert-error">❌ Missing: <strong>${missing.join(', ')}</strong>.<br>
+         Make sure you select all 3 correct PDF files.
+         ${errs.length ? '<br><br>' + errs.join('<br>') : ''}</div>`,
         true
       );
       return;
     }
 
-    setMsg('Extracting fields...');
+    setMsg('Extracting fields…');
     const dn     = parseDN(docs.DN);
     const cn     = parseCN(docs.CN);
     const policy = parsePOLICY(docs.POLICY);
@@ -503,24 +463,26 @@ async function processFiles(fileList) {
 
   } catch (err) {
     console.error('[Widget] Processing error:', err);
-    showError('<div class="alert alert-error">&#10060; Error reading PDFs: ' + escHtml(err.message || String(err)) + '</div>', true);
+    showError(
+      `<div class="alert alert-error">❌ Error reading PDFs: ${err.message || err}</div>`,
+      true
+    );
   }
 }
 
-// Build & Show Preview
 function showPreview() {
   const s = state;
   let alerts = '';
 
   if (s._policyNoMismatch) {
-    alerts += '<div class="alert alert-warn">&#9888;&#65039; Policy Number differs between Invoice and Policy Schedule &mdash; please verify.</div>';
+    alerts += `<div class="alert alert-warn">⚠️ Policy Number differs between the Invoice and Policy Schedule — please verify before submitting.</div>`;
   }
   if (s._emptyFields.length) {
-    alerts += '<div class="alert alert-warn">&#9888;&#65039; Could not extract: <strong>' + s._emptyFields.join(', ') + '</strong>. Fill these manually.</div>';
+    alerts += `<div class="alert alert-warn">⚠️ Could not extract: <strong>${s._emptyFields.join(', ')}</strong>. Fill these manually.</div>`;
   }
 
   const sections = [
-    ['&#128196; Tax Invoice (DN) &mdash; Auto-filled', [
+    ['📄 Tax Invoice (DN) — Auto-filled', [
       ['Insured Name',          s.Insured_Name,           true],
       ['Invoice Date',          s.Invoice_Date,           true],
       ['Invoice No. (D.N. No)', s.Insurer_Invoice_Number, true],
@@ -529,33 +491,33 @@ function showPreview() {
       ['Period To',             s.Period_To,              true],
       ['Premium (Total)',       s.Premium,                true],
     ]],
-    ['&#128196; Credit Note (CN) &mdash; Auto-filled', [
+    ['📄 Credit Note (CN) — Auto-filled', [
       ['Commission',            s.Commission,             true],
       ['VAT on Commission',     s.VAT,                    true],
     ]],
-    ['&#128196; Policy Schedule &mdash; Partial', [
+    ['📄 Policy Schedule — Partial', [
       ['Contact Number',        s.Contact_Number,         true],
       ['Chassis Number',        s.Chassis_Number,         true],
       ['Registration No.',      s.Registration_Number,    true],
-      ['Insurance Type',        s._insurTypeSuggestion,   false, 'Detected from: "' + escHtml(s._insurTypeRaw) + '"'],
+      ['Insurance Type',        s._insurTypeSuggestion,   false, `Detected from: "${s._insurTypeRaw}"`],
       ['Vehicle Brand (Make)',  s._vehicleMakeRaw,        false, 'Select closest match from Vehicle Brands dropdown'],
     ]],
   ];
 
   let html = '';
   for (const [heading, fields] of sections) {
-    html += '<div class="section-header">' + heading + '</div>';
+    html += `<div class="section-header">${heading}</div>`;
     for (const [label, value, isAuto, hint] of fields) {
       const empty = !value;
-      html += '<div class="field-row">' +
-        '<div class="fn">' + label + '</div>' +
-        '<div class="fv' + (empty ? ' empty' : '') + '">' +
-        (empty ? '&mdash;' : escHtml(value)) +
-        (hint ? '<span class="hint">' + escHtml(hint) + '</span>' : '') +
-        '</div>' +
-        '<div class="badge ' + (isAuto ? 'badge-auto' : 'badge-manual') + '">' +
-        (isAuto ? '&#10003; Auto' : '&#9888; Manual') +
-        '</div></div>';
+      html += `
+        <div class="field-row">
+          <div class="fn">${label}</div>
+          <div class="fv ${empty ? 'empty' : ''}">
+            ${empty ? '—' : escHtml(value)}
+            ${hint ? `<span class="hint">${escHtml(hint)}</span>` : ''}
+          </div>
+          <div class="badge ${isAuto ? 'badge-auto' : 'badge-manual'}">${isAuto ? '✓ Auto' : '⚠️ Manual'}</div>
+        </div>`;
     }
   }
 
@@ -564,26 +526,17 @@ function showPreview() {
   showSection('secPreview');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // Apply Fields to Zoho Creator Form
-//
-// Strategy (tried in order):
-//   1. DATA.updateField  — SDK v2 standard; one call per field
-//   2. WIDGET.updateFields — older SDK v2 path (if WIDGET namespace exists)
-//   3. UTIL.setFieldValue  — alternative utility path
-//   4. Diagnostic — shows all methods inside every namespace for debugging
-// ─────────────────────────────────────────────────────────────────────────────
+// Creates a new record via DATA.addRecord, then navigates to
+// the record's edit view via UTIL.navigateParentURL so the user
+// can complete dropdown fields and save.
+// ─────────────────────────────────────────────────────────────
 async function applyToForm() {
   const btn = document.getElementById('applyBtn');
   btn.disabled    = true;
-  btn.textContent = 'Applying fields...';
+  btn.textContent = 'Creating record…';
 
-  // Wait for SDK init to complete
-  if (_zohoInitPromise) {
-    try { await _zohoInitPromise; } catch (_) {}
-  }
-
-  // Build data object — only include fields that have a value
   const raw = {
     Insured_Name:           state.Insured_Name,
     Invoice_Date:           state.Invoice_Date,
@@ -598,78 +551,48 @@ async function applyToForm() {
     Chassis_Number:         state.Chassis_Number,
     Registration_Number:    state.Registration_Number,
   };
+
   const data = {};
   for (const [k, v] of Object.entries(raw)) {
     if (v) data[k] = v;
   }
 
-  const ns = (typeof ZOHO !== 'undefined' && ZOHO.CREATOR)
-    ? Object.keys(ZOHO.CREATOR) : [];
-  console.log('[Widget] ZOHO.CREATOR namespaces:', ns);
-  console.log('[Widget] data to apply:', JSON.stringify(data, null, 2));
+  console.log('[Widget] Creating record with data:', data);
 
-  // ── Strategy 1: DATA.updateField — SDK v2 standard for form-embedded widgets ─
   try {
-    if (ZOHO.CREATOR.DATA && typeof ZOHO.CREATOR.DATA.updateField === 'function') {
-      console.log('[Widget] Using DATA.updateField (SDK v2)');
-      for (const [fieldName, value] of Object.entries(data)) {
-        console.log('[Widget] Updating field:', fieldName, '=', value);
-        await ZOHO.CREATOR.DATA.updateField({ fieldName: fieldName, value: value });
+    const resp = await ZOHO.CREATOR.DATA.addRecord({
+      appLinkName:  ZC_APP,
+      formLinkName: ZC_FORM,
+      data:         { data }
+    });
+
+    console.log('[Widget] addRecord response:', resp);
+
+    if (resp && resp.code === 3000) {
+      const recordId = resp.data && resp.data.ID;
+      if (recordId) {
+        const editUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/record-edit/${ZC_FORM}/${recordId}`;
+        console.log('[Widget] Navigating to edit view:', editUrl);
+        showSection('secSuccess');
+        // Use UTIL.navigateParentURL (correct namespace in SDK v2)
+        await ZOHO.CREATOR.UTIL.navigateParentURL({ url: editUrl });
+      } else {
+        showSection('secSuccess');
       }
-      showSection('secSuccess');
-      return;
+    } else {
+      const msg = (resp && resp.message) ? resp.message : JSON.stringify(resp);
+      showError(`<div class="alert alert-error">❌ Could not create record: ${escHtml(msg)}</div>`, true);
+      btn.disabled    = false;
+      btn.textContent = '✅ Apply to Form';
     }
-  } catch (e1) {
-    console.warn('[Widget] DATA.updateField failed:', e1.message || e1);
+  } catch (e) {
+    console.error('[Widget] addRecord error:', e);
+    showError(`<div class="alert alert-error">❌ Error: ${escHtml(String(e.message || e))}</div>`, true);
+    btn.disabled    = false;
+    btn.textContent = '✅ Apply to Form';
   }
-
-  // ── Strategy 2: WIDGET.updateFields — alternate SDK v2 path ─────────────────
-  try {
-    if (ZOHO.CREATOR.WIDGET && typeof ZOHO.CREATOR.WIDGET.updateFields === 'function') {
-      console.log('[Widget] Using WIDGET.updateFields');
-      await ZOHO.CREATOR.WIDGET.updateFields({ data: data });
-      showSection('secSuccess');
-      return;
-    }
-  } catch (e2) {
-    console.warn('[Widget] WIDGET.updateFields failed:', e2.message || e2);
-  }
-
-  // ── Strategy 3: UTIL.setFieldValue — utility path ────────────────────────────
-  try {
-    if (ZOHO.CREATOR.UTIL && typeof ZOHO.CREATOR.UTIL.setFieldValue === 'function') {
-      console.log('[Widget] Using UTIL.setFieldValue');
-      for (const [fieldName, value] of Object.entries(data)) {
-        await ZOHO.CREATOR.UTIL.setFieldValue({ fieldName: fieldName, value: value });
-      }
-      showSection('secSuccess');
-      return;
-    }
-  } catch (e3) {
-    console.warn('[Widget] UTIL.setFieldValue failed:', e3.message || e3);
-  }
-
-  // ── Strategy 4: Diagnostic — show all methods in each namespace ───────────────
-  let nsDetail = '';
-  for (const key of ns) {
-    try {
-      const methods = Object.keys(ZOHO.CREATOR[key] || {}).join(', ') || '(empty)';
-      nsDetail += escHtml(key) + ': ' + escHtml(methods) + '<br>';
-    } catch (_) { nsDetail += escHtml(key) + ': (error)<br>'; }
-  }
-  showError(
-    '<div class="alert alert-error">' +
-    '&#10060; SDK method not found. Namespace details:<br>' +
-    '<code style="font-size:10px;word-break:break-all">' +
-    (nsDetail || 'No namespaces found') +
-    '</code></div>',
-    true
-  );
-  btn.disabled    = false;
-  btn.textContent = '&#10003; Apply to Form';
 }
 
-// UI Helpers
 function showSection(id) {
   ['secUpload','secProcessing','secError','secPreview','secSuccess'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
@@ -684,31 +607,30 @@ function setMsg(msg) {
 function showError(html, showRetry) {
   const sec = document.getElementById('secError');
   sec.innerHTML = html +
-    (showRetry
-      ? '<div class="btn-row" style="margin-top:12px"><button class="btn btn-secondary" onclick="doReset()">&#128260; Try Again</button></div>'
-      : '');
+    (showRetry ? `<div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="doReset()">🔄 Try Again</button></div>` : '');
   showSection('secError');
 }
 
 const CHIP_LABELS = {
-  DN:     '&#128196; Tax Invoice (DN)',
-  CN:     '&#128196; Credit Note (CN)',
-  POLICY: '&#128196; Policy Schedule',
+  DN:     '📄 Tax Invoice (DN)',
+  CN:     '📄 Credit Note (CN)',
+  POLICY: '📄 Policy Schedule',
 };
 function resetChips() {
   ['DN','CN','POLICY'].forEach(t => {
-    const el = document.getElementById('chip-' + t);
+    const el = document.getElementById(`chip-${t}`);
     el.className = 'doc-chip';
-    el.innerHTML = CHIP_LABELS[t];
+    el.textContent = CHIP_LABELS[t];
   });
 }
 function markChip(type, cls) {
   if (!type) return;
-  const el = document.getElementById('chip-' + type);
+  const el = document.getElementById(`chip-${type}`);
   if (!el) return;
-  el.className = 'doc-chip ' + cls;
-  const icon = cls === 'detected' ? '&#10003; ' : '&#10007; ';
-  el.innerHTML = icon + CHIP_LABELS[type];
+  el.className = `doc-chip ${cls}`;
+  const icons = { detected: '✓', missing: '✗' };
+  el.textContent = `${icons[cls] || ''} ${CHIP_LABELS[type]}`;
 }
 
 function doReset() {
