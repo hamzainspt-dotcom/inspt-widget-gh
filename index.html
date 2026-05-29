@@ -560,24 +560,23 @@ async function applyToForm() {
   console.log('[Widget] Creating record with data:', data);
 
   try {
-    const resp = await ZOHO.CREATOR.DATA.addRecord({
-      appLinkName:  ZC_APP,
-      formLinkName: ZC_FORM,
-      data:         { data }
+    // SDK v2 method is addRecords (plural), params are snake_case, body goes in payload
+    const resp = await ZOHO.CREATOR.DATA.addRecords({
+      app_name:  ZC_APP,
+      form_name: ZC_FORM,
+      payload:   { data }
     });
 
-    console.log('[Widget] addRecord response:', resp);
+    console.log('[Widget] addRecords response:', resp);
 
     if (resp && resp.code === 3000) {
       const recordId = resp.data && resp.data.ID;
+      showSection('secSuccess');
       if (recordId) {
         const editUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/record-edit/${ZC_FORM}/${recordId}`;
         console.log('[Widget] Navigating to edit view:', editUrl);
-        showSection('secSuccess');
-        // Use UTIL.navigateParentURL (correct namespace in SDK v2)
-        await ZOHO.CREATOR.UTIL.navigateParentURL({ url: editUrl });
-      } else {
-        showSection('secSuccess');
+        // navigateParentURL requires { action: url }, not { url: url }
+        await ZOHO.CREATOR.UTIL.navigateParentURL({ action: editUrl });
       }
     } else {
       const msg = (resp && resp.message) ? resp.message : JSON.stringify(resp);
@@ -586,7 +585,7 @@ async function applyToForm() {
       btn.textContent = '✅ Apply to Form';
     }
   } catch (e) {
-    console.error('[Widget] addRecord error:', e);
+    console.error('[Widget] addRecords error:', e);
     showError(`<div class="alert alert-error">❌ Error: ${escHtml(String(e.message || e))}</div>`, true);
     btn.disabled    = false;
     btn.textContent = '✅ Apply to Form';
