@@ -566,7 +566,7 @@ async function applyToForm() {
     params.set(k, v);
   }
 
-  const formUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/record-add/${ZC_FORM}?${params.toString()}`;
+  const formUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/#Form:${ZC_FORM}?${params.toString()}`;
   console.log('[Widget] Navigating to pre-filled form:', formUrl);
 
   // Strategy 1: Zoho SDK navigateParentURL
