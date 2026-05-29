@@ -569,15 +569,24 @@ async function applyToForm() {
   const formUrl = `https://creatorapp.zoho.com/${ZC_OWNER}/${ZC_APP}/record-add/${ZC_FORM}?${params.toString()}`;
   console.log('[Widget] Navigating to pre-filled form:', formUrl);
 
+  // Strategy 1: Zoho SDK navigateParentURL
+  // Strategy 2 (fallback): directly set window.top.location — works if Zoho
+  //   doesn't sandbox the iframe with allow-top-navigation restrictions.
   try {
     await ZOHO.CREATOR.UTIL.navigateParentURL({ action: formUrl });
-    showSection('secSuccess');
   } catch (e) {
-    console.error('[Widget] Navigation error:', e);
-    showError(`<div class="alert alert-error">❌ Error: ${escHtml(String(e.message || e))}</div>`, true);
-    btn.disabled    = false;
-    btn.textContent = '✅ Apply to Form';
+    console.warn('[Widget] SDK navigation rejected, trying window.top:', e);
+    try {
+      window.top.location.href = formUrl;
+    } catch (e2) {
+      console.error('[Widget] window.top navigation blocked:', e2);
+      showError(`<div class="alert alert-error">❌ Could not navigate to form. Please open this URL manually:<br><a href="${escHtml(formUrl)}" target="_blank" style="word-break:break-all;font-size:10px">${escHtml(formUrl)}</a></div>`, true);
+      btn.disabled    = false;
+      btn.textContent = '✅ Apply to Form';
+      return;
+    }
   }
+  showSection('secSuccess');
 }
 
 function showSection(id) {
