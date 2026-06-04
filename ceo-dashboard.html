@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>INSPT CEO Dashboard</title>
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<style>
+:root{color-scheme:light}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4f8;color:#0f172a;font-size:14px;padding:16px}
+.spinner-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:#64748b;font-size:13px}
+.spinner{width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#1e3a5f;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:16px 20px;color:#991b1b;font-size:13px;line-height:1.6}
+.err strong{display:block;margin-bottom:6px;font-size:14px}
+.err code{background:#fee2e2;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:12px}
+/* Header */
+.dash-header{background:#1e3a5f;color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.dash-title{font-size:16px;font-weight:700}
+.dash-sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px}
+.dash-meta{font-size:11px;color:rgba(255,255,255,.55);text-align:right}
+.refresh-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px}
+.refresh-btn:hover{background:rgba(255,255,255,.25)}
+/* Summary strip */
+.summary-strip{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.sum-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;flex:1;min-width:140px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.sum-card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#64748b;margin-bottom:5px}
+.sum-card-value{font-size:18px;font-weight:800;color:#1e3a5f}
+.sum-card-value.gold{color:#b45309}
+/* Section */
+.section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1e3a5f;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title::before{content:'';width:3px;height:16px;background:#b45309;border-radius:2px;display:inline-block}
+.note{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:9px 13px;font-size:12px;color:#92400e;margin-bottom:14px}
+/* Agent grid */
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.agent-card{background:#fff;border:1px solid #e2e8f0;border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.agent-head{padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;transition:background .15s}
+.agent-head:hover{background:#f8fafc}
+.agent-name{font-weight:700;font-size:15px;color:#1e3a5f}
+.agent-detail{font-size:11px;color:#64748b;margin-top:3px}
+.agent-amount{font-size:17px;font-weight:800;color:#b45309;text-align:right}
+.agent-amount-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-top:2px}
+.chevron{color:#94a3b8;font-size:11px;margin-top:3px;transition:transform .2s;display:block}
+.chevron.open{transform:rotate(180deg)}
+.agent-body{display:none;border-top:1px solid #f1f5f9;overflow-x:auto}
+.agent-body.open{display:block}
+table.t{width:100%;border-collapse:collapse;font-size:12px}
+table.t th{padding:7px 11px;text-align:left;background:#f8fafc;color:#94a3b8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+table.t td{padding:7px 11px;border-top:1px solid #f1f5f9;white-space:nowrap;vertical-align:middle}
+table.t tr:hover td{background:#f8fafc}
+table.t .amt{text-align:right;font-weight:700;color:#b45309}
+table.t .muted{color:#94a3b8}
+table.t tfoot td{background:#fef3c7;font-weight:700;color:#1e3a5f}
+.pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700}
+.pill-pending{background:#fef9c3;color:#854d0e}
+.pill-paid{background:#dcfce7;color:#166534}
+.pill-direct{background:#dbeafe;color:#1e40af}
+.pill-credit{background:#f3e8ff;color:#6b21a8}
+.empty{color:#94a3b8;text-align:center;padding:20px;font-size:13px;font-style:italic}
+</style>
+</head>
+<body>
+<div id="root"><div class="spinner-wrap"><div class="spinner"></div>Loading dashboard...</div></div>
+<script>
+const ZC_APP = 'inspt-policy-accounting-system';
+const ZC_REPORT = 'All_Policy_Entries';
+let allRecords = [];
+
+function n(v){return parseFloat(v)||0;}
+function omr(v){return 'OMR '+n(v).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function agentName(f){
+  if(!f||f===''||f===null)return null;
+  if(typeof f==='object') return f.display_value||f.Agent_Name||f.agent_name||JSON.stringify(f);
+  return String(f).trim();
+}
+
+function premStatusPill(s){
+  if(!s||s==='Pending')return '<span class="pill pill-pending">Pending</span>';
+  if(s==='Paid to INSPT'||s==='Paid Directly to Insurer')return '<span class="pill pill-paid">'+esc(s)+'</span>';
+  if(s==='Credit')return '<span class="pill pill-credit">Credit</span>';
+  return '<span class="pill pill-pending">'+esc(s)+'</span>';
+}
+
+function processRecords(records){
+  const agentMap={};
+  let totalPolicies=0, totalPremium=0, totalCommission=0, totalNetComm=0;
+
+  records.forEach(rec=>{
+    totalPolicies++;
+    totalPremium+=n(rec.Premium);
+    totalCommission+=n(rec.Commission);
+    totalNetComm+=n(rec.Net_Commission);
+
+    const ag=agentName(rec.Insurer_Agents);
+    if(!ag||ag.toLowerCase()==='null'||ag==='-')return;
+
+    const cs=n(rec.Commission_Shared);
+    if(!agentMap[ag]) agentMap[ag]={name:ag,totalShared:0,count:0,policies:[]};
+    agentMap[ag].totalShared+=cs;
+    agentMap[ag].count++;
+    agentMap[ag].policies.push({
+      ref:rec.Reference_Number||'—',
+      policy:rec.Policy_Number||'—',
+      insured:rec.Insured_Name||'—',
+      date:rec.Invoice_Date||'—',
+      premium:n(rec.Premium),
+      commShared:cs,
+      status:rec.Dropdown1||'Pending'
+    });
+  });
+
+  return {agentMap, totalPolicies, totalPremium, totalCommission, totalNetComm};
+}
+
+function render(records){
+  const {agentMap,totalPolicies,totalPremium,totalCommission,totalNetComm}=processRecords(records);
+  const agents=Object.values(agentMap).sort((a,b)=>b.totalShared-a.totalShared);
+  const totalShared=agents.reduce((s,a)=>s+a.totalShared,0);
+  const now=new Date().toLocaleString('en-US',{timeZone:'Asia/Muscat',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+
+  const summaryHtml=`
+    <div class="sum-card"><div class="sum-card-label">Total Policies</div><div class="sum-card-value">${totalPolicies}</div></div>
+    <div class="sum-card"><div class="sum-card-label">Total Premium</div><div class="sum-card-value">${omr(totalPremium)}</div></div>
+    <div class="sum-card"><div class="sum-card-label">Total Commission</div><div class="sum-card-value">${omr(totalCommission)}</div></div>
+    <div class="sum-card"><div class="sum-card-label">Net Commission</div><div class="sum-card-value">${omr(totalNetComm)}</div></div>
+    <div class="sum-card"><div class="sum-card-label">Total Comm. Shared</div><div class="sum-card-value gold">${omr(totalShared)}</div></div>`;
+
+  const agentCardsHtml=agents.length===0
+    ?'<div class="empty">No agent-sourced policies found yet.</div>'
+    :agents.map((ag,i)=>{
+      const rows=ag.policies
+        .sort((a,b)=>new Date(b.date)-new Date(a.date))
+        .map(p=>`<tr>
+          <td class="muted">${esc(p.ref)}</td>
+          <td>${esc(p.policy)}</td>
+          <td>${esc(p.insured)}</td>
+          <td class="muted">${p.date}</td>
+          <td style="text-align:right">${omr(p.premium)}</td>
+          <td class="amt">${omr(p.commShared)}</td>
+          <td>${premStatusPill(p.status)}</td>
+        </tr>`).join('');
+      return `<div class="agent-card">
+        <div class="agent-head" onclick="toggle(${i})">
+          <div>
+            <div class="agent-name">${esc(ag.name)}</div>
+            <div class="agent-detail">${ag.count} polic${ag.count===1?'y':'ies'} &nbsp;·&nbsp; tap to expand</div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <div>
+              <div class="agent-amount">${omr(ag.totalShared)}</div>
+              <div class="agent-amount-lbl">Comm. Shared</div>
+            </div>
+            <span class="chevron" id="chev${i}">&#9660;</span>
+          </div>
+        </div>
+        <div class="agent-body" id="body${i}">
+          <table class="t">
+            <thead><tr><th>Ref</th><th>Policy</th><th>Insured</th><th>Date</th><th style="text-align:right">Premium</th><th style="text-align:right">Shared</th><th>Status</th></tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr><td colspan="5" style="padding:7px 11px">Total</td><td class="amt" style="padding:7px 11px">${omr(ag.totalShared)}</td><td></td></tr></tfoot>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+
+  const agentNote=agents.length>0
+    ?`${agents.length} agent(s) with commission data. Showing all-time totals. Commission Shared data available from June 2026 onwards.`
+    :'No placement agency data found. Ensure policies have Insurer Agents field populated.';
+
+  document.getElementById('root').innerHTML=`
+    <div class="dash-header">
+      <div>
+        <div class="dash-title">Insurance Spot — CEO Dashboard</div>
+        <div class="dash-sub">Phase 1: Agent Commission Balance &nbsp;·&nbsp; Muscat, Oman</div>
+      </div>
+      <div class="dash-meta">
+        Updated: ${now} (Oman)<br>
+        <button class="refresh-btn" onclick="load()">&#8635; Refresh</button>
+      </div>
+    </div>
+    <div class="summary-strip">${summaryHtml}</div>
+    <div class="section-title">Agent Commission Balance</div>
+    <div class="note">${esc(agentNote)}</div>
+    <div class="agent-grid">${agentCardsHtml}</div>`;
+}
+
+function toggle(i){
+  document.getElementById('body'+i).classList.toggle('open');
+  document.getElementById('chev'+i).classList.toggle('open');
+}
+
+async function fetchPage(page){
+  const resp=await ZOHO.CREATOR.DATA.getRecords({
+    appName:ZC_APP,
+    reportName:ZC_REPORT,
+    config:{page,pageSize:200}
+  });
+  if(resp.code!==3000)throw new Error('Creator error '+resp.code+': '+(resp.error||JSON.stringify(resp)));
+  return resp.data||[];
+}
+
+async function load(){
+  document.getElementById('root').innerHTML='<div class="spinner-wrap"><div class="spinner"></div>Loading...</div>';
+  try{
+    let page=1, all=[];
+    while(true){
+      const batch=await fetchPage(page);
+      all=all.concat(batch);
+      if(batch.length<200)break;
+      page++;
+    }
+    allRecords=all;
+    render(allRecords);
+  }catch(e){
+    document.getElementById('root').innerHTML=`<div class="err">
+      <strong>Error loading data</strong>
+      ${esc(e.message)}<br><br>
+      Check that the widget has access to the <code>All_Policy_Entries</code> report and that the app name is correct.
+    </div>`;
+  }
+}
+
+ZOHO.CREATOR.init().then(load).catch(e=>{
+  document.getElementById('root').innerHTML=`<div class="err"><strong>SDK init failed</strong>${esc(e.message||String(e))}</div>`;
+});
+</script>
+</body>
+</html>
