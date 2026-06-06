@@ -370,7 +370,7 @@ async function fetchPage(page){
     page:page,
     pageSize:200
   });
-  if(resp.code!==3000)throw new Error('Creator error '+resp.code+': '+(resp.error||JSON.stringify(resp)));
+  if(resp.code!==3000)throw new Error('Code='+resp.code+' | '+JSON.stringify(resp).substring(0,300));
   return resp.data||[];
 }
 
@@ -389,8 +389,7 @@ async function load(){
   }catch(e){
     document.getElementById('root').innerHTML=`<div class="err">
       <strong>Error loading data</strong>
-      ${esc(e.message)}<br><br>
-      Check that the widget has access to the <code>All_Policy_Entries</code> report and that the app name is correct.
+      <code style="display:block;margin-top:8px;white-space:pre-wrap;word-break:break-all">${esc(e.message)}</code>
     </div>`;
   }
 }
