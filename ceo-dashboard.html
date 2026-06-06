@@ -21,7 +21,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4f8;color:#0f172
 .dash-meta{font-size:11px;color:rgba(255,255,255,.55);text-align:right}
 .refresh-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px}
 .refresh-btn:hover{background:rgba(255,255,255,.25)}
-.summary-strip{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.summary-stripydisplay:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .sum-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;flex:1;min-width:140px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .sum-card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#64748b;margin-bottom:5px}
 .sum-card-value{font-size:18px;font-weight:800;color:#1e3a5f}
@@ -29,7 +29,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4f8;color:#0f172
 .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1e3a5f;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .section-title::before{content:'';width:3px;height:16px;background:#b45309;border-radius:2px;display:inline-block}
 .note{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:9px 13px;font-size:12px;color:#92400e;margin-bottom:14px}
-.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;margin-bottom:24px}
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
 .agent-card{background:#fff;border:1px solid #e2e8f0;border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
 .agent-head{padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;transition:background .15s}
 .agent-head:hover{background:#f8fafc}
@@ -54,18 +54,6 @@ table.t tfoot td{background:#fef3c7;font-weight:700;color:#1e3a5f}
 .pill-direct{background:#dbeafe;color:#1e40af}
 .pill-credit{background:#f3e8ff;color:#6b21a8}
 .empty{color:#94a3b8;text-align:center;padding:20px;font-size:13px;font-style:italic}
-.insurer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:24px}
-.insurer-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.insurer-name{font-weight:700;font-size:13px;color:#1e3a5f;margin-bottom:6px;white-space:nowraw;overflow:hidden;text-overflow:ellipsis}
-.insurer-stat{display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-top:3px}
-.insurer-stat strong{color:#0f172a}
-.status-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
-.status-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;flex:1;min-width:130px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.status-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:4px}
-.status-value{font-size:20px;font-weight:800;color:#1e3a5f}
-.status-value.warn{color:#b45309}
-.status-value.danger{color:#dc2626}
-.status-value.good{color:#16a34a}
 </style>
 </head>
 <body>
@@ -80,41 +68,132 @@ function omr(v){return 'OMR '+n(v).toLocaleString('en-US',{minimumFractionDigits
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 function agentName(f){
-  if(f===null||f===undefined||f==='')return null;
-  if(typeof f==='object'){
-    var v=f.display_value||f.Agent_Name||f.agent_name;
-    if(v)return String(v).trim();
-    var s=JSON.stringify(f);
-    return(s==='{}'||s==='null')?null:s;
-  }
-  var s=String(f).trim();
-  return(s===''||s==='null'||s==='{}')?null:s;
-}
-
-function insurerName(f){
-  if(f===null||f===undefined||f==='')return'Unknown';
-  if(typeof f==='object')return f.display_value||f.Insurer_Name||f.insurer_name||'Unknown';
-  var s=String(f).trim();
-  return(s===''||s==='null')?'Unknown':s;
+  if(!f||f===''||f===null)return null;
+  if(typeof f==='object') return f.display_value||f.Agent_Name||f.agent_name||JSON.stringify(f);
+  return String(f).trim();
 }
 
 function premStatusPill(s){
-  var st=s||'Pending';
-  if(st==='Paid to INSPT'||st==='Paid Directly to Insurer')return'<span class="pill pill-paid">'+esc(st)+'</span>';
-  if(st==='Credit')return'<span class="pill pill-credit">Credit</span>';
-  if(st==='Cancelled')return'<span class="pill pill-direct">Cancelled</span>';
-  return'<span class="pill pill-pending">'+esc(st)+'</span>';
+  if(!s||s==='Pending')return '<span class="pill pill-pending">Pending</span>';
+  if(s==='Paid to INSPT'||s==='Paid Directly to Insurer')return '<span class="pill pill-paid">'+esc(s)+'</span>';
+  if(s==='Credit')return '<span class="pill pill-credit">Credit</span>';
+  return '<span class="pill pill-pending">'+esc(s)+'</span>';
 }
 
-function fetchAll(){
+function processRecords(records){
+  var agentMap={};
+  var totalPolicies=0,totalPremium=0,totalCommission=0,totalNetComm=0;
+  records.forEach(function(rec){
+    totalPolicies++;
+    totalPremium+=n(rec.Premium);
+    totalCommission+=n(rec.Commission);
+    totalNetComm+=n(rec.Net_Commission);
+    var ag=agentName(rec.Insurer_Agents);
+    if(!ag||ag.toLowerCase()==='null'||ag==='-')return;
+    var cs=n(rec.Commission_Shared);
+    if(!agentMap[ag]) agentMap[ag]={name:ag,totalShared:0,count:0,policies:[]};
+    agentMap[ag].totalShared+=cs;
+    agentMap[ag].count++;
+    agentMap[ag].policies.push({
+      ref:rec.Reference_Number||'â',
+      policy:rec.Policy_Number||'â',
+      insured:rec.Insured_Name||'â',
+      date:rec.Invoice_Date||'â',
+      premium:n(rec.Premium),
+      commShared:cs,
+      status:rec.Dropdown1||'Pending'
+    });
+  });
+  return {agentMap:agentMap,totalPolicies:totalPolicies,totalPremium:totalPremium,totalCommission:totalCommission,totalNetComm:totalNetComm};
+}
+
+function render(records){
+  var r=processRecords(records);
+  var agentMap=r.agentMap,totalPolicies=r.totalPolicies,totalPremium=r.totalPremium,totalCommission=r.totalCommission,totalNetComm=r.totalNetComm;
+  var agents=Object.values(agentMap).sort(function(a,b){return b.totalShared-a.totalShared;});
+  var totalShared=agents.reduce(function(s,a){return s+a.totalShared;},0);
+  var now=new Date().toLocaleString('en-US',{timeZone:'Asia/Muscat',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+
+  var summaryHtml=
+    '<div class="sum-card"><div class="sum-card-label">Total Policies</div><div class="sum-card-value">'+totalPolicies+'</div></div>'+
+    '<div class="sum-card"><div class="sum-card-label">Total Premium</div><div class="sum-card-value">'+omr(totalPremium)+'</div></div>'+
+    '<div class="sum-card"><div class="sum-card-label">Total Commission</div><div class="sum-card-value">'+omr(totalCommission)+'</div></div>'+
+    '<div class="sum-card"><div class="sum-card-label">Net Commission</div><div class="sum-card-value">'+omr(totalNetComm)+'</div></div>'+
+    '<div class="sum-card"><div class="sum-card-label">Total Comm. Shared</div><div class="sum-card-value gold">'+omr(totalShared)+'</div></div>';
+
+  var agentCardsHtml=agents.length===0
+    ?'<div class="empty">No agent-sourced policies found yet.</div>'
+    :agents.map(function(ag,i){
+      var rows=ag.policies
+        .sort(function(a,b){return new Date(b.date)-new Date(a.date);})
+        .map(function(p){return '<tr>'+
+          '<td class="muted">'+esc(p.ref)+'</td>'+
+          '<td>'+esc(p.policy)+'</td>'+
+          '<td>'+esc(p.insured)+'</td>'+
+          '<td class="muted">'+p.date+'</td>'+
+          '<td style="text-align:right">'+omr(p.premium)+'</td>'+
+          '<td class="amt">'+omr(p.commShared)+'</td>'+
+          '<td>'+premStatusPill(p.status)+'</td>'+
+          '</tr>';}).join('');
+      return '<div class="agent-card">'+
+        '<div class="agent-head" onclick="toggle('+i+')">'+
+          '<div>'+
+            '<div class="agent-name">'+esc(ag.name)+'</div>'+
+            '<div class="agent-detail">'+ag.count+' polic'+(ag.count===1?'y':'ies')+' &nbsp;&middot;&nbsp; tap to expand</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:flex-start;gap:8px">'+
+            '<div>'+
+              '<div class="agent-amount">'+omr(ag.totalShared)+'</div>'+
+              '<div class="agent-amount-lbl">Comm. Shared</div>'+
+            '</div>'+
+            '<span class="chevron" id="chev'+i+'">&#9660;</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="agent-body" id="body'+i+'">'+
+          '<table class="t">'+
+            '<thead><tr><th>Ref</th><th>Policy</th><th>Insured</th><th>Date</th><th style="text-align:right">Premium</th><th style="text-align:right">Shared</th><th>Status</th></tr></thead>'+
+            '<tbody>'+rows+'</tbody>'+
+            '<tfoot><tr><td colspan="5" style="padding:7px 11px">Total</td><td class="amt" style="padding:7px 11px">'+omr(ag.totalShared)+'</td><td></td></tr></tfoot>'+
+          '</table>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+
+  var agentNote=agents.length>0
+    ?(agents.length+' agent(s) with commission data. Showing all-time totals.')
+    :'No placement agency data found. Ensure policies have Insurer Agents field populated.';
+
+  document.getElementById('root').innerHTML=
+    '<div class="dash-header">'+
+      '<div>'+
+        '<div class="dash-title">Insurance Spot â CEO Dashboard</div>'+
+        '<div class="dash-sub">Phase 1: Agent Commission Balance &nbsp;&middot;&nbsp; Muscat, Oman</div>'+
+      '</div>'+
+      '<div class="dash-meta">'+
+        'Updated: '+now+' (Oman)<br>'+
+        '<button class="refresh-btn" onclick="load()">&#8635; Refresh</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="summary-strip">'+summaryHtml+'</div>'+
+    '<div class="section-title">Agent Commission Balance</div>'+
+    '<div class="note">'+esc(agentNote)+'</div>'+
+    '<div class="agent-grid">'+agentCardsHtml+'</div>';
+}
+
+function toggle(i){
+  document.getElementById('body'+i).classList.toggle('open');
+  document.getElementById('chev'+i).classList.toggle('open');
+}
+
+function load(){
+  document.getElementById('root').innerHTML='<div class="spinner-wrap"><div class="spinner"></div>Loading...</div>';
   var all=[];
   var config={app_name:ZC_APP,report_name:ZC_REPORT,field_config:'all',max_records:1000};
-
   function fetchPage(){
     return ZOHO.CREATOR.DATA.getRecords(config).then(function(resp){
       if(!resp||resp.code!==3000){
-        var msg=resp?(resp.message||resp.error||JSON.stringify(resp)):'null response';
-        throw new Error('getRecords error (code '+(resp?resp.code:'null')+'): '+msg);
+        var msg=resp?(resp.message||resp.error||JSON.stringify(resp).slice(0,200)):'null response';
+        throw new Error('getRecords failed (code '+(resp?resp.code:'null')+'): '+msg);
       }
       var batch=resp.data||[];
       all=all.concat(batch);
@@ -125,120 +204,7 @@ function fetchAll(){
       return all;
     });
   }
-  return fetchPage();
-}
-
-function processRecords(records){
-  var agentMap={},insurerMap={};
-  var totalPolicies=0,totalPremium=0,totalCommission=0,totalNetComm=0,totalSharedAll=0;
-  var pendingCount=0,syncFailCount=0,receiptPendingCount=0;
-
-  records.forEach(function(rec){
-    totalPolicies++;
-    totalPremium+=n(rec.Premium);
-    totalCommission+=n(rec.Commission);
-    totalNetComm+=n(rec.Net_Commission);
-    var premStatus=rec.Dropdown1||'Pending';
-    if(premStatus==='Pending'||premStatus==='Partially Paid'||premStatus==='Credit')pendingCount++;
-    if(rec.Policy_Status==='Invoice Sync Failed'||rec.Zoho_Books_Sync_Status==='Failed')syncFailCount++;
-    if(rec.Receipt_Approval_Status==='Pending Approval')receiptPendingCount++;
-
-    var ag=agentName(rec.Insurer_Agents);
-    if(ag&&ag.toLowerCase()!=='null'){
-      var cs=n(rec.Commission_Shared);
-      totalSharedAll+=cs;
-      if(!agentMap[ag])agentMap[ag]={name:ag,totalShared:0,count:0,policies:[]};
-      agentMap[ag].totalShared+=cs;
-      agentMap[ag].count++;
-      agentMap[ag].policies.push({ref:rec.Reference_Number||'â',policy:rec.Policy_Number||'â',insured:rec.Insured_Name||'â',date:rec.Invoice_Date||'â',premium:n(rec.Premium),commShared:cs,status:premStatus});
-    }
-
-    var ins=insurerName(rec.Insurers);
-    if(!insurerMap[ins])insurerMap[ins]={name:ins,count:0,totalPremium:0,totalComm:0};
-    insurerMap[ins].count++;
-    insurerMap[ins].totalPremium+=n(rec.Premium);
-    insurerMap[ins].totalComm+=n(rec.Commission);
-  });
-
-  return{agentMap:agentMap,insurerMap:insurerMap,totalPolicies:totalPolicies,totalPremium:totalPremium,totalCommission:totalCommission,totalNetComm:totalNetComm,totalSharedAll:totalSharedAll,pendingCount:pendingCount,syncFailCount:syncFailCount,receiptPendingCount:receiptPendingCount};
-}
-
-function render(records){
-  var d=processRecords(records);
-  var agents=Object.values(d.agentMap).sort(function(a,b){return b.totalShared-a.totalShared;});
-  var insurers=Object.values(d.insurerMap).sort(function(a,b){return b.totalPremium-a.totalPremium;});
-  var now=new Date().toLocaleString('en-US',{timeZone:'Asia/Muscat',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
-
-  var summaryHtml=
-    '<div class="sum-card"><div class="sum-card-label">Total Policies</div><div class="sum-card-value">'+d.totalPolicies+'</div></div>'+
-    '<div class="sum-card"><div class="sum-card-label">Total Premium</div><div class="sum-card-value">'+omr(d.totalPremium)+'</div></div>'+
-    '<div class="sum-card"><div class="sum-card-label">Total Commission</div><div class="sum-card-value">'+omr(d.totalCommission)+'</div></div>'+
-    '<div class="sum-card"><div class="sum-card-label">Net Commission</div><div class="sum-card-value">'+omr(d.totalNetComm)+'</div></div>'+
-    '<div class="sum-card"><div class="sum-card-label">Total Comm. Shared</div><div class="sum-card-value gold">'+omr(d.totalSharedAll)+'</div></div>';
-
-  var statusHtml=
-    '<div class="status-card"><div class="status-label">Premium Pending</div><div class="status-value warn">'+d.pendingCount+'</div></div>'+
-    '<div class="status-card"><div class="status-label">Receipt Pending Approval</div><div class="status-value warn">'+d.receiptPendingCount+'</div></div>'+
-    (d.syncFailCount>0
-      ?'<div class="status-card"><div class="status-label">Invoice Sync Failed</div><div class="status-value danger">'+d.syncFailCount+'</div></div>'
-      :'<div class="status-card"><div class="status-label">Invoice Sync</div><div class="status-value good">OK</div></div>');
-
-  var agentNote=agents.length>0
-    ?agents.length+' agent(s) with data. Policies sourced via placement agents shown below. Commission Shared populated from June 2026 onwards.'
-    :'No placement agency data found. Policies with an agent assigned will appear here.';
-
-  var agentCardsHtml=agents.length===0
-    ?'<div class="empty">No placement agency data found yet.</div>'
-    :agents.map(function(ag,i){
-        var rows=ag.policies.slice().sort(function(a,b){return b.date>a.date?1:-1;}).map(function(p){
-          return'<tr><td class="muted">'+esc(p.ref)+'</td><td>'+esc(p.policy)+'</td><td>'+esc(p.insured)+'</td><td class="muted">'+esc(p.date)+'</td><td style="text-align:right">'+omr(p.premium)+'</td><td class="amt">'+omr(p.commShared)+'</td><td>'+premStatusPill(p.status)+'</td></tr>';
-        }).join('');
-        return'<div class="agent-card">'+
-          '<div class="agent-head" onclick="toggle('+i+')">'+
-            '<div><div class="agent-name">'+esc(ag.name)+'</div><div class="agent-detail">'+ag.count+' polic'+(ag.count===1?'y':'ies')+' &nbsp;&middot;&nbsp; tap to expand</div></div>'+
-            '<div style="display:flex;align-items:flex-start;gap:8px"><div><div class="agent-amount">'+omr(ag.totalShared)+'</div><div class="agent-amount-lbl">Comm. Shared</div></div><span class="chevron" id="chev'+i+'">&#9660;</span></div>'+
-          '</div>'+
-          '<div class="agent-body" id="body'+i+'">'+
-            '<table class="t"><thead><tr><th>Ref</th><th>Policy</th><th>Insured</th><th>Date</th><th style="text-align:right">Premium</th><th style="text-align:right">Shared</th><th>Status</th></tr></thead>'+
-            '<tbody>'+rows+'</tbody>'+
-            '<tfoot><tr><td colspan="5" style="padding:7px 11px">Total</td><td class="amt" style="padding:7px 11px">'+omr(ag.totalShared)+'</td><td></td></tr></tfoot>'+
-          '</table></div></div>';
-      }).join('');
-
-  var insurerCardsHtml=insurers.map(function(ins){
-    var commRate=ins.totalPremium>0?((ins.totalComm/ins.totalPremium)*100).toFixed(1):'0.0';
-    return'<div class="insurer-card">'+
-      '<div class="insurer-name" title="'+esc(ins.name)+'">'+esc(ins.name)+'</div>'+
-      '<div class="insurer-stat"><span>Policies</span><strong>'+ins.count+'</strong></div>'+
-      '<div class="insurer-stat"><span>Premium</span><strong>'+omr(ins.totalPremium)+'</strong></div>'+
-      '<div class="insurer-stat"><span>Commission</span><strong>'+omr(ins.totalComm)+'</strong></div>'+
-      '<div class="insurer-stat"><span>Comm Rate</span><strong>'+commRate+'%</strong></div>'+
-    '</div>';
-  }).join('');
-
-  document.getElementById('root').innerHTML=
-    '<div class="dash-header">'+
-      '<div><div class="dash-title">Insurance Spot â CEO Dashboard</div><div class="dash-sub">All-Time Summary &nbsp;&middot;&nbsp; Muscat, Oman</div></div>'+
-      '<div class="dash-meta">Updated: '+now+' (Oman)<br><button class="refresh-btn" onclick="load()">&#8635; Refresh</button></div>'+
-    '</div>'+
-    '<div class="summary-strip">'+summaryHtml+'</div>'+
-    '<div class="section-title">Status Overview</div>'+
-    '<div class="status-strip">'+statusHtml+'</div>'+
-    '<div class="section-title">Agent Commission Balance</div>'+
-    '<div class="note">'+esc(agentNote)+'</div>'+
-    '<div class="agent-grid">'+agentCardsHtml+'</div>'+
-    '<div class="section-title">Premium by Insurer</div>'+
-    '<div class="insurer-grid">'+insurerCardsHtml+'</div>';
-}
-
-function toggle(i){
-  document.getElementById('body'+i).classList.toggle('open');
-  document.getElementById('chev'+i).classList.toggle('open');
-}
-
-function load(){
-  document.getElementById('root').innerHTML='<div class="spinner-wrap"><div class="spinner"></div>Loading...</div>';
-  fetchAll().then(function(records){
+  fetchPage().then(function(records){
     allRecords=records;
     render(allRecords);
   }).catch(function(e){
