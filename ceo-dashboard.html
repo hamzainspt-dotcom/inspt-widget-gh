@@ -3,197 +3,372 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>INSPT CEO Dashboard</title>
+<title>Insurance Spot — CEO Dashboard</title>
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
-:root{color-scheme:light}
+:root{
+  color-scheme:dark;
+
+  /* Surfaces — navy ramp, near-black base up to raised panels */
+  --bg:#091320;
+  --bg-glow:#13294a;
+  --panel:#0f2034;
+  --panel-2:#142a44;
+  --panel-3:#1a3450;
+
+  /* Hairlines */
+  --line:rgba(150,180,216,.12);
+  --line-strong:rgba(150,180,216,.22);
+
+  /* Ink ramp — cool-tinted, contrast-checked on --panel */
+  --ink:#eaf1fa;
+  --ink-2:#b0c1d6;
+  --ink-3:#8ba0ba;
+
+  /* Brand */
+  --navy:#1e3a5f;
+  --gold-deep:#b45309;   /* brand gold — fills / on-light */
+  --gold:#e7a83c;        /* gold accent on dark */
+  --gold-bright:#f4bd5c; /* hero figures on dark */
+  --gold-tint:rgba(231,168,60,.10);
+  --gold-line:rgba(231,168,60,.30);
+
+  /* Semantic */
+  --ok:#5fd99a;          --ok-tint:rgba(95,217,154,.13);
+  --warn:#f0b54a;        --warn-tint:rgba(240,181,74,.13);
+  --danger:#f3766b;      --danger-tint:rgba(243,118,107,.13);
+  --info:#7fc2f0;        --info-tint:rgba(127,194,240,.13);
+  --plum:#c4abff;        --plum-tint:rgba(168,130,250,.14);
+
+  /* Type */
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+
+  /* Motion */
+  --ease:cubic-bezier(.22,1,.36,1);   /* ease-out-quint-ish */
+  --fast:.18s;
+
+  /* Elevation — soft drop + inset top highlight for a crafted raised feel */
+  --shadow:0 1px 2px rgba(0,0,0,.30),0 8px 24px -16px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.035);
+  --shadow-hi:0 2px 4px rgba(0,0,0,.34),0 16px 36px -18px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);
+
+  --z-sticky:100;
+}
+
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4f8;color:#0f172a;font-size:14px;padding:16px}
-.spinner-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:#64748b;font-size:13px}
-.spinner{width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#1e3a5f;border-radius:50%;animation:spin .7s linear infinite}
+html{font-size:16px}
+body{
+  font-family:var(--sans);
+  background:
+    radial-gradient(1100px 480px at 78% -180px,var(--bg-glow) 0%,transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+  color:var(--ink);
+  font-size:.875rem;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  padding:20px;
+}
+.wrap{max-width:1240px;margin:0 auto}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+/* ── Header ───────────────────────────────────────────── */
+.dash-header{
+  position:sticky;top:8px;z-index:var(--z-sticky);
+  background:linear-gradient(180deg,rgba(20,42,68,.92),rgba(15,32,52,.92));
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);
+  padding:16px 22px;margin-bottom:22px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
+}
+.brand{display:flex;align-items:center;gap:13px;min-width:0}
+.brand-mark{
+  flex:none;width:38px;height:38px;border-radius:11px;
+  background:linear-gradient(150deg,#27548a,var(--navy));
+  border:1px solid var(--gold-line);
+  display:grid;place-items:center;color:var(--gold-bright);
+  font-weight:800;font-size:15px;letter-spacing:-.02em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 2px 8px -2px rgba(0,0,0,.5);
+}
+.brand-text{min-width:0}
+.dash-title{font-size:1.0625rem;font-weight:700;letter-spacing:-.015em;color:var(--ink)}
+.dash-sub{font-size:.6875rem;color:var(--ink-3);margin-top:1px;display:flex;align-items:center;gap:7px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--ok-tint)}
+.header-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.updated{font-size:.6875rem;color:var(--ink-3);text-align:right;line-height:1.5}
+.updated b{color:var(--ink-2);font-weight:600}
+.refresh-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--panel-2);color:var(--ink);
+  border:1px solid var(--line-strong);
+  padding:8px 14px 8px 12px;border-radius:10px;
+  font:inherit;font-size:.75rem;font-weight:600;cursor:pointer;
+  transition:background var(--fast) var(--ease),border-color var(--fast) var(--ease),transform var(--fast) var(--ease);
+}
+.refresh-btn:hover{background:var(--panel-3);border-color:var(--gold-line);color:#fff}
+.refresh-btn:active{transform:scale(.97)}
+.refresh-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.refresh-btn svg{width:14px;height:14px;color:var(--gold)}
+
+/* ── Section headers ──────────────────────────────────── */
+.section{margin-bottom:30px}
+.section-title{
+  display:flex;align-items:center;gap:9px;
+  font-size:.8125rem;font-weight:700;letter-spacing:.01em;color:var(--ink);
+  margin-bottom:13px;
+}
+.section-title::before{
+  content:'';width:7px;height:7px;flex:none;
+  background:linear-gradient(135deg,var(--gold-bright),var(--gold-deep));
+  border-radius:1.5px;transform:rotate(45deg);
+}
+.section-title .count{
+  font-size:.6875rem;font-weight:600;color:var(--ink-3);
+  background:var(--panel);border:1px solid var(--line);
+  padding:1px 8px;border-radius:20px;
+}
+
+/* ── KPI strip ────────────────────────────────────────── */
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-bottom:22px}
+.kpi{
+  background:var(--panel);border:1px solid var(--line);border-radius:13px;
+  padding:15px 16px 16px;box-shadow:var(--shadow);
+  position:relative;overflow:hidden;
+}
+.kpi-label{
+  font-size:.625rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--ink-3);margin-bottom:9px;display:block;
+}
+.kpi-val{font-size:1.625rem;font-weight:750;color:var(--ink);line-height:1;display:flex;align-items:baseline;gap:5px}
+.kpi-val .unit{font-size:.75rem;font-weight:600;color:var(--ink-3);letter-spacing:0}
+.kpi--gold{background:linear-gradient(180deg,var(--gold-tint),transparent),var(--panel);border-color:var(--gold-line)}
+.kpi--gold .kpi-val{color:var(--gold-bright)}
+.kpi--gold .kpi-val .unit{color:var(--gold)}
+.kpi--gold .kpi-label{color:var(--gold)}
+
+/* ── Status flags ─────────────────────────────────────── */
+.status-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.status-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:13px;
+  padding:14px 16px;box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:13px;
+}
+.status-icon{
+  flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+}
+.status-icon svg{width:17px;height:17px}
+.status-body{min-width:0}
+.status-label{font-size:.625rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3)}
+.status-value{font-size:1.375rem;font-weight:750;line-height:1.15;margin-top:1px}
+.s-warn .status-icon{background:var(--warn-tint);color:var(--warn)} .s-warn .status-value{color:var(--warn)}
+.s-info .status-icon{background:var(--info-tint);color:var(--info)} .s-info .status-value{color:var(--info)}
+.s-ok   .status-icon{background:var(--ok-tint);color:var(--ok)}     .s-ok   .status-value{color:var(--ok);font-size:1.0625rem;display:flex;align-items:center;gap:6px}
+.s-danger .status-icon{background:var(--danger-tint);color:var(--danger)} .s-danger .status-value{color:var(--danger)}
+
+/* ── Agent cards ──────────────────────────────────────── */
+.note{
+  font-size:.75rem;color:var(--ink-2);line-height:1.55;margin-bottom:14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;
+  display:flex;gap:9px;align-items:flex-start;
+}
+.note svg{width:14px;height:14px;color:var(--gold);flex:none;margin-top:1px}
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:13px}
+.agent-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);overflow:hidden;
+  transition:border-color var(--fast) var(--ease),box-shadow var(--fast) var(--ease);
+}
+.agent-card:hover{border-color:var(--line-strong);box-shadow:var(--shadow-hi)}
+.agent-card.open{border-color:var(--gold-line)}
+.agent-head{
+  padding:15px 17px;cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  transition:background var(--fast) var(--ease);
+}
+.agent-head:hover{background:var(--panel-2)}
+.agent-head:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:12px}
+.rank{
+  flex:none;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;
+  background:var(--panel-3);color:var(--ink-2);font-size:.6875rem;font-weight:700;
+  font-variant-numeric:tabular-nums;border:1px solid var(--line);
+}
+.agent-card:first-child .rank{background:var(--gold-tint);color:var(--gold-bright);border-color:var(--gold-line)}
+.agent-id{display:flex;align-items:center;gap:11px;min-width:0}
+.agent-name{font-weight:700;font-size:.9375rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-detail{font-size:.6875rem;color:var(--ink-3);margin-top:2px}
+.agent-right{display:flex;align-items:center;gap:11px;flex:none}
+.agent-amount{font-size:1.0625rem;font-weight:750;color:var(--gold-bright);text-align:right;line-height:1}
+.agent-amount .unit{font-size:.625rem;color:var(--gold);font-weight:600}
+.agent-amount-lbl{font-size:.5625rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);margin-top:3px;text-align:right}
+.chevron{color:var(--ink-3);transition:transform .26s var(--ease),color var(--fast) var(--ease)}
+.chevron svg{width:15px;height:15px;display:block}
+.agent-card.open .chevron{transform:rotate(180deg);color:var(--gold)}
+
+/* expand via grid-rows — animatable, no max-height guesswork */
+.agent-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s var(--ease)}
+.agent-card.open .agent-body{grid-template-rows:1fr}
+.agent-body-inner{overflow:hidden;min-height:0}
+.table-scroll{overflow-x:auto;border-top:1px solid var(--line)}
+
+table.t{width:100%;border-collapse:collapse;font-size:.75rem}
+table.t th{
+  padding:9px 13px;text-align:left;background:var(--panel-2);
+  color:var(--ink-3);font-size:.625rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;
+  position:sticky;top:0;
+}
+table.t td{padding:9px 13px;border-top:1px solid var(--line);white-space:nowrap;vertical-align:middle;color:var(--ink-2)}
+table.t tbody tr{transition:background var(--fast) var(--ease)}
+table.t tbody tr:hover td{background:var(--panel-2)}
+table.t td.insured{color:var(--ink);font-weight:500}
+table.t .amt{text-align:right;font-weight:700;color:var(--gold-bright);font-variant-numeric:tabular-nums}
+table.t .right{text-align:right;font-variant-numeric:tabular-nums}
+table.t .muted{color:var(--ink-3)}
+table.t tfoot td{background:var(--gold-tint);font-weight:700;color:var(--gold-bright);border-top:1px solid var(--gold-line)}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:.625rem;font-weight:700;letter-spacing:.01em;white-space:nowrap}
+.pill::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.85}
+.pill-pending{background:var(--warn-tint);color:var(--warn)}
+.pill-paid{background:var(--ok-tint);color:var(--ok)}
+.pill-direct{background:var(--info-tint);color:var(--info)}
+.pill-credit{background:var(--plum-tint);color:var(--plum)}
+
+/* ── Insurer grid ─────────────────────────────────────── */
+.insurer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px}
+.insurer-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:13px;
+  padding:15px 16px;box-shadow:var(--shadow);
+  transition:border-color var(--fast) var(--ease),box-shadow var(--fast) var(--ease);
+}
+.insurer-card:hover{border-color:var(--line-strong);box-shadow:var(--shadow-hi)}
+.insurer-name{
+  font-weight:700;font-size:.875rem;color:var(--ink);margin-bottom:11px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.insurer-stat{display:flex;justify-content:space-between;align-items:baseline;font-size:.75rem;color:var(--ink-3);margin-top:6px}
+.insurer-stat b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
+.insurer-stat b.gold{color:var(--gold-bright)}
+.rate-row{margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.rate-head{display:flex;justify-content:space-between;font-size:.625rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-bottom:6px}
+.rate-head b{color:var(--gold);font-weight:700;letter-spacing:0}
+.rate-track{height:5px;border-radius:3px;background:var(--panel-3);overflow:hidden}
+.rate-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold-deep),var(--gold-bright));transform-origin:left;transform:scaleX(var(--r,0));transition:transform .6s var(--ease) .15s}
+
+/* ── Entrance (one deliberate load moment) ───────────── */
+@keyframes enter{from{opacity:0;transform:translateY(9px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+.anim{animation:enter .5s var(--ease) backwards;animation-delay:calc(var(--i,0)*42ms)}
+
+/* ── Skeleton loading ─────────────────────────────────── */
+.sk-grid{display:grid;gap:12px}
+.sk{position:relative;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:13px}
+.sk::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(150,180,216,.07) 50%,transparent 100%);
+  background-size:200% 100%;animation:shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer{from{background-position:120% 0}to{background-position:-120% 0}}
+.sk-kpi{height:88px} .sk-status{height:64px} .sk-card{height:60px} .sk-ins{height:148px}
+.sk-load-label{font-size:.75rem;color:var(--ink-3);margin:2px 0 14px;display:flex;align-items:center;gap:8px}
+.sk-spin{width:13px;height:13px;border:2px solid var(--line-strong);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.err{background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:16px 20px;color:#991b1b;font-size:13px;line-height:1.6}
-.err strong{display:block;margin-bottom:6px;font-size:14px}
-.err code{background:#fee2e2;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:12px}
-.dash-header{background:#1e3a5f;color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
-.dash-title{font-size:16px;font-weight:700}
-.dash-sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px}
-.dash-meta{font-size:11px;color:rgba(255,255,255,.55);text-align:right}
-.refresh-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px}
-.refresh-btn:hover{background:rgba(255,255,255,.25)}
-.summary-stripydisplay:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
-.sum-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;flex:1;min-width:140px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.sum-card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#64748b;margin-bottom:5px}
-.sum-card-value{font-size:18px;font-weight:800;color:#1e3a5f}
-.sum-card-value.gold{color:#b45309}
-.section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1e3a5f;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.section-title::before{content:'';width:3px;height:16px;background:#b45309;border-radius:2px;display:inline-block}
-.note{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:9px 13px;font-size:12px;color:#92400e;margin-bottom:14px}
-.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
-.agent-card{background:#fff;border:1px solid #e2e8f0;border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
-.agent-head{padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;transition:background .15s}
-.agent-head:hover{background:#f8fafc}
-.agent-name{font-weight:700;font-size:15px;color:#1e3a5f}
-.agent-detail{font-size:11px;color:#64748b;margin-top:3px}
-.agent-amount{font-size:17px;font-weight:800;color:#b45309;text-align:right}
-.agent-amount-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-top:2px}
-.chevron{color:#94a3b8;font-size:11px;margin-top:3px;transition:transform .2s;display:block}
-.chevron.open{transform:rotate(180deg)}
-.agent-body{display:none;border-top:1px solid #f1f5f9;overflow-x:auto}
-.agent-body.open{display:block}
-table.t{width:100%;border-collapse:collapse;font-size:12px}
-table.t th{padding:7px 11px;text-align:left;background:#f8fafc;color:#94a3b8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
-table.t td{padding:7px 11px;border-top:1px solid #f1f5f9;white-space:nowrap;vertical-align:middle}
-table.t tr:hover td{background:#f8fafc}
-table.t .amt{text-align:right;font-weight:700;color:#b45309}
-table.t .muted{color:#94a3b8}
-table.t tfoot td{background:#fef3c7;font-weight:700;color:#1e3a5f}
-.pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700}
-.pill-pending{background:#fef9c3;color:#854d0e}
-.pill-paid{background:#dcfce7;color:#166534}
-.pill-direct{background:#dbeafe;color:#1e40af}
-.pill-credit{background:#f3e8ff;color:#6b21a8}
-.empty{color:#94a3b8;text-align:center;padding:20px;font-size:13px;font-style:italic}
+
+/* ── Empty / error ────────────────────────────────────── */
+.empty{
+  grid-column:1/-1;text-align:center;padding:34px 20px;color:var(--ink-3);font-size:.8125rem;
+  background:var(--panel);border:1px dashed var(--line-strong);border-radius:13px;
+}
+.empty svg{width:26px;height:26px;color:var(--ink-3);opacity:.6;margin-bottom:9px}
+.empty b{display:block;color:var(--ink-2);font-size:.875rem;margin-bottom:4px;font-weight:600}
+.err{
+  background:var(--danger-tint);border:1px solid rgba(243,118,107,.4);border-radius:13px;
+  padding:18px 20px;color:#ffd9d4;font-size:.8125rem;line-height:1.6;
+}
+.err strong{display:flex;align-items:center;gap:8px;color:var(--danger);font-size:.9375rem;margin-bottom:8px}
+.err strong svg{width:17px;height:17px}
+.err code{background:rgba(0,0,0,.28);padding:1px 6px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.75rem;color:#ffe3df}
+.err .detail{color:#f6b3ac;word-break:break-word}
+
+@media (max-width:640px){
+  body{padding:13px}
+  .dash-header{top:0;padding:14px 16px}
+  .header-right{width:100%;justify-content:space-between}
+  .kpi-val{font-size:1.4375rem}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important;
+  }
+  .rate-fill{transform:scaleX(var(--r,0))}
+}
 </style>
 </head>
 <body>
-<div id="root"><div class="spinner-wrap"><div class="spinner"></div>Loading dashboard...</div></div>
+<div class="wrap"><div id="root"></div></div>
 <script>
 var ZC_APP='inspt-policy-accounting-system';
 var ZC_REPORT='All_Policy_Entries';
 var allRecords=[];
 
+/* ── Helpers ─────────────────────────────────────────── */
 function n(v){return parseFloat(v)||0;}
 function omr(v){return 'OMR '+n(v).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});}
+function omrNum(v){return n(v).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+/* Inline icons */
+var IC={
+  refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg>',
+  chevron:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  receipt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18l2.5-1.5L10 21l2-1.5L14 21l2.5-1.5L19 21V3l-2.5 1.5L14 3l-2 1.5L10 3 7.5 4.5 5 3z"/><path d="M9 8h6M9 12h6"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+  empty:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z"/></svg>'
+};
+
+/* agentName — Creator returns empty lookups as {ID:'',Agent_Name:''}, NOT null.
+   Must check ID first or every blank lookup counts as a phantom agent. Preserve exactly. */
 function agentName(f){
-  if(!f||f===''||f===null)return null;
-  if(typeof f==='object') return f.display_value||f.Agent_Name||f.agent_name||JSON.stringify(f);
-  return String(f).trim();
+  if(f===null||f===undefined||f==='')return null;
+  if(typeof f==='object'){
+    var id=String(f.ID||f.id||'').trim();
+    if(!id||id===''||id==='0')return null;
+    var v=f.display_value||f.Agent_Name||f.agent_name;
+    if(v&&String(v).trim())return String(v).trim();
+    return null;
+  }
+  var s=String(f).trim();
+  if(!s||s==='null'||s==='{}'||s.charAt(0)==='{')return null;
+  return s;
+}
+
+function insurerName(f){
+  if(f===null||f===undefined||f==='')return'Unknown';
+  if(typeof f==='object')return f.display_value||f.Insurer_Name||f.insurer_name||'Unknown';
+  var s=String(f).trim();
+  return(s===''||s==='null')?'Unknown':s;
 }
 
 function premStatusPill(s){
-  if(!s||s==='Pending')return '<span class="pill pill-pending">Pending</span>';
-  if(s==='Paid to INSPT'||s==='Paid Directly to Insurer')return '<span class="pill pill-paid">'+esc(s)+'</span>';
-  if(s==='Credit')return '<span class="pill pill-credit">Credit</span>';
-  return '<span class="pill pill-pending">'+esc(s)+'</span>';
+  var st=s||'Pending';
+  if(st==='Paid to INSPT'||st==='Paid Directly to Insurer')return'<span class="pill pill-paid">'+esc(st)+'</span>';
+  if(st==='Credit')return'<span class="pill pill-credit">Credit</span>';
+  if(st==='Cancelled')return'<span class="pill pill-direct">Cancelled</span>';
+  return'<span class="pill pill-pending">'+esc(st)+'</span>';
 }
 
-function processRecords(records){
-  var agentMap={};
-  var totalPolicies=0,totalPremium=0,totalCommission=0,totalNetComm=0;
-  records.forEach(function(rec){
-    totalPolicies++;
-    totalPremium+=n(rec.Premium);
-    totalCommission+=n(rec.Commission);
-    totalNetComm+=n(rec.Net_Commission);
-    var ag=agentName(rec.Insurer_Agents);
-    if(!ag||ag.toLowerCase()==='null'||ag==='-')return;
-    var cs=n(rec.Commission_Shared);
-    if(!agentMap[ag]) agentMap[ag]={name:ag,totalShared:0,count:0,policies:[]};
-    agentMap[ag].totalShared+=cs;
-    agentMap[ag].count++;
-    agentMap[ag].policies.push({
-      ref:rec.Reference_Number||'â',
-      policy:rec.Policy_Number||'â',
-      insured:rec.Insured_Name||'â',
-      date:rec.Invoice_Date||'â',
-      premium:n(rec.Premium),
-      commShared:cs,
-      status:rec.Dropdown1||'Pending'
-    });
-  });
-  return {agentMap:agentMap,totalPolicies:totalPolicies,totalPremium:totalPremium,totalCommission:totalCommission,totalNetComm:totalNetComm};
-}
-
-function render(records){
-  var r=processRecords(records);
-  var agentMap=r.agentMap,totalPolicies=r.totalPolicies,totalPremium=r.totalPremium,totalCommission=r.totalCommission,totalNetComm=r.totalNetComm;
-  var agents=Object.values(agentMap).sort(function(a,b){return b.totalShared-a.totalShared;});
-  var totalShared=agents.reduce(function(s,a){return s+a.totalShared;},0);
-  var now=new Date().toLocaleString('en-US',{timeZone:'Asia/Muscat',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
-
-  var summaryHtml=
-    '<div class="sum-card"><div class="sum-card-label">Total Policies</div><div class="sum-card-value">'+totalPolicies+'</div></div>'+
-    '<div class="sum-card"><div class="sum-card-label">Total Premium</div><div class="sum-card-value">'+omr(totalPremium)+'</div></div>'+
-    '<div class="sum-card"><div class="sum-card-label">Total Commission</div><div class="sum-card-value">'+omr(totalCommission)+'</div></div>'+
-    '<div class="sum-card"><div class="sum-card-label">Net Commission</div><div class="sum-card-value">'+omr(totalNetComm)+'</div></div>'+
-    '<div class="sum-card"><div class="sum-card-label">Total Comm. Shared</div><div class="sum-card-value gold">'+omr(totalShared)+'</div></div>';
-
-  var agentCardsHtml=agents.length===0
-    ?'<div class="empty">No agent-sourced policies found yet.</div>'
-    :agents.map(function(ag,i){
-      var rows=ag.policies
-        .sort(function(a,b){return new Date(b.date)-new Date(a.date);})
-        .map(function(p){return '<tr>'+
-          '<td class="muted">'+esc(p.ref)+'</td>'+
-          '<td>'+esc(p.policy)+'</td>'+
-          '<td>'+esc(p.insured)+'</td>'+
-          '<td class="muted">'+p.date+'</td>'+
-          '<td style="text-align:right">'+omr(p.premium)+'</td>'+
-          '<td class="amt">'+omr(p.commShared)+'</td>'+
-          '<td>'+premStatusPill(p.status)+'</td>'+
-          '</tr>';}).join('');
-      return '<div class="agent-card">'+
-        '<div class="agent-head" onclick="toggle('+i+')">'+
-          '<div>'+
-            '<div class="agent-name">'+esc(ag.name)+'</div>'+
-            '<div class="agent-detail">'+ag.count+' polic'+(ag.count===1?'y':'ies')+' &nbsp;&middot;&nbsp; tap to expand</div>'+
-          '</div>'+
-          '<div style="display:flex;align-items:flex-start;gap:8px">'+
-            '<div>'+
-              '<div class="agent-amount">'+omr(ag.totalShared)+'</div>'+
-              '<div class="agent-amount-lbl">Comm. Shared</div>'+
-            '</div>'+
-            '<span class="chevron" id="chev'+i+'">&#9660;</span>'+
-          '</div>'+
-        '</div>'+
-        '<div class="agent-body" id="body'+i+'">'+
-          '<table class="t">'+
-            '<thead><tr><th>Ref</th><th>Policy</th><th>Insured</th><th>Date</th><th style="text-align:right">Premium</th><th style="text-align:right">Shared</th><th>Status</th></tr></thead>'+
-            '<tbody>'+rows+'</tbody>'+
-            '<tfoot><tr><td colspan="5" style="padding:7px 11px">Total</td><td class="amt" style="padding:7px 11px">'+omr(ag.totalShared)+'</td><td></td></tr></tfoot>'+
-          '</table>'+
-        '</div>'+
-      '</div>';
-    }).join('');
-
-  var agentNote=agents.length>0
-    ?(agents.length+' agent(s) with commission data. Showing all-time totals.')
-    :'No placement agency data found. Ensure policies have Insurer Agents field populated.';
-
-  document.getElementById('root').innerHTML=
-    '<div class="dash-header">'+
-      '<div>'+
-        '<div class="dash-title">Insurance Spot â CEO Dashboard</div>'+
-        '<div class="dash-sub">Phase 1: Agent Commission Balance &nbsp;&middot;&nbsp; Muscat, Oman</div>'+
-      '</div>'+
-      '<div class="dash-meta">'+
-        'Updated: '+now+' (Oman)<br>'+
-        '<button class="refresh-btn" onclick="load()">&#8635; Refresh</button>'+
-      '</div>'+
-    '</div>'+
-    '<div class="summary-strip">'+summaryHtml+'</div>'+
-    '<div class="section-title">Agent Commission Balance</div>'+
-    '<div class="note">'+esc(agentNote)+'</div>'+
-    '<div class="agent-grid">'+agentCardsHtml+'</div>';
-}
-
-function toggle(i){
-  document.getElementById('body'+i).classList.toggle('open');
-  document.getElementById('chev'+i).classList.toggle('open');
-}
-
-function load(){
-  document.getElementById('root').innerHTML='<div class="spinner-wrap"><div class="spinner"></div>Loading...</div>';
+/* ── Data fetch (SDK v2, paginated via record_cursor) ── */
+function fetchAll(){
   var all=[];
   var config={app_name:ZC_APP,report_name:ZC_REPORT,field_config:'all',max_records:1000};
+
   function fetchPage(){
     return ZOHO.CREATOR.DATA.getRecords(config).then(function(resp){
       if(!resp||resp.code!==3000){
-        var msg=resp?(resp.message||resp.error||JSON.stringify(resp).slice(0,200)):'null response';
-        throw new Error('getRecords failed (code '+(resp?resp.code:'null')+'): '+msg);
+        var msg=resp?(resp.message||resp.error||JSON.stringify(resp)):'null response';
+        throw new Error('getRecords error (code '+(resp?resp.code:'null')+'): '+msg);
       }
       var batch=resp.data||[];
       all=all.concat(batch);
@@ -204,17 +379,208 @@ function load(){
       return all;
     });
   }
-  fetchPage().then(function(records){
+  return fetchPage();
+}
+
+/* ── Aggregation ─────────────────────────────────────── */
+function processRecords(records){
+  var agentMap={},insurerMap={};
+  var totalPolicies=0,totalPremium=0,totalCommission=0,totalNetComm=0,totalSharedAll=0;
+  var pendingCount=0,syncFailCount=0,receiptPendingCount=0;
+
+  records.forEach(function(rec){
+    totalPolicies++;
+    totalPremium+=n(rec.Premium);
+    totalCommission+=n(rec.Commission);
+    totalNetComm+=n(rec.Net_Commission);
+    var premStatus=rec.Dropdown1||'Pending';
+    if(premStatus==='Pending'||premStatus==='Partially Paid'||premStatus==='Credit')pendingCount++;
+    if(rec.Policy_Status==='Invoice Sync Failed'||rec.Zoho_Books_Sync_Status==='Failed')syncFailCount++;
+    if(rec.Receipt_Approval_Status==='Pending Approval')receiptPendingCount++;
+
+    var ag=agentName(rec.Insurer_Agents);
+    if(ag&&ag.toLowerCase()!=='null'){
+      var cs=n(rec.Commission_Shared);
+      totalSharedAll+=cs;
+      if(!agentMap[ag])agentMap[ag]={name:ag,totalShared:0,count:0,policies:[]};
+      agentMap[ag].totalShared+=cs;
+      agentMap[ag].count++;
+      agentMap[ag].policies.push({ref:rec.Reference_Number||'—',policy:rec.Policy_Number||'—',insured:rec.Insured_Name||'—',date:rec.Invoice_Date||'—',premium:n(rec.Premium),commShared:cs,status:premStatus});
+    }
+
+    var ins=insurerName(rec.Insurers);
+    if(!insurerMap[ins])insurerMap[ins]={name:ins,count:0,totalPremium:0,totalComm:0};
+    insurerMap[ins].count++;
+    insurerMap[ins].totalPremium+=n(rec.Premium);
+    insurerMap[ins].totalComm+=n(rec.Commission);
+  });
+
+  return{agentMap:agentMap,insurerMap:insurerMap,totalPolicies:totalPolicies,totalPremium:totalPremium,totalCommission:totalCommission,totalNetComm:totalNetComm,totalSharedAll:totalSharedAll,pendingCount:pendingCount,syncFailCount:syncFailCount,receiptPendingCount:receiptPendingCount};
+}
+
+/* ── Markup builders ─────────────────────────────────── */
+function headerHtml(now){
+  return '<div class="dash-header">'+
+    '<div class="brand">'+
+      '<div class="brand-mark">IS</div>'+
+      '<div class="brand-text">'+
+        '<div class="dash-title">Insurance Spot — CEO Dashboard</div>'+
+        '<div class="dash-sub"><span class="live-dot"></span>All-time summary · Muscat, Oman</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="header-right">'+
+      '<div class="updated">Last updated<br><b>'+now+'</b> (Oman)</div>'+
+      '<button class="refresh-btn" onclick="load()" aria-label="Refresh dashboard data">'+IC.refresh+'Refresh</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function kpi(label,value,unit,gold,i){
+  var u=unit?'<span class="unit">'+unit+'</span>':'';
+  return '<div class="kpi anim'+(gold?' kpi--gold':'')+'" style="--i:'+i+'">'+
+    '<span class="kpi-label">'+label+'</span>'+
+    '<div class="kpi-val num">'+u+value+'</div>'+
+  '</div>';
+}
+
+function statusCard(cls,icon,label,valueHtml,i){
+  return '<div class="status-card '+cls+' anim" style="--i:'+i+'">'+
+    '<div class="status-icon">'+icon+'</div>'+
+    '<div class="status-body"><div class="status-label">'+label+'</div><div class="status-value num">'+valueHtml+'</div></div>'+
+  '</div>';
+}
+
+function render(records){
+  var d=processRecords(records);
+  var agents=Object.values(d.agentMap).sort(function(a,b){return b.totalShared-a.totalShared;});
+  var insurers=Object.values(d.insurerMap).sort(function(a,b){return b.totalPremium-a.totalPremium;});
+  var now=new Date().toLocaleString('en-US',{timeZone:'Asia/Muscat',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+
+  /* KPI strip */
+  var kpiHtml=
+    kpi('Total Policies',String(d.totalPolicies),'',false,0)+
+    kpi('Total Premium',omrNum(d.totalPremium),'OMR',false,1)+
+    kpi('Total Commission',omrNum(d.totalCommission),'OMR',false,2)+
+    kpi('Net Commission',omrNum(d.totalNetComm),'OMR',false,3)+
+    kpi('Total Comm. Shared',omrNum(d.totalSharedAll),'OMR',true,4);
+
+  /* Status flags */
+  var syncCard=d.syncFailCount>0
+    ?statusCard('s-danger',IC.alert,'Invoice Sync Failed',String(d.syncFailCount),2)
+    :statusCard('s-ok',IC.check,'Invoice Sync',IC.check+'All synced',2);
+  var statusHtml=
+    statusCard('s-warn',IC.clock,'Premium Pending',String(d.pendingCount),0)+
+    statusCard('s-info',IC.receipt,'Receipt Pending Approval',String(d.receiptPendingCount),1)+
+    syncCard;
+
+  /* Agent cards */
+  var agentNote='<div class="note">'+IC.info+'<span>'+
+    (agents.length>0
+      ? esc(agents.length)+' agent'+(agents.length===1?'':'s')+' with placement data. Commission Shared is populated from June 2026 onward. Select a card to view its policies.'
+      : 'No placement agency data found yet. Policies with an assigned agent will appear here.')+
+    '</span></div>';
+
+  var agentCardsHtml=agents.length===0
+    ? '<div class="empty">'+IC.empty+'<b>No agent commission data</b>Policies routed through a placement agent will populate this view.</div>'
+    : agents.map(function(ag,i){
+        var rows=ag.policies.slice().sort(function(a,b){return b.date>a.date?1:-1;}).map(function(p){
+          return '<tr>'+
+            '<td class="muted">'+esc(p.ref)+'</td>'+
+            '<td>'+esc(p.policy)+'</td>'+
+            '<td class="insured">'+esc(p.insured)+'</td>'+
+            '<td class="muted">'+esc(p.date)+'</td>'+
+            '<td class="right">'+omr(p.premium)+'</td>'+
+            '<td class="amt">'+omr(p.commShared)+'</td>'+
+            '<td>'+premStatusPill(p.status)+'</td>'+
+          '</tr>';
+        }).join('');
+        return '<div class="agent-card anim" id="ac'+i+'" style="--i:'+i+'">'+
+          '<div class="agent-head" role="button" tabindex="0" aria-expanded="false" aria-controls="ab'+i+'" onclick="toggle('+i+')" onkeydown="keyToggle(event,'+i+')">'+
+            '<div class="agent-id">'+
+              '<div class="rank">'+(i+1)+'</div>'+
+              '<div style="min-width:0"><div class="agent-name" title="'+esc(ag.name)+'">'+esc(ag.name)+'</div>'+
+              '<div class="agent-detail">'+ag.count+' polic'+(ag.count===1?'y':'ies')+'</div></div>'+
+            '</div>'+
+            '<div class="agent-right">'+
+              '<div><div class="agent-amount num"><span class="unit">OMR </span>'+omrNum(ag.totalShared)+'</div><div class="agent-amount-lbl">Comm. shared</div></div>'+
+              '<span class="chevron">'+IC.chevron+'</span>'+
+            '</div>'+
+          '</div>'+
+          '<div class="agent-body" id="ab'+i+'">'+
+            '<div class="agent-body-inner"><div class="table-scroll">'+
+              '<table class="t"><thead><tr><th>Ref</th><th>Policy No</th><th>Insured</th><th>Date</th><th class="right">Premium</th><th class="right">Comm. Shared</th><th>Status</th></tr></thead>'+
+              '<tbody>'+rows+'</tbody>'+
+              '<tfoot><tr><td colspan="5">Total comm. shared</td><td class="amt">'+omr(ag.totalShared)+'</td><td></td></tr></tfoot>'+
+              '</table>'+
+            '</div></div>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+
+  /* Insurer cards */
+  var insurerCardsHtml=insurers.length===0
+    ? '<div class="empty">'+IC.empty+'<b>No insurer data</b>Premium by insurer will appear once policies are recorded.</div>'
+    : insurers.map(function(ins,i){
+        var rate=ins.totalPremium>0?(ins.totalComm/ins.totalPremium)*100:0;
+        var scale=Math.min(rate/100,1).toFixed(3);
+        return '<div class="insurer-card anim" style="--i:'+i+'">'+
+          '<div class="insurer-name" title="'+esc(ins.name)+'">'+esc(ins.name)+'</div>'+
+          '<div class="insurer-stat"><span>Policies</span><b>'+ins.count+'</b></div>'+
+          '<div class="insurer-stat"><span>Premium</span><b>'+omr(ins.totalPremium)+'</b></div>'+
+          '<div class="insurer-stat"><span>Commission</span><b class="gold">'+omr(ins.totalComm)+'</b></div>'+
+          '<div class="rate-row">'+
+            '<div class="rate-head"><span>Commission rate</span><b>'+rate.toFixed(1)+'%</b></div>'+
+            '<div class="rate-track"><div class="rate-fill" style="--r:'+scale+'"></div></div>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+
+  document.getElementById('root').innerHTML=
+    headerHtml(now)+
+    '<div class="kpi-strip">'+kpiHtml+'</div>'+
+    '<div class="section"><div class="section-title">Status overview</div><div class="status-strip">'+statusHtml+'</div></div>'+
+    '<div class="section"><div class="section-title">Agent commission balance<span class="count">'+agents.length+'</span></div>'+agentNote+'<div class="agent-grid">'+agentCardsHtml+'</div></div>'+
+    '<div class="section"><div class="section-title">Premium by insurer<span class="count">'+insurers.length+'</span></div><div class="insurer-grid">'+insurerCardsHtml+'</div></div>';
+}
+
+/* ── Interaction ─────────────────────────────────────── */
+function toggle(i){
+  var card=document.getElementById('ac'+i);
+  if(!card)return;
+  var open=card.classList.toggle('open');
+  var head=card.querySelector('.agent-head');
+  if(head)head.setAttribute('aria-expanded',open?'true':'false');
+}
+function keyToggle(e,i){
+  if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){e.preventDefault();toggle(i);}
+}
+
+/* ── Skeleton ────────────────────────────────────────── */
+function skeleton(){
+  function many(cls,k){var s='';for(var j=0;j<k;j++)s+='<div class="sk '+cls+'"></div>';return s;}
+  return headerHtml('—')+
+    '<div class="sk-load-label"><span class="sk-spin"></span>Loading policy data…</div>'+
+    '<div class="kpi-strip">'+many('sk-kpi',5)+'</div>'+
+    '<div class="section"><div class="section-title">Status overview</div><div class="status-strip">'+many('sk-status',3)+'</div></div>'+
+    '<div class="section"><div class="section-title">Agent commission balance</div><div class="agent-grid">'+many('sk-card',6)+'</div></div>'+
+    '<div class="section"><div class="section-title">Premium by insurer</div><div class="insurer-grid">'+many('sk-ins',4)+'</div></div>';
+}
+
+/* ── Load (SDK v2: no init() — call directly) ────────── */
+function load(){
+  document.getElementById('root').innerHTML=skeleton();
+  fetchAll().then(function(records){
     allRecords=records;
     render(allRecords);
   }).catch(function(e){
     document.getElementById('root').innerHTML=
-      '<div class="err"><strong>Error loading data</strong>'+esc(e.message)+
-      '<br><br>Check that <code>All_Policy_Entries</code> report is accessible.</div>';
+      headerHtml('—')+
+      '<div class="err"><strong>'+IC.alert+'Could not load dashboard data</strong>'+
+      '<div class="detail">'+esc(e.message)+'</div>'+
+      '<br>Check that the <code>'+ZC_REPORT+'</code> report is published and accessible to this widget.</div>';
   });
 }
 
-/* SDK v2: no init() needed â call load directly */
 load();
 </script>
 </body>
