@@ -246,24 +246,43 @@
   }
 
   /* ============ Data fetch ============ */
-  function fetchAll(cb, err){
+  function fetchAll(cb, errCb){
     var all = [], page = 1;
     function next(){
-      ZOHO.CREATOR.DATA.getRecords({
-        appName:'inspt-policy-accounting-system',
-        reportName:'All_Policy_Entries',
-        page:page, pageSize:200
-      }).then(function(resp){
+      var p;
+      try {
+        p = ZOHO.CREATOR.DATA.getRecords({
+          appName:'inspt-policy-accounting-system',
+          reportName:'All_Policy_Entries',
+          page:page, pageSize:200
+        });
+      } catch(ex){
+        errCb('THROW:' + (ex && ex.message || String(ex)));
+        return;
+      }
+      if(!p){ errCb('NULL_RETURN'); return; }
+      if(typeof p.then !== 'function'){ errCb('NOT_PROMISE:' + typeof p); return; }
+      p.then(function(resp){
         if(!resp || resp.code !== 3000){
-          // code 3100 = no records found -> treat as empty set, not an error
           if(resp && resp.code === 3100){ cb(all); return; }
-          err(resp ? resp.code : 'NO_RESPONSE'); return;
+          errCb('CODE:' + (resp ? resp.code : 'null') + (resp && resp.message ? ':'+resp.message : ''));
+          return;
         }
         var data = resp.data || [];
         all = all.concat(data);
         if(data.length < 200){ cb(all); }
         else { page++; next(); }
-      }).catch(function(e){ err((e && (e.code||e.message)) || 'FETCH_FAILED'); });
+      }).catch(function(e){
+        var detail;
+        if(e == null){ detail = 'null'; }
+        else {
+          try { detail = JSON.stringify(e); } catch(_){ detail = String(e); }
+          if(detail === '{}' || detail === 'null'){
+            detail = e.message || e.code || e.description || e.error || e.errorMessage || String(e);
+          }
+        }
+        errCb('REJECT:' + String(detail).substring(0, 120));
+      });
     }
     next();
   }
@@ -595,22 +614,44 @@
   }
 
   /* ============ Boot ============ */
-  function boot(){
-    try{ skeleton(); }catch(e){}
+  function boot(retryCount){
+    retryCount = retryCount || 0;
     fetchAll(function(recs){
       try{ render(compute(recs)); }
-      catch(e){ console.error(e); showError('RENDER_ERROR'); }
+      catch(e){ console.error('RENDER_ERROR', e); showError('RENDER_ERROR:' + (e&&e.message||'')); }
     }, function(code){
-      console.error('getRecords failed', code);
-      showError(code);
+      console.error('fetchAll error', code);
+      // If we get REJECT:null it usually means the Creator session context isn't ready yet.
+      // Retry up to 3 times with increasing delay before showing the error.
+      if(String(code).indexOf('REJECT:null') === 0 && retryCount < 3){
+        setTimeout(function(){ boot(retryCount + 1); }, 1000 * (retryCount + 1));
+      } else {
+        showError(code);
+      }
     });
+  }
+
+  /* ---- SDK init with fallback ---- */
+  var _bootFired = false;
+  function fireBootOnce(){
+    if(_bootFired) return;
+    _bootFired = true;
+    skeleton();
+    boot();
   }
 
   function waitForSDK(tries){
     tries = tries || 0;
     if(window.ZOHO && window.ZOHO.CREATOR && window.ZOHO.CREATOR.DATA){
-      skeleton();
-      boot();
+      // SDK loaded — call init() to establish auth context, then boot.
+      // init() may or may not resolve in SDK v2; we boot either way.
+      try {
+        ZOHO.CREATOR.init()
+          .then(function(){ fireBootOnce(); })
+          .catch(function(){ fireBootOnce(); });
+      } catch(e){ fireBootOnce(); }
+      // Safety net: if init() never resolves, boot after 3 seconds
+      setTimeout(fireBootOnce, 3000);
     } else if(tries > 30){
       showError('SDK_NOT_LOADED');
     } else {
