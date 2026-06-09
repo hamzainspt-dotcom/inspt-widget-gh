@@ -216,8 +216,11 @@
   <div class="state-box">
     <div class="spinner"></div>
     <div>Loading agent data…</div>
+    <div id="live-status" style="font-size:11px;color:#8B6355;margin-top:8px;"></div>
   </div>
 </div>
+<span class="debug-toggle" id="debug-toggle-btn" onclick="toggleDebug()" style="margin-top:8px;">Show debug log</span>
+<pre class="debug-log" id="debug-log"></pre>
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -240,6 +243,12 @@ function fmt(n) {
 
 function log(msg) {
   debugLines.push(msg);
+  // Update live debug panel if visible
+  var el = document.getElementById('debug-log');
+  if (el) el.textContent = debugLines.join('\n');
+  // Update live status during loading
+  var ls = document.getElementById('live-status');
+  if (ls) ls.textContent = msg;
 }
 
 function strVal(v) {
@@ -259,10 +268,24 @@ function numVal(v) {
 
 // ─── FETCH ALL PAGES FROM A REPORT ────────────────────────────────────────────
 function fetchAllPages(reportName, callback) {
-  var allRecords = [];
-  var pageSize   = 200;
+  var allRecords  = [];
+  var pageSize    = 200;
+  var callbackFired = false;
+
+  function done(err) {
+    if (callbackFired) return;
+    callbackFired = true;
+    callback(err, allRecords);
+  }
+
+  // Per-report timeout: if no response in 12s, return what we have
+  var reportTimer = setTimeout(function() {
+    log('TIMEOUT fetching ' + reportName + ' — returning ' + allRecords.length + ' records so far');
+    done('timeout');
+  }, 12000);
 
   function fetchPage(pageNum) {
+    log('Fetching ' + reportName + ' page ' + pageNum + '…');
     ZOHO.CREATOR.DATA.getRecords({
       appName:    APP,
       reportName: reportName,
@@ -271,25 +294,24 @@ function fetchAllPages(reportName, callback) {
         pageSize: pageSize
       }
     }).then(function(resp) {
-      log('Report ' + reportName + ' page ' + pageNum + ' code=' + resp.code + ' count=' + (resp.data ? resp.data.length : 0));
+      log(reportName + ' p' + pageNum + ' → code=' + resp.code + ' count=' + (resp.data ? resp.data.length : 0));
 
       if (resp.code === 3000 && resp.data && resp.data.length > 0) {
         allRecords = allRecords.concat(resp.data);
         if (resp.data.length === pageSize) {
           fetchPage(pageNum + 1);
         } else {
-          callback(null, allRecords);
+          clearTimeout(reportTimer);
+          done(null);
         }
-      } else if (resp.code === 3100 || (resp.data && resp.data.length === 0)) {
-        // End of pages
-        callback(null, allRecords);
       } else {
-        log('Unexpected response: ' + JSON.stringify(resp).substr(0, 200));
-        callback(null, allRecords); // Soft fail — return what we have
+        clearTimeout(reportTimer);
+        done(null);
       }
     }).catch(function(err) {
-      log('ERROR fetching ' + reportName + ': ' + JSON.stringify(err));
-      callback(err, allRecords);
+      log('ERROR ' + reportName + ': ' + JSON.stringify(err).substr(0, 150));
+      clearTimeout(reportTimer);
+      done(err);
     });
   }
 
@@ -428,11 +450,10 @@ function render(rows) {
     html += '</tbody></table></div>';
   }
 
-  // Debug toggle
-  html += '<span class="debug-toggle" onclick="toggleDebug()">Show debug log</span>';
-  html += '<pre class="debug-log" id="debug-log">' + debugLines.join('\n') + '</pre>';
-
   document.getElementById('root').innerHTML = html;
+  // Hide the external debug toggle button since render is done and debug is at bottom
+  var btn = document.getElementById('debug-toggle-btn');
+  if (btn) btn.style.display = 'none';
 }
 
 function toggleDebug() {
@@ -458,10 +479,25 @@ function boot() {
   var settlements  = null;
   var errors       = [];
   var done         = 0;
+  var rendered     = false;
+
+  // Master timeout: force render after 15s regardless
+  setTimeout(function() {
+    if (!rendered) {
+      log('MASTER TIMEOUT — forcing render with available data');
+      receivables  = receivables  || [];
+      payables     = payables     || [];
+      settlements  = settlements  || [];
+      rendered = true;
+      var rows = buildLedger(receivables, payables, settlements);
+      render(rows);
+    }
+  }, 15000);
 
   function checkDone() {
     done++;
     if (done < 3) return;
+    if (rendered) return;
     if (errors.length > 0) {
       log('Errors: ' + errors.join('; '));
     }
@@ -473,6 +509,7 @@ function boot() {
     if (settlements.length > 0) log('Settlement[0] keys: ' + Object.keys(settlements[0]).join(', '));
     if (settlements.length > 0) log('Settlement[0] sample: ' + JSON.stringify(settlements[0]).substr(0, 300));
 
+    rendered = true;
     var rows = buildLedger(receivables, payables, settlements);
     log('Built ' + rows.length + ' agent rows');
     render(rows);
