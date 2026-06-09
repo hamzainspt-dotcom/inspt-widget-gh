@@ -223,6 +223,14 @@
 <pre class="debug-log" id="debug-log"></pre>
 
 <script>
+// Immediate proof-of-life log
+document.addEventListener('DOMContentLoaded', function() {
+  var el = document.getElementById('debug-log');
+  if (el) el.textContent = 'Script loaded. Waiting for boot...';
+  var ls = document.getElementById('live-status');
+  if (ls) ls.textContent = 'Script loaded...';
+});
+
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 var APP   = 'inspt-policy-accounting-system';
 var OWNER = 'mohammadhamza383';
@@ -534,9 +542,19 @@ function boot() {
   });
 }
 
-// Boot with init + safety timeout
-ZOHO.CREATOR.init().then(boot).catch(boot);
+// Safety timeout MUST be registered first — before anything that could throw
 setTimeout(boot, 3000);
+
+// SDK init (wrapped — if ZOHO is undefined or throws, setTimeout above still fires)
+try {
+  if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.init) {
+    ZOHO.CREATOR.init().then(boot).catch(boot);
+  } else {
+    log('ZOHO SDK not ready — relying on timeout');
+  }
+} catch(e) {
+  log('SDK init threw: ' + (e && e.message));
+}
 </script>
 </body>
 </html>
