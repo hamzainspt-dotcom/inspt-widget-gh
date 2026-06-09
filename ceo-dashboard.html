@@ -254,7 +254,7 @@
         p = ZOHO.CREATOR.DATA.getRecords({
           appName:'inspt-policy-accounting-system',
           reportName:'All_Policy_Entries',
-          page:page, pageSize:200
+          config:{page:page, pageSize:200}
         });
       } catch(ex){
         errCb('THROW:' + (ex && ex.message || String(ex)));
