@@ -235,9 +235,8 @@ document.addEventListener('DOMContentLoaded', function() {
 var APP   = 'inspt-policy-accounting-system';
 var OWNER = 'mohammadhamza383';
 
-var REPORT_RECEIVABLE  = 'Agent_Receivable_Summary';
-var REPORT_PAYABLE     = 'Agent_Payable_Summary';
-var REPORT_SETTLEMENTS = 'Agent_Settlements_Report';
+var REPORT_ALL_POLICIES = 'All_Policy_Entries';
+var REPORT_SETTLEMENTS  = 'Agent_Settlements';
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 var debugLines = [];
@@ -262,8 +261,8 @@ function log(msg) {
 function strVal(v) {
   if (v === null || v === undefined) return '';
   if (typeof v === 'object') {
-    // Lookup object — try common sub-field names
-    return String(v.Agent_Name || v.zc_display_value || v.ID || '').trim();
+    // Creator lookup fields return {display_value, ID}
+    return String(v.display_value || v.Agent_Name || v.zc_display_value || '').trim();
   }
   return String(v).trim();
 }
@@ -327,43 +326,43 @@ function fetchAllPages(reportName, callback) {
 }
 
 // ─── AGGREGATE DATA ───────────────────────────────────────────────────────────
-function buildLedger(receivables, payables, settlements) {
+function buildLedger(allPolicies, settlements) {
   // agents[name] = { receivable, payable, agentPaid, insptPaid }
   var agents = {};
 
   function ensure(name) {
     if (!name) return null;
     var n = name.trim();
-    if (!n || n === 'Direct') return null; // Skip Direct entries
+    if (!n || n === 'Direct' || n === 'AL MADINA') return null;
     if (!agents[n]) agents[n] = { receivable: 0, payable: 0, agentPaid: 0, insptPaid: 0 };
     return n;
   }
 
-  // RECEIVABLES: agent owes INSPT (Placement Agency policies)
-  receivables.forEach(function(r) {
-    // Field name: Insurer_Agents or Placement_Agency depending on report column config
-    var agentRaw = r['Insurer_Agents'] || r['Placement_Agency'] || r['Placement Agency'] || '';
-    var agentName = strVal(agentRaw);
-    var commission = numVal(r['Commission_Shared'] || r['Commission Shared'] || 0);
-    var n = ensure(agentName);
-    if (n) agents[n].receivable += commission;
-  });
+  allPolicies.forEach(function(r) {
+    var placementAgent = strVal(r['Insurer_Agents']);  // lookup → display_value
+    var sourceType     = strVal(r['Sources_of_Business']); // lookup → display_value
+    var sourceAgent    = strVal(r['Agent_Source_Details']); // plain dropdown string
+    var commission     = numVal(r['Commission_Shared']);
 
-  // PAYABLES: INSPT owes agent (Source=Agent policies)
-  payables.forEach(function(r) {
-    var agentRaw = r['Agent_Source_Details'] || r['Agent Source Details'] || '';
-    var agentName = strVal(agentRaw);
-    var commission = numVal(r['Commission_Shared'] || r['Commission Shared'] || 0);
-    var n = ensure(agentName);
-    if (n) agents[n].payable += commission;
+    // RECEIVABLE: agent placed the policy (Placement Agency), they owe INSPT
+    if (placementAgent && placementAgent !== 'Direct') {
+      var n = ensure(placementAgent);
+      if (n && commission > 0) agents[n].receivable += commission;
+    }
+
+    // PAYABLE: agent referred the client (Source=Agent), INSPT owes them
+    if (sourceType === 'Agent' && sourceAgent) {
+      var m = ensure(sourceAgent);
+      if (m && commission > 0) agents[m].payable += commission;
+    }
   });
 
   // SETTLEMENTS: physical money movements
   settlements.forEach(function(r) {
-    var agentRaw  = r['Agent'] || r['Agent_Name'] || r['Agent Name'] || '';
+    var agentRaw  = r['Agent'] || '';
     var agentName = strVal(agentRaw);
     var amount    = numVal(r['Amount'] || 0);
-    var direction = strVal(r['Direction'] || r['direction'] || '');
+    var direction = strVal(r['Direction'] || '');
     var n = ensure(agentName);
     if (!n) return;
     if (direction === 'Agent pays INSPT') {
@@ -482,56 +481,41 @@ function boot() {
   booted = true;
   log('Boot started');
 
-  var receivables  = null;
-  var payables     = null;
+  var allPolicies  = null;
   var settlements  = null;
   var errors       = [];
   var done         = 0;
   var rendered     = false;
 
-  // Master timeout: force render after 15s regardless
+  // Master timeout: force render after 25s regardless (All_Policy_Entries is larger)
   setTimeout(function() {
     if (!rendered) {
       log('MASTER TIMEOUT — forcing render with available data');
-      receivables  = receivables  || [];
-      payables     = payables     || [];
+      allPolicies  = allPolicies  || [];
       settlements  = settlements  || [];
       rendered = true;
-      var rows = buildLedger(receivables, payables, settlements);
+      var rows = buildLedger(allPolicies, settlements);
       render(rows);
     }
-  }, 15000);
+  }, 25000);
 
   function checkDone() {
     done++;
-    if (done < 3) return;
+    if (done < 2) return;
     if (rendered) return;
-    if (errors.length > 0) {
-      log('Errors: ' + errors.join('; '));
-    }
-    log('Receivables: ' + receivables.length + ' | Payables: ' + payables.length + ' | Settlements: ' + settlements.length);
-
-    // Log first record of each for field name debugging
-    if (receivables.length > 0) log('Receivable[0] keys: ' + Object.keys(receivables[0]).join(', '));
-    if (payables.length > 0)    log('Payable[0] keys: ' + Object.keys(payables[0]).join(', '));
-    if (settlements.length > 0) log('Settlement[0] keys: ' + Object.keys(settlements[0]).join(', '));
-    if (settlements.length > 0) log('Settlement[0] sample: ' + JSON.stringify(settlements[0]).substr(0, 300));
+    if (errors.length > 0) log('Errors: ' + errors.join('; '));
+    log('Policies: ' + allPolicies.length + ' | Settlements: ' + settlements.length);
+    if (allPolicies.length > 0) log('Policy[0] sample: Insurer_Agents=' + JSON.stringify(allPolicies[0].Insurer_Agents) + ' Sources=' + JSON.stringify(allPolicies[0].Sources_of_Business) + ' AgentSrc=' + allPolicies[0].Agent_Source_Details + ' CommShared=' + allPolicies[0].Commission_Shared);
 
     rendered = true;
-    var rows = buildLedger(receivables, payables, settlements);
+    var rows = buildLedger(allPolicies, settlements);
     log('Built ' + rows.length + ' agent rows');
     render(rows);
   }
 
-  fetchAllPages(REPORT_RECEIVABLE, function(err, data) {
-    if (err) errors.push('Receivable fetch error');
-    receivables = data || [];
-    checkDone();
-  });
-
-  fetchAllPages(REPORT_PAYABLE, function(err, data) {
-    if (err) errors.push('Payable fetch error');
-    payables = data || [];
+  fetchAllPages(REPORT_ALL_POLICIES, function(err, data) {
+    if (err) errors.push('All Policies fetch error');
+    allPolicies = data || [];
     checkDone();
   });
 
