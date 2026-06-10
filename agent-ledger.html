@@ -425,7 +425,7 @@ function render(rows) {
   html += '</div>';
 
   if (rows.length === 0) {
-    html += '<div class="state-box">No agent data found. Check that Agent_Receivable_Summary, Agent_Payable_Summary and Agent_Settlements_Report have data.</div>';
+    html += '<div class="state-box">No agent data found.<br><br><strong>Debug log:</strong><br><pre style="text-align:left;font-size:10px;background:#f0f0f0;padding:8px;border-radius:4px;max-height:300px;overflow-y:auto;">' + debugLines.join('\n') + '</pre></div>';
   } else {
     html += '<div class="table-wrap"><table>';
     html += '<thead><tr>';
@@ -526,18 +526,35 @@ function boot() {
   });
 }
 
-// Safety timeout MUST be registered first — before anything that could throw
-setTimeout(boot, 3000);
+// Safety timeout — only fires if SDK init NEVER resolves (shows error, does NOT call boot)
+setTimeout(function() {
+  if (!booted) {
+    booted = true;
+    log('SDK init timed out after 15s — not inside Creator context?');
+    showError('Timed out waiting for Zoho SDK. Debug: ' + debugLines.join(' | '));
+  }
+}, 15000);
 
-// SDK init (wrapped — if ZOHO is undefined or throws, setTimeout above still fires)
+// SDK init — ONLY source of boot(). Do NOT boot from a timeout (SDK bridge not ready yet).
 try {
   if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.init) {
-    ZOHO.CREATOR.init().then(boot).catch(boot);
+    log('Calling ZOHO.CREATOR.init()...');
+    ZOHO.CREATOR.init().then(function() {
+      log('SDK init resolved — booting');
+      boot();
+    }).catch(function(e) {
+      log('SDK init rejected: ' + JSON.stringify(e).substring(0, 150));
+      if (!booted) { booted = true; showError('SDK init failed: ' + JSON.stringify(e)); }
+    });
   } else {
-    log('ZOHO SDK not ready — relying on timeout');
+    log('ZOHO SDK not available on page');
+    booted = true;
+    showError('ZOHO Creator SDK not found. Open this widget inside the INSPT app.');
   }
 } catch(e) {
   log('SDK init threw: ' + (e && e.message));
+  booted = true;
+  showError('SDK error: ' + (e && e.message));
 }
 </script>
 </body>
