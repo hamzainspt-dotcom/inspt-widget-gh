@@ -1,665 +1,773 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>INSPT CEO Dashboard</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CEO Dashboard – INSPT</title>
+<!-- ceo-dashboard.html v7 | INSPT Policy Accounting System | 2026-06-11 full rebuild
+     KPI logic confirmed with Hamza 2026-06-11. MoM = vs full previous month.
+     Agent balances use NEW contra logic: receivable = full Commission (excl Direct placement),
+     payable = Commission_Shared where Source = Agent. Cancelled premium-status entries excluded
+     from revenue sums. Receipt Pending scoped to current month (all 979 historical = Pending Approval). -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
-  :root{
-    --bg:#FFFFFF;
-    --card:#FFFFFF;
-    --shadow:0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
-    --shadow-hover:0 2px 6px rgba(0,0,0,0.09), 0 10px 28px rgba(0,0,0,0.08);
-    --primary:#6B3A2A;
-    --accent:#B5622A;
-    --accent-light:#E8C4A0;
-    --pos:#2A7D4F;
-    --pos-bg:#EAF5EE;
-    --neg:#C0392B;
-    --neg-bg:#FCECEA;
-    --alert:#8B5E0A;
-    --alert-bg:#FEF6E4;
-    --ink:#1C1410;
-    --ink-2:#7A6455;
-    --border:rgba(107,58,42,0.1);
-    --r:14px;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #F8F4EF;
+    --card: #FFFFFF;
+    --primary: #6B3A2A;
+    --primary-soft: #8A4A30;
+    --accent: #B5622A;
+    --gold: #C9954A;
+    --pos: #2A7D4F;
+    --neg: #C0392B;
+    --amber: #B07818;
+    --text: #2C1810;
+    --text2: #8B6B5A;
+    --border: #EDE3DA;
+    --shadow-sm: 0 1px 3px rgba(107,58,42,.06), 0 1px 2px rgba(107,58,42,.04);
+    --shadow-md: 0 4px 14px rgba(107,58,42,.10), 0 2px 5px rgba(107,58,42,.06);
+    --shadow-lg: 0 10px 28px rgba(107,58,42,.14), 0 4px 10px rgba(107,58,42,.08);
   }
 
-  *{box-sizing:border-box;}
-  html,body{background:var(--bg);margin:0;padding:0;}
-  body{
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-    color:var(--ink);
-    -webkit-font-smoothing:antialiased;
-    text-rendering:optimizeLegibility;
-    line-height:1.45;
-  }
-  .wrap{max-width:1240px;margin:0 auto;padding:28px clamp(16px,3vw,32px) 48px;}
-
-  /* ---------- Header ---------- */
-  .hdr{
-    display:flex;align-items:flex-end;justify-content:space-between;
-    gap:20px;flex-wrap:wrap;margin-bottom:26px;
-  }
-  .hdr h1{
-    margin:0;font-weight:500;color:var(--primary);
-    font-size:clamp(1.6rem,3.2vw,2.15rem);
-    letter-spacing:-0.02em;text-wrap:balance;
-  }
-  .hdr .sub{margin:4px 0 0;color:var(--ink-2);font-size:0.95rem;}
-  .hdr .date{
-    background:var(--card);border:1px solid var(--border);
-    color:var(--ink-2);font-size:0.85rem;font-weight:500;
-    padding:8px 14px;border-radius:999px;white-space:nowrap;
-    box-shadow:var(--shadow);
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #FFFFFF; /* must stay white — Zoho iframe border behaviour */
+    color: var(--text);
+    font-size: 13px;
+    padding: 16px;
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* ---------- KPI grid ---------- */
-  .kpis{
-    display:grid;gap:14px;margin-bottom:22px;
-    grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
-  }
-  .card{
-    background:var(--card);border:1px solid var(--border);
-    border-radius:var(--r);box-shadow:var(--shadow);
-    transition:transform .15s ease, box-shadow .15s ease;
-  }
-  .kpi{padding:16px 18px 15px;display:flex;flex-direction:column;min-height:118px;}
-  .kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover);}
-  .kpi .label{
-    font-size:0.7rem;font-weight:600;letter-spacing:0.045em;
-    text-transform:uppercase;color:var(--ink-2);margin-bottom:auto;
-  }
-  .kpi .val{
-    font-size:clamp(1.35rem,2.2vw,1.7rem);font-weight:600;
-    color:var(--ink);letter-spacing:-0.02em;margin:12px 0 8px;
-    font-variant-numeric:tabular-nums;line-height:1.1;
-  }
-  .kpi .foot{min-height:22px;display:flex;align-items:center;}
-  .badge{
-    display:inline-flex;align-items:center;gap:5px;
-    font-size:0.78rem;font-weight:600;padding:3px 9px;border-radius:999px;
-    opacity:0;transition:opacity .2s ease;
-  }
-  .badge.show{opacity:1;}
-  .badge.up{color:var(--pos);background:var(--pos-bg);}
-  .badge.down{color:var(--neg);background:var(--neg-bg);}
-  .badge.flat{color:var(--ink-2);background:rgba(107,58,42,0.06);}
-  .badge .arw{font-size:0.72rem;line-height:1;}
-  .badge .cmp{color:var(--ink-2);font-weight:500;margin-left:2px;}
+  .fade-up { opacity: 0; transform: translateY(10px); animation: fadeUp .55s cubic-bezier(.22,.61,.36,1) forwards; }
+  @keyframes fadeUp { to { opacity: 1; transform: none; } }
 
-  /* alert variants (cards 5-7) */
-  .kpi.alert{background:var(--alert-bg);border-color:rgba(139,94,10,0.18);}
-  .kpi.alert .label{color:var(--alert);}
-  .kpi.alert .val{color:#5a3d06;}
-  .kpi.alert .note{font-size:0.78rem;color:var(--alert);font-weight:500;}
-  .kpi.alert.danger{background:var(--neg-bg);border-color:rgba(192,57,43,0.22);}
-  .kpi.alert.danger .label{color:var(--neg);}
-  .kpi.alert.danger .val{color:var(--neg);}
-  .kpi.alert.danger .note{color:var(--neg);}
-
-  /* ---------- Charts ---------- */
-  .charts{display:grid;gap:14px;margin-bottom:22px;grid-template-columns:3fr 2fr;}
-  @media (max-width:840px){.charts{grid-template-columns:1fr;}}
-  .panel{padding:18px 20px 20px;}
-  .panel h2,.tbl-wrap h2{
-    margin:0 0 14px;font-size:1.02rem;font-weight:600;
-    color:var(--primary);letter-spacing:-0.01em;
+  /* ---------------- Header ---------------- */
+  .header {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(118deg, #5C3023 0%, #6B3A2A 38%, #8A4A30 72%, #B5622A 100%);
+    border-radius: 16px;
+    padding: 22px 26px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-md);
   }
-  .chart-box{position:relative;height:260px;}
-
-  /* ---------- Tables ---------- */
-  .tbl-wrap{padding:18px 20px 14px;margin-bottom:22px;overflow-x:auto;}
-  table{width:100%;border-collapse:collapse;font-size:0.88rem;}
-  thead th{
-    text-align:left;font-weight:600;color:var(--ink-2);
-    font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;
-    padding:0 14px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
+  .header::after {
+    content: '';
+    position: absolute;
+    right: -60px; top: -90px;
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 70%);
+    pointer-events: none;
   }
-  thead th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;}
-  tbody td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--ink);}
-  tbody tr:last-child td{border-bottom:none;}
-  tbody td.name{font-weight:500;}
-  tfoot td{
-    padding:12px 14px;font-weight:600;color:var(--primary);
-    border-top:2px solid var(--border);font-variant-numeric:tabular-nums;
+  .header h1 { font-size: 20px; font-weight: 800; letter-spacing: .2px; }
+  .header .sub { font-size: 12.5px; opacity: .85; margin-top: 4px; font-weight: 500; }
+  .header .right { text-align: right; }
+  .header .today { font-size: 13px; font-weight: 700; }
+  .header .refreshed { font-size: 11px; opacity: .7; margin-top: 3px; }
+
+  /* ---------------- Alert strip ---------------- */
+  #alertStrip { display: none; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .alert-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 10px;
+    padding: 9px 14px;
+    box-shadow: var(--shadow-sm);
   }
-  .barcell{width:170px;min-width:120px;}
-  .minibar{height:7px;border-radius:4px;background:rgba(107,58,42,0.08);overflow:hidden;}
-  .minibar > span{display:block;height:100%;border-radius:4px;background:var(--accent);
-    width:0;transition:width .7s cubic-bezier(.22,1,.36,1);}
-  .minibar.alt > span{background:var(--primary);}
-  .trow{opacity:0;}
+  .alert-pill .dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .alert-pill.red { background: rgba(192,57,43,.08); color: var(--neg); border: 1px solid rgba(192,57,43,.25); }
+  .alert-pill.red .dot { background: var(--neg); }
+  .alert-pill.amber { background: rgba(176,120,24,.08); color: var(--amber); border: 1px solid rgba(176,120,24,.28); }
+  .alert-pill.amber .dot { background: var(--amber); }
 
-  /* ---------- Animations ---------- */
-  @keyframes cardIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
-  @keyframes rowIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
-  .anim{opacity:0;animation:cardIn .4s ease forwards;}
-  .trow.anim{animation:rowIn .35s ease forwards;}
-
-  /* ---------- Skeleton ---------- */
-  @keyframes pulse{0%,100%{opacity:.55;}50%{opacity:.9;}}
-  .sk{background:linear-gradient(90deg,rgba(107,58,42,0.07),rgba(107,58,42,0.11),rgba(107,58,42,0.07));
-    border-radius:8px;animation:pulse 1.4s ease-in-out infinite;}
-  .sk-line{height:13px;margin:8px 0;}
-
-  /* ---------- Error ---------- */
-  .errbox{
-    background:var(--primary);color:#fff;border-radius:var(--r);
-    padding:30px 28px;box-shadow:var(--shadow);text-align:center;
+  /* ---------------- KPI grid ---------------- */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
   }
-  .errbox h2{margin:0 0 6px;font-weight:500;font-size:1.2rem;}
-  .errbox p{margin:0;opacity:.85;font-size:0.92rem;}
-
-  .empty{color:var(--ink-2);font-size:0.9rem;padding:18px 14px;text-align:center;}
-
-  @media (prefers-reduced-motion: reduce){
-    .anim,.trow.anim{animation:none !important;opacity:1 !important;transform:none !important;}
-    .badge{opacity:1 !important;}
-    .card{transition:none;}
-    .minibar > span{transition:none;}
-    .sk{animation:none;}
+  .kpi {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .3s ease, transform .3s ease;
+    position: relative;
+    overflow: hidden;
   }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--accent), var(--gold));
+    opacity: 0;
+    transition: opacity .3s ease;
+  }
+  .kpi:hover { box-shadow: var(--shadow-lg); transform: translateY(-3px); }
+  .kpi:hover::before { opacity: 1; }
+  .kpi .label { font-size: 10.5px; color: var(--text2); text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
+  .kpi .value { font-size: 21px; font-weight: 800; margin-top: 6px; color: var(--primary); font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .kpi .value.warn { color: var(--amber); }
+  .kpi .value.bad { color: var(--neg); }
+  .kpi .meta { display: flex; align-items: center; gap: 6px; margin-top: 7px; min-height: 18px; flex-wrap: wrap; }
+  .delta {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 10.5px; font-weight: 700;
+    border-radius: 20px; padding: 2.5px 8px;
+  }
+  .delta.up   { background: rgba(42,125,79,.12); color: var(--pos); }
+  .delta.down { background: rgba(192,57,43,.10); color: var(--neg); }
+  .delta.flat { background: rgba(139,107,90,.12); color: var(--text2); }
+  .hint { font-size: 10.5px; color: var(--text2); font-weight: 500; }
+
+  /* ---------------- Cards / grid rows ---------------- */
+  .row {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .row.charts { grid-template-columns: 1.6fr 1fr; }
+  .row.tables { grid-template-columns: 1.4fr 1fr; }
+  @media (max-width: 900px) { .row.charts, .row.tables { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .3s ease;
+  }
+  .card:hover { box-shadow: var(--shadow-md); }
+  .card h2 { font-size: 13.5px; font-weight: 800; color: var(--primary); letter-spacing: .2px; }
+  .card .subtitle { font-size: 11px; color: var(--text2); margin-top: 2px; font-weight: 500; }
+  .card-head { margin-bottom: 14px; }
+
+  /* ---------------- Bar chart ---------------- */
+  .bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    height: 190px;
+    padding-top: 18px;
+  }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }
+  .bar-val { font-size: 10.5px; font-weight: 700; color: var(--text2); font-variant-numeric: tabular-nums; }
+  .bar-wrap { width: 100%; max-width: 58px; height: 100%; display: flex; align-items: flex-end; }
+  .bar {
+    width: 100%;
+    border-radius: 7px 7px 3px 3px;
+    background: linear-gradient(180deg, var(--accent) 0%, var(--primary) 100%);
+    height: 0;
+    transition: height .9s cubic-bezier(.22,.61,.36,1), filter .2s ease, box-shadow .2s ease;
+    box-shadow: 0 2px 6px rgba(107,58,42,.18);
+  }
+  .bar-col:hover .bar { filter: brightness(1.12); box-shadow: 0 4px 12px rgba(107,58,42,.3); }
+  .bar.current { background: linear-gradient(180deg, var(--gold) 0%, var(--accent) 100%); }
+  .bar-label { font-size: 10.5px; color: var(--text2); font-weight: 600; }
+  .bar-label.current { color: var(--accent); font-weight: 800; }
+
+  /* ---------------- Donut ---------------- */
+  .donut-wrap { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .donut-svg { flex-shrink: 0; }
+  .donut-center-num { font-size: 17px; font-weight: 800; fill: var(--primary); }
+  .donut-center-lbl { font-size: 8.5px; font-weight: 700; fill: #8B6B5A; letter-spacing: .5px; }
+  .legend { display: flex; flex-direction: column; gap: 10px; min-width: 150px; flex: 1; }
+  .legend .li { display: flex; align-items: center; gap: 9px; }
+  .legend .sw { width: 11px; height: 11px; border-radius: 3.5px; flex-shrink: 0; }
+  .legend .nm { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; }
+  .legend .amt { font-size: 12px; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+  .legend .pct { font-size: 10.5px; color: var(--text2); font-weight: 600; margin-left: 5px; }
+
+  /* ---------------- Tables ---------------- */
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .55px;
+    color: var(--text2); font-weight: 800;
+    text-align: left; padding: 7px 8px;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  thead th.num { text-align: right; }
+  tbody td { padding: 9px 8px; border-bottom: 1px solid var(--border); font-size: 12.5px; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr { transition: background .15s ease; }
+  tbody tr:hover { background: #FBF7F2; }
+  .agent-name { font-weight: 700; color: var(--text); }
+  td.net { font-weight: 800; }
+  td.net.pos { color: var(--pos); }
+  td.net.neg { color: var(--neg); }
+  .chip {
+    display: inline-block; font-size: 9.5px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .4px; border-radius: 20px; padding: 3px 8px; white-space: nowrap;
+  }
+  .chip.owes-us { background: rgba(42,125,79,.12); color: var(--pos); }
+  .chip.we-owe { background: rgba(192,57,43,.10); color: var(--neg); }
+  .chip.settled { background: rgba(139,107,90,.12); color: var(--text2); }
+
+  /* ---------------- Insurer bars ---------------- */
+  .ins-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  .ins-name { font-size: 12px; font-weight: 600; width: 118px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ins-track { flex: 1; height: 9px; background: var(--cream); border-radius: 6px; overflow: hidden; }
+  .ins-fill {
+    height: 100%; width: 0;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 80%);
+    transition: width .9s cubic-bezier(.22,.61,.36,1);
+  }
+  .ins-amt { font-size: 11.5px; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; width: 96px; text-align: right; flex-shrink: 0; }
+
+  .footnote { font-size: 10.5px; color: var(--text2); margin-top: 4px; text-align: center; padding-bottom: 6px; }
+
+  /* ---------------- Loading / error ---------------- */
+  #loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 70px 0; color: var(--text2); }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #errorBox {
+    display: none;
+    background: rgba(192,57,43,.08);
+    border: 1px solid rgba(192,57,43,.3);
+    color: var(--neg);
+    border-radius: 12px; padding: 14px 16px; margin: 12px 0; font-size: 12.5px;
+  }
+  #warnBox {
+    display: none;
+    background: rgba(176,120,24,.08);
+    border: 1px solid rgba(176,120,24,.3);
+    color: var(--amber);
+    border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 12px;
+  }
+  .empty-mini { color: var(--text2); font-size: 12px; padding: 18px 0; text-align: center; }
+  #app { display: none; }
 </style>
 </head>
 <body>
-  <div class="wrap" id="root">
-    <!-- Header -->
-    <header class="hdr">
-      <div>
-        <h1 id="greeting">Good morning, MS 👋</h1>
-        <p class="sub">INSPT Insurance Dashboard</p>
-      </div>
-      <div class="date" id="today">&nbsp;</div>
-    </header>
 
-    <!-- Content (filled by JS) -->
-    <div id="content"></div>
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Loading executive dashboard…</div>
+</div>
+
+<div id="errorBox"></div>
+
+<div id="app">
+  <div class="header fade-up">
+    <div>
+      <h1>INSPT Executive Dashboard</h1>
+      <div class="sub">Insurance Spot — performance at a glance</div>
+    </div>
+    <div class="right">
+      <div class="today" id="todayLbl"></div>
+      <div class="refreshed" id="refreshedAt"></div>
+    </div>
   </div>
 
-<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <div id="warnBox"></div>
+  <div id="alertStrip" class="fade-up" style="animation-delay:.05s"></div>
+
+  <div class="kpis" id="kpiGrid"></div>
+
+  <div class="row charts">
+    <div class="card fade-up" style="animation-delay:.18s">
+      <div class="card-head">
+        <h2>Premium Written — Last 6 Months</h2>
+        <div class="subtitle">Monthly totals in OMR (cancelled entries excluded)</div>
+      </div>
+      <div class="bars" id="barChart"></div>
+    </div>
+    <div class="card fade-up" style="animation-delay:.24s">
+      <div class="card-head">
+        <h2>Business Source Split</h2>
+        <div class="subtitle">Premium by source — last 6 months</div>
+      </div>
+      <div class="donut-wrap" id="donutWrap"></div>
+    </div>
+  </div>
+
+  <div class="row tables">
+    <div class="card fade-up" style="animation-delay:.30s">
+      <div class="card-head">
+        <h2>Agent Net Balances</h2>
+        <div class="subtitle">Unsettled entries + settlements · receivable = full commission (placement) · payable = commission shared</div>
+      </div>
+      <div id="agentTable"></div>
+    </div>
+    <div class="card fade-up" style="animation-delay:.36s">
+      <div class="card-head">
+        <h2>Premium by Insurer</h2>
+        <div class="subtitle">Last 6 months · top insurers</div>
+      </div>
+      <div id="insurerList"></div>
+    </div>
+  </div>
+
+  <div class="footnote fade-up" style="animation-delay:.42s" id="footNote"></div>
+</div>
+
 <script>
-(function(){
-  "use strict";
+/* =====================================================================
+   CEO Dashboard Widget v7 — INSPT (2026-06-11 full rebuild)
+   Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   ===================================================================== */
 
-  var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  /* ============ Helpers ============ */
-  var MONTHS = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-  var MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var FULLM = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-  function parseDate(str){
-    if(!str) return null;
-    var p = String(str).split('-');
-    if(p.length !== 3 || !MONTHS.hasOwnProperty(p[1])) return null;
-    return new Date(parseInt(p[2],10), MONTHS[p[1]], parseInt(p[0],10));
+/*CORE-START*/
+function lookupVal(field) {
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
   }
-  function getLookupName(field){
-    if(!field) return null;
-    var id = String(field.ID || field.id || '').trim();
-    if(!id || id === '0') return null;
-    var keys = Array.prototype.slice.call(arguments,1);
-    if(field.display_value) return field.display_value;
-    for(var i=0;i<keys.length;i++){ if(field[keys[i]]) return field[keys[i]]; }
-    return null;
-  }
-  function num(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
-  function omr(v){
-    return 'OMR ' + v.toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});
-  }
-  function intf(v){ return Math.round(v).toLocaleString('en-US'); }
-  function pct1(v){ return (v>=0?'+':'') + v.toFixed(1) + '%'; }
-  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
-    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-  function el(id){ return document.getElementById(id); }
+  return String(field).trim();
+}
 
-  /* ============ Date header ============ */
-  var NOW = new Date();
-  var CY = NOW.getFullYear(), CM = NOW.getMonth();
-  var PM = CM === 0 ? 11 : CM-1, PY = CM === 0 ? CY-1 : CY;
-  el('today').textContent = DAYS[NOW.getDay()] + ', ' + NOW.getDate() + ' ' + FULLM[CM] + ' ' + CY;
-  var hr = NOW.getHours();
-  el('greeting').textContent = (hr<12?'Good morning':hr<17?'Good afternoon':'Good evening') + ', MS 👋';
+function num(v) {
+  var n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
 
-  /* ============ Skeleton ============ */
-  function skeleton(){
-    var k='';
-    for(var i=0;i<7;i++){
-      k += '<div class="card kpi"><div class="sk sk-line" style="width:55%"></div>'+
-           '<div class="sk" style="height:26px;width:75%;margin:14px 0 10px"></div>'+
-           '<div class="sk sk-line" style="width:40%"></div></div>';
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// "dd-MMM-yyyy" -> {y, m} or null
+function parseMonth(s) {
+  if (!s) return null;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(String(s).trim());
+  if (!m) return null;
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  if (mon === undefined) return null;
+  return { y: parseInt(m[3], 10), m: mon };
+}
+
+function monthKey(y, m) { return y * 12 + m; }
+
+function fmtOMR(v) {
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  var parts = abs.toFixed(3).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + parts[0] + '.' + parts[1] + ' OMR';
+}
+
+function fmtCompact(v) {
+  var abs = Math.abs(v);
+  if (abs >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+  if (abs >= 10000) return (v / 1000).toFixed(1) + 'K';
+  return Math.round(v).toLocaleString('en-US');
+}
+
+// MoM % vs full previous month. Returns null when prev is 0.
+function momPct(cur, prev) {
+  if (!prev) return null;
+  return (cur - prev) / Math.abs(prev) * 100;
+}
+
+// Build all dashboard data. `now` = {y, m} for current month.
+function buildDashboard(policies, settlements, now) {
+  var curKey = monthKey(now.y, now.m);
+  var prevKey = curKey - 1;
+  var sixStart = curKey - 5;
+
+  var k = {
+    premiumMTD: 0, premiumPrev: 0,
+    commissionMTD: 0, commissionPrev: 0,
+    netCommMTD: 0, netCommPrev: 0,
+    policiesMTD: 0, policiesPrev: 0,
+    receiptPendingMTD: 0,
+    premiumOutstanding: 0, outstandingCount: 0,
+    syncFailed: 0
+  };
+
+  var monthly = {};   // key -> premium
+  var source = {};    // name -> premium (6 months)
+  var insurers = {};  // name -> premium (6 months)
+  var agents = {};    // name -> {recv, pay, settle}
+
+  function agentFor(name) {
+    if (!agents[name]) agents[name] = { recv: 0, pay: 0, settle: 0 };
+    return agents[name];
+  }
+
+  (policies || []).forEach(function (p) {
+    var pm = parseMonth(p.Invoice_Date);
+    var mk = pm ? monthKey(pm.y, pm.m) : null;
+    var premStatus = String(p.Dropdown1 || '').trim();
+    var cancelled = premStatus === 'Cancelled';
+    var premium = num(p.Premium);
+
+    // --- KPIs ---
+    if (!cancelled && mk === curKey) {
+      k.premiumMTD += premium;
+      k.commissionMTD += num(p.Commission);
+      k.netCommMTD += num(p.Net_Commission);
+      k.policiesMTD += 1;
     }
-    var ch = '<div class="charts">'+
-      '<div class="card panel"><div class="sk sk-line" style="width:40%;margin-bottom:16px"></div>'+
-      '<div class="sk" style="height:240px;border-radius:10px"></div></div>'+
-      '<div class="card panel"><div class="sk sk-line" style="width:50%;margin-bottom:16px"></div>'+
-      '<div class="sk" style="height:240px;border-radius:10px"></div></div></div>';
-    function tbl(){
-      var r='<div class="card tbl-wrap"><div class="sk sk-line" style="width:30%;margin-bottom:18px"></div>';
-      for(var j=0;j<5;j++){ r+='<div class="sk sk-line" style="height:18px;width:'+(95-j*6)+'%"></div>'; }
-      return r+'</div>';
+    if (!cancelled && mk === prevKey) {
+      k.premiumPrev += premium;
+      k.commissionPrev += num(p.Commission);
+      k.netCommPrev += num(p.Net_Commission);
+      k.policiesPrev += 1;
     }
-    el('content').innerHTML = '<div class="kpis">'+k+'</div>'+ch+tbl()+tbl();
-  }
+    if (mk === curKey && String(p.Receipt_Approval_Status || '').trim() === 'Pending Approval') {
+      k.receiptPendingMTD += 1;
+    }
+    if (premStatus === 'Pending' || premStatus === 'Partially Paid' || premStatus === 'Credit') {
+      k.premiumOutstanding += premium;
+      k.outstandingCount += 1;
+    }
+    if (String(p.Policy_Status || '').trim() === 'Invoice Sync Failed' ||
+        String(p.Zoho_Books_Sync_Status || '').trim() === 'Failed') {
+      k.syncFailed += 1;
+    }
 
-  /* ============ Data fetch ============ */
-  function fetchAll(cb, errCb){
-    var all = [], page = 1;
-    function next(){
-      var p;
-      try {
-        p = ZOHO.CREATOR.DATA.getRecords({
-          appName:'inspt-policy-accounting-system',
-          reportName:'All_Policy_Entries',
-          config:{page:page, pageSize:200}
-        });
-      } catch(ex){
-        errCb('THROW:' + (ex && ex.message || String(ex)));
-        return;
+    // --- 6-month aggregates (cancelled excluded) ---
+    if (!cancelled && mk !== null && mk >= sixStart && mk <= curKey) {
+      monthly[mk] = (monthly[mk] || 0) + premium;
+      var src = lookupVal(p.Sources_of_Business) || 'Other';
+      source[src] = (source[src] || 0) + premium;
+      var ins = lookupVal(p.Insurers);
+      if (ins) insurers[ins] = (insurers[ins] || 0) + premium;
+    }
+
+    // --- Agent balances (NEW contra logic, unsettled only) ---
+    if (String(p.Agent_Commission_Status || '').trim() === 'Unsettled') {
+      var placement = lookupVal(p.Insurer_Agents);
+      var commission = num(p.Commission);
+      if (placement && placement !== 'Direct' && commission !== 0) {
+        agentFor(placement).recv += commission;
       }
-      if(!p){ errCb('NULL_RETURN'); return; }
-      if(typeof p.then !== 'function'){ errCb('NOT_PROMISE:' + typeof p); return; }
-      p.then(function(resp){
-        if(!resp || resp.code !== 3000){
-          if(resp && resp.code === 3100){ cb(all); return; }
-          errCb('CODE:' + (resp ? resp.code : 'null') + (resp && resp.message ? ':'+resp.message : ''));
-          return;
-        }
-        var data = resp.data || [];
-        all = all.concat(data);
-        if(data.length < 200){ cb(all); }
-        else { page++; next(); }
-      }).catch(function(e){
-        var detail;
-        if(e == null){ detail = 'null'; }
-        else {
-          try { detail = JSON.stringify(e); } catch(_){ detail = String(e); }
-          if(detail === '{}' || detail === 'null'){
-            detail = e.message || e.code || e.description || e.error || e.errorMessage || String(e);
-          }
-        }
-        errCb('REJECT:' + String(detail).substring(0, 120));
+      var srcType = lookupVal(p.Sources_of_Business);
+      var refAgent = String(p.Agent_Source_Details || '').trim();
+      var shared = num(p.Commission_Shared);
+      if (srcType === 'Agent' && refAgent && shared !== 0) {
+        agentFor(refAgent).pay += shared;
+      }
+    }
+  });
+
+  (settlements || []).forEach(function (s) {
+    var agent = lookupVal(s.Agent);
+    if (!agent) return;
+    var amount = num(s.Amount);
+    if (amount === 0) return;
+    var dir = String(s.Direction || '').trim();
+    if (dir === 'Agent pays INSPT') agentFor(agent).settle -= amount;
+    else if (dir === 'INSPT pays Agent') agentFor(agent).settle += amount;
+  });
+
+  // monthly array oldest -> newest
+  var months = [];
+  for (var i = sixStart; i <= curKey; i++) {
+    var y = Math.floor(i / 12), m = i % 12;
+    months.push({ label: MONTH_NAMES[m] + ' ' + String(y).slice(2), premium: monthly[i] || 0, current: i === curKey });
+  }
+
+  var agentRows = Object.keys(agents).map(function (n) {
+    var a = agents[n];
+    return { name: n, recv: a.recv, pay: a.pay, settle: a.settle, net: a.recv - a.pay + a.settle };
+  }).filter(function (a) {
+    return Math.abs(a.recv) > 0.0005 || Math.abs(a.pay) > 0.0005 || Math.abs(a.settle) > 0.0005;
+  }).sort(function (a, b) { return Math.abs(b.net) - Math.abs(a.net); });
+
+  var insurerRows = Object.keys(insurers).map(function (n) {
+    return { name: n, premium: insurers[n] };
+  }).sort(function (a, b) { return b.premium - a.premium; });
+
+  return { kpis: k, months: months, source: source, insurers: insurerRows, agents: agentRows };
+}
+/*CORE-END*/
+
+// ---------------- DOM / SDK layer ----------------
+
+var APP_NAME = 'inspt-policy-accounting-system';
+var booted = false;
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  var el = document.getElementById('errorBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function showWarn(msg) {
+  var el = document.getElementById('warnBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+async function fetchAllPages(reportName) {
+  var all = [];
+  var cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: reportName, max_records: 200 };
+    if (cursor) params.record_cursor = cursor;
+    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) break;
+    all = all.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return all;
+}
+
+var SETTLEMENT_REPORT_CANDIDATES = ['All_Agent_Settlements', 'Agent_Settlements', 'Agent_Settlements_Report'];
+
+async function fetchSettlementsSafe() {
+  for (var i = 0; i < SETTLEMENT_REPORT_CANDIDATES.length; i++) {
+    try {
+      return await fetchAllPages(SETTLEMENT_REPORT_CANDIDATES[i]);
+    } catch (e) {
+      var es = String(e && e.message || '') + ' ' + ((e && e.code) || '') + ' ' + JSON.stringify(e);
+      if (/9220|3100|no data/i.test(es)) return [];
+    }
+  }
+  return null;
+}
+
+function animateCounter(el, target, formatter) {
+  var start = null, dur = 700;
+  function step(t) {
+    if (start === null) start = t;
+    var p = Math.min((t - start) / dur, 1);
+    var eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = formatter(target * eased);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function deltaChip(cur, prev, prevLabel) {
+  var pct = momPct(cur, prev);
+  if (pct === null) return '<span class="delta flat">— vs ' + esc(prevLabel) + '</span>';
+  var up = pct >= 0;
+  var cls = Math.abs(pct) < 0.05 ? 'flat' : (up ? 'up' : 'down');
+  var arrow = Math.abs(pct) < 0.05 ? '•' : (up ? '▲' : '▼');
+  return '<span class="delta ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(0) + '% vs ' + esc(prevLabel) + '</span>';
+}
+
+function renderKPIs(k, monthLbl, prevLbl) {
+  var defs = [
+    { label: 'Premium Written (' + monthLbl + ')', val: k.premiumMTD, fmt: fmtOMR, meta: deltaChip(k.premiumMTD, k.premiumPrev, prevLbl) },
+    { label: 'Commission Earned (' + monthLbl + ')', val: k.commissionMTD, fmt: fmtOMR, meta: deltaChip(k.commissionMTD, k.commissionPrev, prevLbl) },
+    { label: 'Net Commission (' + monthLbl + ')', val: k.netCommMTD, fmt: fmtOMR, meta: deltaChip(k.netCommMTD, k.netCommPrev, prevLbl) },
+    { label: 'Policies Issued (' + monthLbl + ')', val: k.policiesMTD, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); }, meta: deltaChip(k.policiesMTD, k.policiesPrev, prevLbl) },
+    { label: 'Receipts Pending (' + monthLbl + ')', val: k.receiptPendingMTD, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); }, meta: '<span class="hint">awaiting approval</span>', cls: k.receiptPendingMTD > 0 ? 'warn' : '' },
+    { label: 'Premium Outstanding', val: k.premiumOutstanding, fmt: fmtOMR, meta: '<span class="hint">' + k.outstandingCount + ' entries pending / partial / credit</span>', cls: 'warn' },
+    { label: 'Invoice Sync Failed', val: k.syncFailed, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); }, meta: '<span class="hint">needs attention in Creator</span>', cls: k.syncFailed > 0 ? 'bad' : '' }
+  ];
+  var grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '';
+  defs.forEach(function (d, i) {
+    var div = document.createElement('div');
+    div.className = 'kpi fade-up';
+    div.style.animationDelay = (0.06 + i * 0.045) + 's';
+    div.innerHTML = '<div class="label">' + d.label + '</div>' +
+      '<div class="value ' + (d.cls || '') + '"></div>' +
+      '<div class="meta">' + d.meta + '</div>';
+    grid.appendChild(div);
+    animateCounter(div.querySelector('.value'), d.val, d.fmt);
+  });
+}
+
+function renderBars(months) {
+  var max = Math.max.apply(null, months.map(function (m) { return m.premium; }).concat([1]));
+  var wrap = document.getElementById('barChart');
+  wrap.innerHTML = '';
+  months.forEach(function (m) {
+    var col = document.createElement('div');
+    col.className = 'bar-col';
+    col.innerHTML =
+      '<div class="bar-val">' + fmtCompact(m.premium) + '</div>' +
+      '<div class="bar-wrap"><div class="bar' + (m.current ? ' current' : '') + '" title="' + esc(m.label) + ': ' + fmtOMR(m.premium) + '"></div></div>' +
+      '<div class="bar-label' + (m.current ? ' current' : '') + '">' + esc(m.label) + '</div>';
+    wrap.appendChild(col);
+  });
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      var bars = wrap.querySelectorAll('.bar');
+      months.forEach(function (m, i) {
+        bars[i].style.height = Math.max(m.premium / max * 100, m.premium > 0 ? 3 : 0) + '%';
       });
-    }
-    next();
-  }
-
-  /* ============ Aggregation ============ */
-  function compute(recs){
-    var k = {
-      premMTD:0, commMTD:0, netMTD:0, countMTD:0,
-      premPrev:0, commPrev:0, netPrev:0, countPrev:0,
-      receiptPending:0, outstanding:0, outstandingCount:0, syncFailed:0
-    };
-    // last 6 complete months (ending previous month)
-    var buckets = [], bmap = {};
-    for(var i=6;i>=1;i--){
-      var dt = new Date(CY, CM-i, 1);
-      var key = dt.getFullYear()+'-'+dt.getMonth();
-      var b = {key:key, label:MNAMES[dt.getMonth()], total:0};
-      buckets.push(b); bmap[key]=b;
-    }
-    var src = {Direct:0, Agent:0};
-    var agents = {}, insurers = {};
-    var OUTSTANDING = {'Pending':1,'Partially Paid':1,'Credit':1};
-
-    for(var r=0;r<recs.length;r++){
-      var rec = recs[r];
-      var d = parseDate(rec.Invoice_Date);
-      var premium = num(rec.Premium);
-      var commission = num(rec.Commission);
-      var net = num(rec.Net_Commission);
-      var shared = num(rec.Commission_Shared);
-      var status1 = (rec.Dropdown1||'').trim();
-
-      // current / prior month
-      if(d){
-        if(d.getFullYear()===CY && d.getMonth()===CM){
-          k.premMTD+=premium; k.commMTD+=commission; k.netMTD+=net; k.countMTD++;
-        } else if(d.getFullYear()===PY && d.getMonth()===PM){
-          k.premPrev+=premium; k.commPrev+=commission; k.netPrev+=net; k.countPrev++;
-        }
-        var bk = d.getFullYear()+'-'+d.getMonth();
-        if(bmap[bk]) bmap[bk].total += premium;
-      }
-
-      // alerts
-      if((rec.Receipt_Approval_Status||'').trim()==='Pending Approval') k.receiptPending++;
-      if(OUTSTANDING[status1]){ k.outstanding+=premium; k.outstandingCount++; }
-      if((rec.Policy_Status||'').trim()==='Invoice Sync Failed' ||
-         (rec.Zoho_Books_Sync_Status||'').trim()==='Failed') k.syncFailed++;
-
-      // source split (Direct vs Agent)
-      var sname = getLookupName(rec.Sources_of_Business,'Source_Name');
-      if(sname && sname.toLowerCase().indexOf('agent')!==-1) src.Agent+=premium;
-      else src.Direct+=premium;
-
-      // agent commission balance (placement agency)
-      var aname = getLookupName(rec.Insurer_Agents,'Agent_Name');
-      if(aname){
-        if(!agents[aname]) agents[aname]={name:aname,count:0,shared:0};
-        agents[aname].count++; agents[aname].shared+=shared;
-      }
-
-      // insurer breakdown
-      var iname = getLookupName(rec.Insurers,'Insurer_Name');
-      if(iname){
-        if(!insurers[iname]) insurers[iname]={name:iname,count:0,premium:0,commission:0};
-        insurers[iname].count++; insurers[iname].premium+=premium; insurers[iname].commission+=commission;
-      }
-    }
-
-    var agentList = Object.keys(agents).map(function(x){return agents[x];})
-      .filter(function(a){return a.shared>0;})
-      .sort(function(a,b){return b.shared-a.shared;});
-    var insurerList = Object.keys(insurers).map(function(x){return insurers[x];})
-      .sort(function(a,b){return b.premium-a.premium;});
-
-    return {k:k, buckets:buckets, src:src, agents:agentList, insurers:insurerList};
-  }
-
-  /* ============ MoM badge ============ */
-  function momBadge(cur, prev){
-    if(prev>0){
-      var ch = (cur-prev)/prev*100;
-      var cls = ch>=0 ? 'up' : 'down';
-      var arw = ch>=0 ? '▲' : '▼';
-      return '<span class="badge '+cls+'"><span class="arw">'+arw+'</span>'+pct1(ch)+
-             '<span class="cmp">vs last month</span></span>';
-    }
-    if(cur>0) return '<span class="badge up"><span class="arw">▲</span>New<span class="cmp">vs last month</span></span>';
-    return '<span class="badge flat">—<span class="cmp">vs last month</span></span>';
-  }
-
-  /* ============ Count-up ============ */
-  function countUp(node, target, fmt, dur){
-    if(REDUCE){ node.textContent = fmt(target); return; }
-    var start = null;
-    function step(ts){
-      if(start===null) start=ts;
-      var p = Math.min((ts-start)/(dur||800),1);
-      var eased = 1 - Math.pow(1-p,3);
-      node.textContent = fmt(target*eased);
-      if(p<1) requestAnimationFrame(step);
-      else node.textContent = fmt(target);
-    }
-    requestAnimationFrame(step);
-  }
-
-  /* ============ Render ============ */
-  function render(model){
-    var k = model.k;
-    var metric = [
-      {label:'Premium Written MTD', val:k.premMTD, prev:k.premPrev, fmt:omr},
-      {label:'Commission Earned MTD', val:k.commMTD, prev:k.commPrev, fmt:omr},
-      {label:'Net Commission MTD', val:k.netMTD, prev:k.netPrev, fmt:omr},
-      {label:'Policies Issued MTD', val:k.countMTD, prev:k.countPrev, fmt:intf}
-    ];
-    var alerts = [
-      {label:'Receipt Pending Approval', val:k.receiptPending, fmt:intf,
-       note:k.receiptPending>0?'Awaiting your approval':'All receipts cleared'},
-      {label:'Premium Outstanding', val:k.outstanding, fmt:omr,
-       note:k.outstandingCount+' polic'+(k.outstandingCount===1?'y':'ies')+' unsettled'},
-      {label:'Invoice Sync Failed', val:k.syncFailed, fmt:intf,
-       danger:k.syncFailed>0, note:k.syncFailed>0?'Needs attention':'All synced'}
-    ];
-
-    var html = '<div class="kpis" id="kpis">';
-    metric.forEach(function(m,i){
-      html += '<div class="card kpi anim" style="animation-delay:'+(i*60)+'ms">'+
-        '<div class="label">'+esc(m.label)+'</div>'+
-        '<div class="val" data-val="'+m.val+'" data-fmt="'+(m.fmt===omr?'omr':'int')+'">'+(REDUCE?m.fmt(m.val):m.fmt(0))+'</div>'+
-        '<div class="foot" data-mom="'+m.val+'|'+m.prev+'"></div></div>';
     });
-    alerts.forEach(function(m,i){
-      var idx = metric.length+i;
-      html += '<div class="card kpi alert anim'+(m.danger?' danger':'')+'" style="animation-delay:'+(idx*60)+'ms">'+
-        '<div class="label">'+esc(m.label)+'</div>'+
-        '<div class="val" data-val="'+m.val+'" data-fmt="'+(m.fmt===omr?'omr':'int')+'">'+(REDUCE?m.fmt(m.val):m.fmt(0))+'</div>'+
-        '<div class="foot"><span class="note">'+esc(m.note)+'</span></div></div>';
-    });
-    html += '</div>';
+  });
+}
 
-    // charts
-    html += '<div class="charts">'+
-      '<div class="card panel anim" style="animation-delay:'+(7*60)+'ms">'+
-        '<h2>Monthly Premium &middot; Last 6 Months</h2>'+
-        '<div class="chart-box"><canvas id="barChart"></canvas></div></div>'+
-      '<div class="card panel anim" style="animation-delay:'+(8*60)+'ms">'+
-        '<h2>Premium by Source</h2>'+
-        '<div class="chart-box"><canvas id="donutChart"></canvas></div></div>'+
+var DONUT_COLORS = ['#6B3A2A', '#C9954A', '#B5622A', '#8B6B5A'];
+
+function renderDonut(source) {
+  var entries = Object.keys(source).map(function (n) { return { name: n, val: source[n] }; })
+    .filter(function (e) { return e.val > 0; })
+    .sort(function (a, b) { return b.val - a.val; });
+  var total = entries.reduce(function (a, e) { return a + e.val; }, 0);
+  var wrap = document.getElementById('donutWrap');
+  if (!total) { wrap.innerHTML = '<div class="empty-mini">No premium recorded in this period.</div>'; return; }
+
+  var R = 54, C = 2 * Math.PI * R;
+  var svg = '<svg class="donut-svg" width="150" height="150" viewBox="0 0 150 150">';
+  var acc = 0;
+  entries.forEach(function (e, i) {
+    var frac = e.val / total;
+    svg += '<circle cx="75" cy="75" r="' + R + '" fill="none" stroke="' + DONUT_COLORS[i % DONUT_COLORS.length] + '"' +
+      ' stroke-width="17"' +
+      ' stroke-dasharray="' + (frac * C).toFixed(2) + ' ' + C.toFixed(2) + '"' +
+      ' stroke-dashoffset="' + (C * 0.25 - acc).toFixed(2) + '"></circle>';
+    acc += frac * C;
+  });
+  svg += '<text x="75" y="71" text-anchor="middle" class="donut-center-num">' + fmtCompact(total) + '</text>';
+  svg += '<text x="75" y="86" text-anchor="middle" class="donut-center-lbl">OMR · 6 MO</text>';
+  svg += '</svg>';
+
+  var legend = '<div class="legend">';
+  entries.forEach(function (e, i) {
+    legend += '<div class="li"><span class="sw" style="background:' + DONUT_COLORS[i % DONUT_COLORS.length] + '"></span>' +
+      '<span class="nm">' + esc(e.name) + '</span>' +
+      '<span class="amt">' + fmtOMR(e.val) + '</span>' +
+      '<span class="pct">' + (e.val / total * 100).toFixed(0) + '%</span></div>';
+  });
+  legend += '</div>';
+  wrap.innerHTML = svg + legend;
+}
+
+function renderAgents(agents) {
+  var el = document.getElementById('agentTable');
+  if (!agents.length) { el.innerHTML = '<div class="empty-mini">No outstanding agent activity.</div>'; return; }
+  var rows = agents.slice(0, 8);
+  var html = '<table><thead><tr><th>Agent</th><th class="num">Receivable</th><th class="num">Payable</th><th class="num">Net</th><th></th></tr></thead><tbody>';
+  rows.forEach(function (a) {
+    var pos = a.net >= 0;
+    var chip = Math.abs(a.net) < 0.0005
+      ? '<span class="chip settled">Settled</span>'
+      : (pos ? '<span class="chip owes-us">Owes INSPT</span>' : '<span class="chip we-owe">INSPT Owes</span>');
+    html += '<tr>' +
+      '<td class="agent-name">' + esc(a.name) + '</td>' +
+      '<td class="num">' + fmtOMR(a.recv) + '</td>' +
+      '<td class="num">' + fmtOMR(a.pay) + '</td>' +
+      '<td class="num net ' + (pos ? 'pos' : 'neg') + '">' + fmtOMR(a.net) + '</td>' +
+      '<td>' + chip + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  if (agents.length > 8) html += '<div class="footnote" style="text-align:left">+ ' + (agents.length - 8) + ' more — see Agent Ledger for full statements</div>';
+  el.innerHTML = html;
+}
+
+function renderInsurers(insurers) {
+  var el = document.getElementById('insurerList');
+  if (!insurers.length) { el.innerHTML = '<div class="empty-mini">No insurer data in this period.</div>'; return; }
+  var rows = insurers.slice(0, 8);
+  var max = rows[0].premium || 1;
+  var html = '';
+  rows.forEach(function (r) {
+    html += '<div class="ins-row">' +
+      '<div class="ins-name" title="' + esc(r.name) + '">' + esc(r.name) + '</div>' +
+      '<div class="ins-track"><div class="ins-fill" data-w="' + (r.premium / max * 100).toFixed(1) + '"></div></div>' +
+      '<div class="ins-amt">' + fmtOMR(r.premium) + '</div>' +
       '</div>';
-
-    // agent table
-    html += '<div class="card tbl-wrap anim" style="animation-delay:'+(9*60)+'ms">'+
-      '<h2>Agent Commission Balance</h2>'+ agentTable(model.agents) +'</div>';
-
-    // insurer table
-    html += '<div class="card tbl-wrap anim" style="animation-delay:'+(10*60)+'ms">'+
-      '<h2>Insurer Breakdown</h2>'+ insurerTable(model.insurers) +'</div>';
-
-    el('content').innerHTML = html;
-
-    // animate numbers + badges
-    var vals = document.querySelectorAll('#kpis .val');
-    Array.prototype.forEach.call(vals,function(node){
-      var t = parseFloat(node.getAttribute('data-val'))||0;
-      var fmt = node.getAttribute('data-fmt')==='omr'?omr:intf;
-      countUp(node, t, fmt, 800);
+  });
+  el.innerHTML = html;
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      el.querySelectorAll('.ins-fill').forEach(function (f) { f.style.width = f.getAttribute('data-w') + '%'; });
     });
-    var foots = document.querySelectorAll('#kpis .foot[data-mom]');
-    Array.prototype.forEach.call(foots,function(node){
-      var parts = node.getAttribute('data-mom').split('|');
-      node.innerHTML = momBadge(parseFloat(parts[0])||0, parseFloat(parts[1])||0);
-      var b = node.querySelector('.badge');
-      if(REDUCE){ if(b) b.classList.add('show'); }
-      else { setTimeout(function(){ if(b) b.classList.add('show'); }, 850); }
-    });
+  });
+}
 
-    // stagger table rows + grow mini bars
-    var rows = document.querySelectorAll('.trow');
-    Array.prototype.forEach.call(rows,function(tr,i){
-      tr.classList.add('anim');
-      tr.style.animationDelay = (i*40)+'ms';
-    });
-    requestAnimationFrame(function(){
-      requestAnimationFrame(function(){
-        var bars = document.querySelectorAll('.minibar > span');
-        Array.prototype.forEach.call(bars,function(s){ s.style.width = s.getAttribute('data-w'); });
-      });
-    });
-
-    drawCharts(model);
+function renderAlerts(k, monthLbl) {
+  var strip = document.getElementById('alertStrip');
+  var html = '';
+  if (k.syncFailed > 0) {
+    html += '<span class="alert-pill red"><span class="dot"></span>' + k.syncFailed + ' invoice' + (k.syncFailed === 1 ? '' : 's') + ' failed to sync to Zoho Books</span>';
   }
-
-  function agentTable(list){
-    if(!list.length) return '<div class="empty">No placement-agent commissions recorded.</div>';
-    var max = list[0].shared || 1, totShared=0, totCount=0;
-    var rows='';
-    list.forEach(function(a){
-      totShared+=a.shared; totCount+=a.count;
-      var w = Math.max(2, a.shared/max*100).toFixed(1)+'%';
-      rows += '<tr class="trow"><td class="name">'+esc(a.name)+'</td>'+
-        '<td class="num">'+intf(a.count)+'</td>'+
-        '<td class="num">'+omr(a.shared)+'</td>'+
-        '<td class="barcell"><div class="minibar"><span data-w="'+w+'"></span></div></td></tr>';
-    });
-    return '<table><thead><tr>'+
-      '<th>Agent Name</th><th class="num">Policies</th>'+
-      '<th class="num">Commission Shared</th><th>Share</th></tr></thead>'+
-      '<tbody>'+rows+'</tbody>'+
-      '<tfoot><tr><td>Total ('+list.length+' agents)</td>'+
-      '<td class="num">'+intf(totCount)+'</td>'+
-      '<td class="num">'+omr(totShared)+'</td><td></td></tr></tfoot></table>';
+  if (k.receiptPendingMTD > 0) {
+    html += '<span class="alert-pill amber"><span class="dot"></span>' + k.receiptPendingMTD + ' receipt' + (k.receiptPendingMTD === 1 ? '' : 's') + ' awaiting approval (' + esc(monthLbl) + ')</span>';
   }
+  if (html) { strip.innerHTML = html; strip.style.display = 'flex'; }
+}
 
-  function insurerTable(list){
-    if(!list.length) return '<div class="empty">No insurer records available.</div>';
-    var max = list[0].premium || 1, totPrem=0, totCount=0, totComm=0;
-    var rows='';
-    list.forEach(function(ins){
-      totPrem+=ins.premium; totCount+=ins.count; totComm+=ins.commission;
-      var avg = ins.premium>0 ? (ins.commission/ins.premium*100) : 0;
-      var w = Math.max(2, ins.premium/max*100).toFixed(1)+'%';
-      rows += '<tr class="trow"><td class="name">'+esc(ins.name)+'</td>'+
-        '<td class="num">'+intf(ins.count)+'</td>'+
-        '<td class="num">'+omr(ins.premium)+'</td>'+
-        '<td class="num">'+avg.toFixed(1)+'%</td>'+
-        '<td class="barcell"><div class="minibar alt"><span data-w="'+w+'"></span></div></td></tr>';
-    });
-    var totAvg = totPrem>0 ? (totComm/totPrem*100) : 0;
-    return '<table><thead><tr>'+
-      '<th>Insurer</th><th class="num">Policies</th>'+
-      '<th class="num">Total Premium</th><th class="num">Avg Comm %</th><th>Premium share</th></tr></thead>'+
-      '<tbody>'+rows+'</tbody>'+
-      '<tfoot><tr><td>Total ('+list.length+' insurers)</td>'+
-      '<td class="num">'+intf(totCount)+'</td>'+
-      '<td class="num">'+omr(totPrem)+'</td>'+
-      '<td class="num">'+totAvg.toFixed(1)+'%</td><td></td></tr></tfoot></table>';
-  }
-
-  /* ============ Charts ============ */
-  function drawCharts(model){
-    if(typeof Chart === 'undefined') return;
-    Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
-    Chart.defaults.color = '#7A6455';
-    var animOpt = REDUCE ? false : {duration:700, easing:'easeOutQuart'};
-
-    // Bar
-    var bc = el('barChart');
-    if(bc){
-      new Chart(bc.getContext('2d'),{
-        type:'bar',
-        data:{
-          labels:model.buckets.map(function(b){return b.label;}),
-          datasets:[{
-            data:model.buckets.map(function(b){return b.total;}),
-            backgroundColor:'#B5622A', hoverBackgroundColor:'#6B3A2A',
-            borderRadius:6, maxBarThickness:46
-          }]
-        },
-        options:{
-          responsive:true, maintainAspectRatio:false, animation:animOpt,
-          plugins:{ legend:{display:false},
-            tooltip:{ backgroundColor:'#6B3A2A', padding:10, displayColors:false,
-              callbacks:{ label:function(c){ return omr(c.parsed.y); } } } },
-          scales:{
-            x:{ grid:{display:false}, border:{display:false},
-                ticks:{font:{size:12}} },
-            y:{ beginAtZero:true, border:{display:false},
-                grid:{color:'rgba(107,58,42,0.07)'},
-                ticks:{ font:{size:11}, maxTicksLimit:5,
-                  callback:function(v){ return v>=1000 ? (v/1000).toFixed(0)+'k' : v; } } }
-          }
-        }
-      });
+async function boot() {
+  booted = true;
+  try {
+    var results = await Promise.all([
+      fetchAllPages('All_Policy_Entries').catch(function (e) {
+        throw new Error('All_Policy_Entries: ' + (e && e.message ? e.message : JSON.stringify(e)));
+      }),
+      fetchSettlementsSafe()
+    ]);
+    var settlements = results[1];
+    if (settlements === null) {
+      settlements = [];
+      showWarn('Settlements report not found — agent balances exclude settlements.');
     }
 
-    // Donut
-    var dc = el('donutChart');
-    if(dc){
-      var dData = [model.src.Direct, model.src.Agent];
-      var total = dData[0]+dData[1];
-      var centerText = {
-        id:'centerText',
-        afterDraw:function(chart){
-          var ctx = chart.ctx, area = chart.chartArea;
-          if(!area) return;
-          var cx = (area.left+area.right)/2, cy = (area.top+area.bottom)/2;
-          ctx.save();
-          ctx.textAlign='center'; ctx.textBaseline='middle';
-          ctx.fillStyle='#7A6455';
-          ctx.font='600 11px -apple-system,sans-serif';
-          ctx.fillText('TOTAL PREMIUM', cx, cy-12);
-          ctx.fillStyle='#1C1410';
-          ctx.font='600 16px -apple-system,sans-serif';
-          var tShort = total>=1000 ? (total/1000).toFixed(1)+'k' : total.toFixed(0);
-          ctx.fillText('OMR '+tShort, cx, cy+8);
-          ctx.restore();
-        }
-      };
-      new Chart(dc.getContext('2d'),{
-        type:'doughnut',
-        data:{
-          labels:['Direct','Agent'],
-          datasets:[{ data:dData,
-            backgroundColor:['#6B3A2A','#B5622A'],
-            hoverBackgroundColor:['#582f22','#9c5223'],
-            borderColor:'#FFFFFF', borderWidth:3, hoverOffset:6 }]
-        },
-        options:{
-          responsive:true, maintainAspectRatio:false, cutout:'66%', animation:animOpt,
-          plugins:{
-            legend:{ position:'bottom',
-              labels:{ usePointStyle:true, pointStyle:'circle', padding:16, font:{size:12} } },
-            tooltip:{ backgroundColor:'#6B3A2A', padding:10, displayColors:false,
-              callbacks:{ label:function(c){
-                var v=c.parsed, pc = total>0?(v/total*100).toFixed(1):'0.0';
-                return c.label+': '+omr(v)+' ('+pc+'%)'; } } }
-          }
-        },
-        plugins:[centerText]
-      });
-    }
-  }
+    var nowD = new Date();
+    var now = { y: nowD.getFullYear(), m: nowD.getMonth() };
+    var monthLbl = MONTH_NAMES[now.m];
+    var prevLbl = MONTH_NAMES[(now.m + 11) % 12];
 
-  /* ============ Error ============ */
-  function showError(code){
-    el('content').innerHTML =
-      '<div class="errbox"><h2>Unable to load dashboard data</h2>'+
-      '<p>Code: '+esc(code)+'. Please refresh, or contact support if this persists.</p></div>';
-  }
+    var dash = buildDashboard(results[0], settlements, now);
 
-  /* ============ Boot ============ */
-  function boot(retryCount){
-    retryCount = retryCount || 0;
-    fetchAll(function(recs){
-      try{ render(compute(recs)); }
-      catch(e){ console.error('RENDER_ERROR', e); showError('RENDER_ERROR:' + (e&&e.message||'')); }
-    }, function(code){
-      console.error('fetchAll error', code);
-      // If we get REJECT:null it usually means the Creator session context isn't ready yet.
-      // Retry up to 3 times with increasing delay before showing the error.
-      if(String(code).indexOf('REJECT:null') === 0 && retryCount < 3){
-        setTimeout(function(){ boot(retryCount + 1); }, 1000 * (retryCount + 1));
-      } else {
-        showError(code);
-      }
-    });
-  }
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+    document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('footNote').textContent =
+      'MoM compares ' + monthLbl + '-to-date against full ' + prevLbl + ' · Cancelled entries excluded from revenue · Agent balances follow the contra convention agreed 11-Jun-2026';
 
-  /* ---- SDK init with fallback ---- */
-  var _bootFired = false;
-  function fireBootOnce(){
-    if(_bootFired) return;
-    _bootFired = true;
-    skeleton();
+    renderAlerts(dash.kpis, monthLbl);
+    renderKPIs(dash.kpis, monthLbl, prevLbl);
+    renderBars(dash.months);
+    renderDonut(dash.source);
+    renderAgents(dash.agents);
+    renderInsurers(dash.insurers);
+  } catch (e) {
+    showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+// ---------- Boot pattern (SDK v2 — do not change) ----------
+setTimeout(function () {
+  if (!booted) showError('Widget timed out. Not embedded in Creator?');
+}, 15000);
+
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
+    SigmaSDK.CREATOR.init(function () { if (!booted) boot(); });
+  } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
     boot();
+  } else {
+    showError('Zoho Creator SDK not found.');
   }
-
-  function waitForSDK(tries){
-    tries = tries || 0;
-    if(window.ZOHO && window.ZOHO.CREATOR && window.ZOHO.CREATOR.DATA){
-      // SDK loaded — call init() to establish auth context, then boot.
-      // init() may or may not resolve in SDK v2; we boot either way.
-      try {
-        ZOHO.CREATOR.init()
-          .then(function(){ fireBootOnce(); })
-          .catch(function(){ fireBootOnce(); });
-      } catch(e){ fireBootOnce(); }
-      // Safety net: if init() never resolves, boot after 3 seconds
-      setTimeout(fireBootOnce, 3000);
-    } else if(tries > 30){
-      showError('SDK_NOT_LOADED');
-    } else {
-      setTimeout(function(){ waitForSDK(tries + 1); }, 100);
-    }
-  }
-  waitForSDK();
-})();
+} catch (e) {
+  showError('SDK error: ' + e.message);
+}
 </script>
 </body>
 </html>
