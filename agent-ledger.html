@@ -3,542 +3,587 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Agent Ledger – INSPT</title>
+<title>Agent Statement of Account – INSPT</title>
+<!-- agent-ledger.html v9 | INSPT Policy Accounting System | 2026-06-10 -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  :root {
+    --cream: #F8F4EF;
+    --card: #FFFFFF;
+    --primary: #6B3A2A;
+    --accent: #B5622A;
+    --pos: #2A7D4F;
+    --neg: #C0392B;
+    --text: #2C1810;
+    --text2: #8B6B5A;
+    --border: #E8DDD5;
+  }
+
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #FFFFFF;
-    color: #2C1810;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #FFFFFF; /* must stay white — Zoho iframe border behaviour */
+    color: var(--text);
     font-size: 13px;
-    padding: 16px;
+    padding: 14px;
   }
 
-  h1 {
-    font-size: 16px;
-    font-weight: 700;
-    color: #6B3A2A;
-    margin-bottom: 4px;
-  }
+  .fade-in { animation: fadeIn .45s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-  .subtitle {
-    font-size: 12px;
-    color: #8B6355;
-    margin-bottom: 16px;
-  }
-
-  /* Summary strip */
-  .summary-strip {
+  /* ---------- Header ---------- */
+  .header {
+    background: linear-gradient(120deg, #6B3A2A 0%, #8A4A30 70%, #B5622A 100%);
+    border-radius: 12px;
+    padding: 18px 22px;
+    color: #fff;
     display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
+  .header .sub { font-size: 12px; opacity: .85; margin-top: 3px; }
+  .header .refreshed { font-size: 11px; opacity: .75; text-align: right; }
+
+  /* ---------- KPI cards ---------- */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 10px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
+  }
+  .kpi {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: box-shadow .25s ease, transform .25s ease;
+  }
+  .kpi:hover { box-shadow: 0 6px 16px rgba(107,58,42,.14); transform: translateY(-2px); }
+  .kpi .label { font-size: 10.5px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  .kpi .value { font-size: 19px; font-weight: 700; margin-top: 4px; color: var(--primary); font-variant-numeric: tabular-nums; }
+  .kpi .value.pos { color: var(--pos); }
+  .kpi .value.neg { color: var(--neg); }
+  .kpi .hint { font-size: 10.5px; color: var(--text2); margin-top: 2px; }
+
+  /* ---------- Agent selector ---------- */
+  .selector-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
   }
-
-  .summary-card {
-    background: #F8F4EF;
+  .selector-row label { font-size: 12px; font-weight: 600; color: var(--primary); }
+  select#agentSelect {
+    font: inherit;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 10px 16px;
-    flex: 1;
-    min-width: 140px;
-    border-left: 3px solid #B5622A;
-  }
-
-  .summary-card .label {
-    font-size: 11px;
-    color: #8B6355;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-  }
-
-  .summary-card .value {
-    font-size: 18px;
-    font-weight: 700;
-    color: #6B3A2A;
-    margin-top: 2px;
-  }
-
-  /* Table */
-  .table-wrap {
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
     background: #fff;
-    border-radius: 8px;
+    color: var(--text);
+    min-width: 260px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  select#agentSelect:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,98,42,.15); }
+  .agent-count { font-size: 11px; color: var(--text2); }
+
+  /* ---------- SOA card ---------- */
+  .soa-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 1px 4px rgba(107,58,42,0.08);
+    box-shadow: 0 1px 5px rgba(107,58,42,.07);
+    opacity: 1;
+    transition: opacity .25s ease;
   }
+  .soa-card.switching { opacity: 0; }
 
-  thead tr {
-    background: #6B3A2A;
-    color: #fff;
-  }
-
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 680px; }
   thead th {
-    padding: 10px 12px;
+    background: var(--primary);
+    color: #fff;
     text-align: left;
     font-size: 11px;
-    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: .5px;
+    padding: 10px 12px;
     white-space: nowrap;
   }
-
   thead th.num { text-align: right; }
-
-  tbody tr {
-    border-bottom: 1px solid #F0EAE4;
-    transition: background 0.15s;
-  }
-
-  tbody tr:hover { background: #FBF8F5; }
-
   tbody td {
     padding: 9px 12px;
-    vertical-align: middle;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
   }
-
-  tbody td.num {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-family: 'SF Mono', 'Consolas', monospace;
-    font-size: 12px;
-  }
-
-  .agent-name {
-    font-weight: 600;
-    color: #2C1810;
-  }
-
-  .net-positive {
-    color: #2A7D4F;
-    font-weight: 700;
-  }
-
-  .net-negative {
-    color: #C0392B;
-    font-weight: 700;
-  }
-
-  .net-zero {
-    color: #8B6355;
-    font-weight: 600;
-  }
+  tbody td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr { transition: background .15s ease; }
+  tbody tr:hover { background: #FBF7F2; }
+  .ref { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .desc { font-weight: 500; }
+  td.bal { font-weight: 700; }
+  td.bal.pos { color: var(--pos); }
+  td.bal.neg { color: var(--neg); }
+  .debit { color: var(--pos); }
+  .credit { color: var(--neg); }
 
   .badge {
     display: inline-block;
     font-size: 10px;
-    font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 3px 8px;
+    border-radius: 20px;
     white-space: nowrap;
   }
+  .badge.receivable { background: rgba(42,125,79,.12); color: var(--pos); }
+  .badge.payable { background: rgba(192,57,43,.12); color: var(--neg); }
+  .badge.settlement { background: rgba(181,98,42,.14); color: var(--accent); }
 
-  .badge-positive { background: #D4EDDA; color: #1A5C37; }
-  .badge-negative { background: #FADADD; color: #8B1A1A; }
-  .badge-zero     { background: #E8E0D8; color: #5A3E35; }
-
-  /* Loading / error states */
-  .state-box {
-    text-align: center;
-    padding: 40px 20px;
-    color: #8B6355;
+  /* ---------- Sticky balance footer ---------- */
+  .balance-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--cream);
+    border-top: 2px solid var(--border);
+    flex-wrap: wrap;
+    gap: 6px;
   }
+  .balance-footer .lbl { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
+  .balance-footer .amt { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .balance-footer .amt.pos { color: var(--pos); }
+  .balance-footer .amt.neg { color: var(--neg); }
+  .balance-footer .who { font-size: 11.5px; font-weight: 600; }
+  .balance-footer .who.pos { color: var(--pos); }
+  .balance-footer .who.neg { color: var(--neg); }
 
+  /* ---------- Loading / error / empty ---------- */
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 60px 0;
+    color: var(--text2);
+  }
   .spinner {
-    width: 28px; height: 28px;
-    border: 3px solid #E8E0D8;
-    border-top-color: #B5622A;
+    width: 34px; height: 34px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
     border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    margin: 0 auto 12px;
+    animation: spin .8s linear infinite;
   }
-
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .error-box {
-    background: #FFF0F0;
-    border: 1px solid #FADADD;
-    border-radius: 8px;
-    padding: 12px 16px;
-    color: #8B1A1A;
-    font-size: 12px;
-    margin-bottom: 12px;
-  }
-
-  .debug-toggle {
-    font-size: 11px;
-    color: #B5622A;
-    cursor: pointer;
-    text-decoration: underline;
-    display: block;
-    margin-top: 8px;
-  }
-
-  pre.debug-log {
-    background: #F8F4EF;
-    border-radius: 6px;
-    padding: 10px;
-    font-size: 10px;
-    overflow-x: auto;
-    max-height: 200px;
-    overflow-y: auto;
-    margin-top: 8px;
+  #errorBox {
     display: none;
+    background: rgba(192,57,43,.08);
+    border: 1px solid rgba(192,57,43,.3);
+    color: var(--neg);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    font-size: 12.5px;
   }
 
-  .refresh-btn {
-    background: #6B3A2A;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 14px;
-    font-size: 12px;
-    cursor: pointer;
-    float: right;
-    margin-bottom: 8px;
+  .empty-state {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--text2);
   }
+  .empty-state .icon { font-size: 34px; margin-bottom: 8px; }
+  .empty-state .big { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
 
-  .refresh-btn:hover { background: #B5622A; }
+  #app { display: none; }
 </style>
 </head>
 <body>
 
-<h1>Agent Ledger</h1>
-<p class="subtitle">Receivables, payables &amp; settlements per agent. Positive net = agent owes INSPT.</p>
-
-<div id="root">
-  <div class="state-box">
-    <div class="spinner"></div>
-    <div>Loading agent data…</div>
-    <div id="live-status" style="font-size:11px;color:#8B6355;margin-top:8px;"></div>
-  </div>
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Loading statement of account…</div>
 </div>
-<span class="debug-toggle" id="debug-toggle-btn" onclick="toggleDebug()" style="margin-top:8px;">Show debug log</span>
-<pre class="debug-log" id="debug-log"></pre>
+
+<div id="errorBox"></div>
+
+<div id="app">
+  <div class="header fade-in">
+    <div>
+      <h1>Agent Statement of Account</h1>
+      <div class="sub">Outstanding entries from 01-May-2026</div>
+    </div>
+    <div class="refreshed" id="refreshedAt"></div>
+  </div>
+
+  <div class="kpis fade-in" style="animation-delay:.05s">
+    <div class="kpi">
+      <div class="label">Total Receivable</div>
+      <div class="value pos" id="kpiReceivable">0.000 OMR</div>
+      <div class="hint">Agents owe INSPT</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Total Payable</div>
+      <div class="value neg" id="kpiPayable">0.000 OMR</div>
+      <div class="hint">INSPT owes agents</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Settlements</div>
+      <div class="value" id="kpiSettlements">0.000 OMR</div>
+      <div class="hint">Total this period</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Net Position</div>
+      <div class="value" id="kpiNet">0.000 OMR</div>
+      <div class="hint" id="kpiNetHint">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="selector-row fade-in" style="animation-delay:.1s">
+    <label for="agentSelect">Agent:</label>
+    <select id="agentSelect"></select>
+    <span class="agent-count" id="agentCount"></span>
+  </div>
+
+  <div class="soa-card fade-in" style="animation-delay:.15s" id="soaCard"></div>
+</div>
 
 <script>
-// Immediate proof-of-life log
-document.addEventListener('DOMContentLoaded', function() {
-  var el = document.getElementById('debug-log');
-  if (el) el.textContent = 'Script loaded. Waiting for boot...';
-  var ls = document.getElementById('live-status');
-  if (ls) ls.textContent = 'Script loaded...';
-});
+/* =====================================================================
+   Agent Ledger SOA Widget v9 — INSPT
+   Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   ===================================================================== */
 
-// ─── CONFIG ────────────────────────────────────────────────────────────────────────────────
-var APP   = 'inspt-policy-accounting-system';
-var OWNER = 'mohammadhamza383';
+/*CORE-START*/
+// ---------- Pure helpers (testable) ----------
 
-var REPORT_ALL_POLICIES = 'All_Policy_Entries';
-var REPORT_SETTLEMENTS  = 'Agent_Settlements';
-
-// ─── STATE ────────────────────────────────────────────────────────────────────────────────
-var debugLines = [];
-var booted = false;
-
-// ─── UTILS ───────────────────────────────────────────────────────────────────────────────
-function fmt(n) {
-  if (isNaN(n) || n === null || n === undefined) return '0.000';
-  return Number(n).toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-}
-
-function log(msg) {
-  debugLines.push(msg);
-  var el = document.getElementById('debug-log');
-  if (el) el.textContent = debugLines.join('\n');
-  var ls = document.getElementById('live-status');
-  if (ls) ls.textContent = msg;
-}
-
-function strVal(v) {
-  if (v === null || v === undefined) return '';
-  if (typeof v === 'object') {
-    return String(v.display_value || v.Agent_Name || v.zc_display_value || '').trim();
+function lookupVal(field) {
+  // Lookup fields: {display_value, ID}. Empty lookup: {display_value:"", ID:""} (not null).
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    if (String(field.ID || '').trim() === '' && String(field.display_value || '').trim() === '') return '';
+    return String(field.display_value || '').trim();
   }
-  return String(v).trim();
+  return String(field).trim();
 }
 
-function numVal(v) {
-  if (v === null || v === undefined || v === '') return 0;
-  var n = parseFloat(String(v).replace(/,/g, ''));
+function num(v) {
+  var n = parseFloat(v);
   return isNaN(n) ? 0 : n;
 }
 
-// ─── FETCH ALL PAGES FROM A REPORT ────────────────────────────────────────────────
-function fetchAllPages(reportName, callback) {
-  var allRecords  = [];
-  var maxRecords  = 200;
-  var callbackFired = false;
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
 
-  function done(err) {
-    if (callbackFired) return;
-    callbackFired = true;
-    callback(err, allRecords);
+function parseDMY(s) {
+  // "dd-MMM-yyyy" -> timestamp; unparseable dates sort first
+  if (!s) return 0;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(String(s).trim());
+  if (!m) {
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
   }
-
-  var reportTimer = setTimeout(function() {
-    log('TIMEOUT fetching ' + reportName + ' — returning ' + allRecords.length + ' records so far');
-    done('timeout');
-  }, 12000);
-
-  function fetchPage(cursor) {
-    var label = cursor ? '(cursor)' : 'page 1';
-    log('Fetching ' + reportName + ' ' + label + '…');
-    var params = {
-      app_name:    APP,
-      report_name: reportName,
-      max_records: maxRecords
-    };
-    if (cursor) params.record_cursor = cursor;
-
-    ZOHO.CREATOR.DATA.getRecords(params).then(function(resp) {
-      var count = resp.data ? resp.data.length : 0;
-      log(reportName + ' → code=' + resp.code + ' count=' + count + (resp.record_cursor ? ' [cursor]' : ''));
-
-      if (resp.code === 3000 && resp.data && resp.data.length > 0) {
-        allRecords = allRecords.concat(resp.data);
-        if (resp.data.length === maxRecords && resp.record_cursor) {
-          fetchPage(resp.record_cursor);
-        } else {
-          clearTimeout(reportTimer);
-          done(null);
-        }
-      } else {
-        clearTimeout(reportTimer);
-        done(null);
-      }
-    }).catch(function(err) {
-      log('ERROR ' + reportName + ': ' + JSON.stringify(err).substr(0, 150));
-      clearTimeout(reportTimer);
-      done(err);
-    });
-  }
-
-  fetchPage(null);
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  if (mon === undefined) return 0;
+  return new Date(parseInt(m[3], 10), mon, parseInt(m[1], 10)).getTime();
 }
 
-// ─── AGGREGATE DATA ─────────────────────────────────────────────────────────────────
-function buildLedger(allPolicies, settlements) {
+function fmtOMR(v) {
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  var parts = abs.toFixed(3).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + parts[0] + '.' + parts[1] + ' OMR';
+}
+
+// Build transaction rows per agent from raw records.
+// Returns { agents: { name: [rows...] }, totals: {receivable, payable, settlements, net} }
+function buildLedger(policies, settlements) {
   var agents = {};
+  var totals = { receivable: 0, payable: 0, settlements: 0, net: 0 };
 
-  function ensure(name) {
-    if (!name) return null;
-    var n = name.trim();
-    if (!n || n === 'Direct' || n === 'AL MADINA') return null;
-    if (!agents[n]) agents[n] = { receivable: 0, payable: 0, agentPaid: 0, insptPaid: 0 };
-    return n;
+  function rowsFor(name) {
+    if (!agents[name]) agents[name] = [];
+    return agents[name];
   }
 
-  allPolicies.forEach(function(r) {
-    var placementAgent = strVal(r['Insurer_Agents']);
-    var sourceType     = strVal(r['Sources_of_Business']);
-    var sourceAgent    = strVal(r['Agent_Source_Details']);
-    var commission     = numVal(r['Commission_Shared']);
+  (policies || []).forEach(function (p) {
+    if (String(p.Agent_Commission_Status || '').trim() !== 'Unsettled') return;
+    var amount = num(p.Commission_Shared);
+    var ts = parseDMY(p.Invoice_Date);
+    var desc = [String(p.Insured_Name || '').trim(), String(p.Policy_Number || '').trim()]
+      .filter(Boolean).join(' | ');
 
-    if (placementAgent && placementAgent !== 'Direct') {
-      var n = ensure(placementAgent);
-      if (n && commission > 0) agents[n].receivable += commission;
+    // SIDE 1 — placement agent owes INSPT (receivable)
+    var placement = lookupVal(p.Insurer_Agents);
+    if (placement && amount !== 0) {
+      rowsFor(placement).push({
+        ts: ts, date: p.Invoice_Date || '', ref: String(p.Reference_Number || '').trim(),
+        desc: desc || 'Policy entry', type: 'Receivable', debit: amount, credit: 0
+      });
+      totals.receivable += amount;
     }
 
-    if (sourceType === 'Agent' && sourceAgent) {
-      var m = ensure(sourceAgent);
-      if (m && commission > 0) agents[m].payable += commission;
-    }
-  });
-
-  settlements.forEach(function(r) {
-    var agentRaw  = r['Agent'] || '';
-    var agentName = strVal(agentRaw);
-    var amount    = numVal(r['Amount'] || 0);
-    var direction = strVal(r['Direction'] || '');
-    var n = ensure(agentName);
-    if (!n) return;
-    if (direction === 'Agent pays INSPT') {
-      agents[n].agentPaid += amount;
-    } else if (direction === 'INSPT pays Agent') {
-      agents[n].insptPaid += amount;
+    // SIDE 2 — INSPT owes referral agent (payable)
+    var source = lookupVal(p.Sources_of_Business);
+    var refAgent = String(p.Agent_Source_Details || '').trim();
+    if (source === 'Agent' && refAgent && amount !== 0) {
+      rowsFor(refAgent).push({
+        ts: ts, date: p.Invoice_Date || '', ref: String(p.Reference_Number || '').trim(),
+        desc: desc || 'Policy entry', type: 'Payable', debit: 0, credit: amount
+      });
+      totals.payable += amount;
     }
   });
 
-  var rows = [];
-  Object.keys(agents).forEach(function(name) {
-    var a = agents[name];
-    var outReceivable = a.receivable - a.agentPaid;
-    var outPayable    = a.payable    - a.insptPaid;
-    var net           = outReceivable - outPayable;
+  (settlements || []).forEach(function (s) {
+    var agent = lookupVal(s.Agent);
+    if (!agent) return;
+    var amount = num(s.Amount);
+    if (amount === 0) return;
+    var dir = String(s.Direction || '').trim();
+    var notes = String(s.Notes || '').trim();
+    var row = {
+      ts: parseDMY(s.Settlement_Date), date: s.Settlement_Date || '', ref: '',
+      desc: notes || 'Settlement', type: 'Settlement', debit: 0, credit: 0
+    };
+    if (dir === 'Agent pays INSPT') {
+      row.credit = amount;          // reduces what the agent owes
+    } else if (dir === 'INSPT pays Agent') {
+      row.debit = amount;           // increases net towards agent-owes-INSPT
+    } else {
+      return;                       // unknown direction — skip
+    }
+    rowsFor(agent).push(row);
+    totals.settlements += amount;
+  });
 
-    rows.push({
-      name:            name,
-      receivable:      a.receivable,
-      payable:         a.payable,
-      agentPaid:       a.agentPaid,
-      insptPaid:       a.insptPaid,
-      outReceivable:   outReceivable,
-      outPayable:      outPayable,
-      net:             net
+  // Sort chronologically ascending and compute running balance per agent
+  Object.keys(agents).forEach(function (name) {
+    agents[name].sort(function (a, b) { return a.ts - b.ts; });
+    var bal = 0;
+    agents[name].forEach(function (r) {
+      bal += r.debit - r.credit;    // positive = agent owes INSPT
+      r.balance = bal;
     });
   });
 
-  rows.sort(function(a, b) { return b.net - a.net; });
-  return rows;
+  // Net position = sum of every agent's final balance
+  totals.net = Object.keys(agents).reduce(function (acc, name) {
+    var rows = agents[name];
+    return acc + (rows.length ? rows[rows.length - 1].balance : 0);
+  }, 0);
+
+  return { agents: agents, totals: totals };
 }
+/*CORE-END*/
 
-// ─── RENDER ─────────────────────────────────────────────────────────────────────────────────
-function render(rows) {
-  var totalNet        = rows.reduce(function(s, r) { return s + r.net; }, 0);
-  var totalReceivable = rows.reduce(function(s, r) { return s + r.receivable; }, 0);
-  var totalPayable    = rows.reduce(function(s, r) { return s + r.payable; }, 0);
+// ---------- DOM / SDK layer ----------
 
-  var html = '';
-
-  html += '<button class="refresh-btn" onclick="location.reload()">↺ Refresh</button>';
-  html += '<div style="clear:both;margin-bottom:12px;"></div>';
-
-  html += '<div class="summary-strip">';
-  html += '<div class="summary-card"><div class="label">Total Receivable (OMR)</div><div class="value" style="color:#2A7D4F">' + fmt(totalReceivable) + '</div></div>';
-  html += '<div class="summary-card"><div class="label">Total Payable (OMR)</div><div class="value" style="color:#C0392B">' + fmt(totalPayable) + '</div></div>';
-  html += '<div class="summary-card"><div class="label">Net Position (OMR)</div><div class="value" style="color:' + (totalNet >= 0 ? '#2A7D4F' : '#C0392B') + '">' + fmt(totalNet) + '</div></div>';
-  html += '<div class="summary-card"><div class="label">Active Agents</div><div class="value">' + rows.length + '</div></div>';
-  html += '</div>';
-
-  if (rows.length === 0) {
-    html += '<div class="state-box">No agent data found.<br><br><strong>Debug log:</strong><br><pre style="text-align:left;font-size:10px;background:#f0f0f0;padding:8px;border-radius:4px;max-height:300px;overflow-y:auto;">' + debugLines.join('\n') + '</pre></div>';
-  } else {
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr>';
-    html += '<th>Agent</th>';
-    html += '<th class="num">Receivable<br><span style="font-weight:400;opacity:.8">Agent owes INSPT</span></th>';
-    html += '<th class="num">Payable<br><span style="font-weight:400;opacity:.8">INSPT owes agent</span></th>';
-    html += '<th class="num">Agent Paid</th>';
-    html += '<th class="num">INSPT Paid</th>';
-    html += '<th class="num">Net Balance (OMR)</th>';
-    html += '<th>Status</th>';
-    html += '</tr></thead><tbody>';
-
-    rows.forEach(function(r) {
-      var netClass = r.net > 0.001 ? 'net-positive' : (r.net < -0.001 ? 'net-negative' : 'net-zero');
-      var badgeClass = r.net > 0.001 ? 'badge-positive' : (r.net < -0.001 ? 'badge-negative' : 'badge-zero');
-      var badgeText  = r.net > 0.001 ? 'Owes INSPT' : (r.net < -0.001 ? 'INSPT Owes' : 'Settled');
-
-      html += '<tr>';
-      html += '<td class="agent-name">' + r.name + '</td>';
-      html += '<td class="num" style="color:#2A7D4F">' + fmt(r.receivable) + '</td>';
-      html += '<td class="num" style="color:#C0392B">' + fmt(r.payable) + '</td>';
-      html += '<td class="num">' + fmt(r.agentPaid) + '</td>';
-      html += '<td class="num">' + fmt(r.insptPaid) + '</td>';
-      html += '<td class="num ' + netClass + '">' + fmt(r.net) + '</td>';
-      html += '<td><span class="badge ' + badgeClass + '">' + badgeText + '</span></td>';
-      html += '</tr>';
-    });
-
-    html += '</tbody></table></div>';
-  }
-
-  document.getElementById('root').innerHTML = html;
-  var btn = document.getElementById('debug-toggle-btn');
-  if (btn) btn.style.display = 'none';
-}
-
-function toggleDebug() {
-  var el = document.getElementById('debug-log');
-  if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
-}
+var APP_NAME = 'inspt-policy-accounting-system';
+var booted = false;
+var ledger = null;
 
 function showError(msg) {
-  document.getElementById('root').innerHTML =
-    '<div class="error-box">' + msg + '</div>' +
-    '<span class="debug-toggle" onclick="toggleDebug()">Show debug log</span>' +
-    '<pre class="debug-log" id="debug-log">' + debugLines.join('\n') + '</pre>';
+  var el = document.getElementById('errorBox');
+  document.getElementById('loading').style.display = 'none';
+  el.style.display = 'block';
+  el.textContent = msg;
 }
 
-// ─── BOOT ───────────────────────────────────────────────────────────────────────────────────
-function boot() {
-  if (booted) return;
-  booted = true;
-  log('Boot started');
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
 
-  var allPolicies  = null;
-  var settlements  = null;
-  var errors       = [];
-  var done         = 0;
-  var rendered     = false;
+async function fetchAllPages(reportName) {
+  var allRecords = [];
+  var cursor = null;
+  while (true) {
+    var params = {
+      app_name: APP_NAME,
+      report_name: reportName,
+      max_records: 200
+    };
+    if (cursor) params.record_cursor = cursor;
+    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) break;
+    allRecords = allRecords.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return allRecords;
+}
 
-  setTimeout(function() {
-    if (!rendered) {
-      log('MASTER TIMEOUT — forcing render with available data');
-      allPolicies  = allPolicies  || [];
-      settlements  = settlements  || [];
-      rendered = true;
-      var rows = buildLedger(allPolicies, settlements);
-      render(rows);
-    }
-  }, 25000);
+function animateCounter(el, target, formatter) {
+  var start = null;
+  var dur = 300;
+  function step(t) {
+    if (start === null) start = t;
+    var p = Math.min((t - start) / dur, 1);
+    var eased = 1 - Math.pow(1 - p, 3); // ease-out
+    el.textContent = formatter(target * eased);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
 
-  function checkDone() {
-    done++;
-    if (done < 2) return;
-    if (rendered) return;
-    if (errors.length > 0) log('Errors: ' + errors.join('; '));
-    log('Policies: ' + allPolicies.length + ' | Settlements: ' + settlements.length);
-    if (allPolicies.length > 0) log('Policy[0] sample: Insurer_Agents=' + JSON.stringify(allPolicies[0].Insurer_Agents) + ' Sources=' + JSON.stringify(allPolicies[0].Sources_of_Business) + ' AgentSrc=' + allPolicies[0].Agent_Source_Details + ' CommShared=' + allPolicies[0].Commission_Shared);
+function renderKPIs(t) {
+  animateCounter(document.getElementById('kpiReceivable'), t.receivable, fmtOMR);
+  animateCounter(document.getElementById('kpiPayable'), t.payable, fmtOMR);
+  animateCounter(document.getElementById('kpiSettlements'), t.settlements, fmtOMR);
+  var netEl = document.getElementById('kpiNet');
+  netEl.classList.remove('pos', 'neg');
+  netEl.classList.add(t.net >= 0 ? 'pos' : 'neg');
+  document.getElementById('kpiNetHint').textContent =
+    t.net >= 0 ? 'Agents owe INSPT (net)' : 'INSPT owes agents (net)';
+  animateCounter(netEl, t.net, fmtOMR);
+}
 
-    rendered = true;
-    var rows = buildLedger(allPolicies, settlements);
-    log('Built ' + rows.length + ' agent rows');
-    render(rows);
+function renderAgentOptions(names) {
+  var sel = document.getElementById('agentSelect');
+  sel.innerHTML = '';
+  names.forEach(function (n) {
+    var o = document.createElement('option');
+    o.value = n;
+    o.textContent = n;
+    sel.appendChild(o);
+  });
+  document.getElementById('agentCount').textContent =
+    names.length + ' agent' + (names.length === 1 ? '' : 's') + ' with activity';
+}
+
+function renderSOA(agentName) {
+  var card = document.getElementById('soaCard');
+  var rows = (ledger.agents[agentName] || []);
+
+  if (!rows.length) {
+    card.innerHTML =
+      '<div class="empty-state">' +
+        '<div class="icon">&#128203;</div>' +
+        '<div class="big">No outstanding activity</div>' +
+        '<div>' + esc(agentName || 'This agent') + ' has no unsettled entries or settlements in this period.</div>' +
+      '</div>';
+    return;
   }
 
-  fetchAllPages(REPORT_ALL_POLICIES, function(err, data) {
-    if (err) errors.push('All Policies fetch error');
-    allPolicies = data || [];
-    checkDone();
+  var html = '<div class="table-wrap"><table><thead><tr>' +
+    '<th>Date</th><th>Reference / Description</th><th>Type</th>' +
+    '<th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>' +
+    '</tr></thead><tbody>';
+
+  rows.forEach(function (r) {
+    var badgeCls = r.type.toLowerCase();
+    html += '<tr>' +
+      '<td>' + esc(r.date || '—') + '</td>' +
+      '<td><div class="desc">' + esc(r.desc) + '</div>' +
+        (r.ref ? '<div class="ref">' + esc(r.ref) + '</div>' : '') + '</td>' +
+      '<td><span class="badge ' + badgeCls + '">' + r.type + '</span></td>' +
+      '<td class="num">' + (r.debit ? '<span class="debit">' + fmtOMR(r.debit) + '</span>' : '–') + '</td>' +
+      '<td class="num">' + (r.credit ? '<span class="credit">' + fmtOMR(r.credit) + '</span>' : '–') + '</td>' +
+      '<td class="num bal ' + (r.balance >= 0 ? 'pos' : 'neg') + '">' + fmtOMR(r.balance) + '</td>' +
+      '</tr>';
   });
 
-  fetchAllPages(REPORT_SETTLEMENTS, function(err, data) {
-    if (err) errors.push('Settlements fetch error');
-    settlements = data || [];
-    checkDone();
-  });
+  var net = rows[rows.length - 1].balance;
+  var cls = net >= 0 ? 'pos' : 'neg';
+  var who = net >= 0 ? 'Agent owes INSPT' : 'INSPT owes Agent';
+  if (Math.abs(net) < 0.0005) who = 'Fully settled';
+
+  html += '</tbody></table></div>' +
+    '<div class="balance-footer">' +
+      '<span class="lbl">Current Net Balance — ' + esc(agentName) + '</span>' +
+      '<span><span class="amt ' + cls + '">' + fmtOMR(net) + '</span> ' +
+      '<span class="who ' + cls + '">&nbsp;' + who + '</span></span>' +
+    '</div>';
+
+  card.innerHTML = html;
 }
 
-// Safety timeout — fires if Load event never arrives from Creator parent
-setTimeout(function() {
+function onAgentChange() {
+  var card = document.getElementById('soaCard');
+  card.classList.add('switching');
+  var name = document.getElementById('agentSelect').value;
+  setTimeout(function () {
+    renderSOA(name);
+    card.classList.remove('switching');
+  }, 180);
+}
+
+async function boot() {
+  booted = true;
+  try {
+    var results = await Promise.all([
+      fetchAllPages('All_Policy_Entries'),
+      fetchAllPages('Agent_Settlements')
+    ]);
+    ledger = buildLedger(results[0], results[1]);
+
+    var names = Object.keys(ledger.agents).sort(function (a, b) {
+      return a.localeCompare(b);
+    });
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('refreshedAt').textContent =
+      'Refreshed: ' + new Date().toLocaleString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+
+    renderKPIs(ledger.totals);
+
+    if (!names.length) {
+      document.getElementById('soaCard').innerHTML =
+        '<div class="empty-state">' +
+          '<div class="icon">&#128202;</div>' +
+          '<div class="big">No outstanding activity</div>' +
+          '<div>No unsettled policy entries or settlements found.</div>' +
+        '</div>';
+      document.getElementById('agentCount').textContent = '0 agents';
+      return;
+    }
+
+    renderAgentOptions(names);
+    document.getElementById('agentSelect').addEventListener('change', onAgentChange);
+    renderSOA(names[0]);
+  } catch (e) {
+    showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+// ---------- Boot pattern (SDK v2 — do not change) ----------
+// Safety timeout registered BEFORE init. It ONLY shows an error — it NEVER calls boot().
+setTimeout(function () {
   if (!booted) {
-    booted = true;
-    log('SDK Load timed out after 15s — widget not embedded in Creator?');
-    showError('Timed out waiting for Creator parent. Debug: ' + debugLines.join(' | '));
+    showError('Widget timed out. Not embedded in Creator?');
   }
 }, 15000);
 
-// SDK v2.0 NOTE: ZOHO.CREATOR has no .init() method.
-// Use SigmaSDK.CREATOR.init(callback) — fires callback on the parent Load event.
-// Fallback: ZOHO.CREATOR.DATA.getRecords() internally awaits Load, so boot() can be
-// called directly and requests will queue until the parent registers.
 try {
   if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
-    log('Calling SigmaSDK.CREATOR.init(boot)...');
-    SigmaSDK.CREATOR.init(function() {
-      log('SigmaSDK Load event fired — booting');
+    SigmaSDK.CREATOR.init(function () {
       if (!booted) boot();
     });
   } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
-    log('SigmaSDK not found — using ZOHO.CREATOR.DATA (getRecords awaits Load internally)');
     boot();
   } else {
-    log('No ZOHO SDK found on page');
-    booted = true;
-    showError('ZOHO Creator SDK not found. Open this widget inside the INSPT app.');
+    showError('Zoho Creator SDK not found.');
   }
-} catch(e) {
-  log('SDK check threw: ' + (e && e.message));
-  booted = true;
-  showError('SDK error: ' + (e && e.message));
+} catch (e) {
+  showError('SDK error: ' + e.message);
 }
 </script>
 </body>
