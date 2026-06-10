@@ -199,6 +199,17 @@
     font-size: 12.5px;
   }
 
+  #warnBox {
+    display: none;
+    background: rgba(181,98,42,.1);
+    border: 1px solid rgba(181,98,42,.35);
+    color: #8A4A20;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+
   .empty-state {
     text-align: center;
     padding: 48px 16px;
@@ -220,6 +231,7 @@
 <div id="errorBox"></div>
 
 <div id="app">
+  <div id="warnBox"></div>
   <div class="header fade-in">
     <div>
       <h1>Agent Statement of Account</h1>
@@ -522,14 +534,41 @@ function onAgentChange() {
   }, 180);
 }
 
+function showWarn(msg) {
+  var el = document.getElementById('warnBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+// The Agent_Settlements FORM exists but may have no REPORT yet (v2 API reads
+// reports only). Try known link names; if none resolve, degrade gracefully.
+var SETTLEMENT_REPORT_CANDIDATES = ['All_Agent_Settlements', 'Agent_Settlements', 'Agent_Settlements_Report'];
+
+async function fetchSettlementsSafe() {
+  for (var i = 0; i < SETTLEMENT_REPORT_CANDIDATES.length; i++) {
+    try {
+      return await fetchAllPages(SETTLEMENT_REPORT_CANDIDATES[i]);
+    } catch (e) { /* try next candidate */ }
+  }
+  return null; // no settlements report available
+}
+
 async function boot() {
   booted = true;
   try {
     var results = await Promise.all([
-      fetchAllPages('All_Policy_Entries'),
-      fetchAllPages('Agent_Settlements')
+      fetchAllPages('All_Policy_Entries').catch(function (e) {
+        throw new Error('All_Policy_Entries: ' + (e && e.message ? e.message : JSON.stringify(e)));
+      }),
+      fetchSettlementsSafe()
     ]);
-    ledger = buildLedger(results[0], results[1]);
+    var settlementRecords = results[1];
+    if (settlementRecords === null) {
+      settlementRecords = [];
+      showWarn('Settlements report not found in Creator — figures below exclude settlements. ' +
+        'Create a report for the Agent_Settlements form (link name: All_Agent_Settlements), then refresh.');
+    }
+    ledger = buildLedger(results[0], settlementRecords);
 
     var names = Object.keys(ledger.agents).sort(function (a, b) {
       return a.localeCompare(b);
