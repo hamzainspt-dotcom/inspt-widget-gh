@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Agent Statement of Account – INSPT</title>
-<!-- agent-ledger.html v9 | INSPT Policy Accounting System | 2026-06-10 -->
+<!-- agent-ledger.html v9.2 | INSPT Policy Accounting System | 2026-06-10 -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -274,7 +274,7 @@
 
 <script>
 /* =====================================================================
-   Agent Ledger SOA Widget v9 — INSPT
+   Agent Ledger SOA Widget v9.2 — INSPT
    Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
    ===================================================================== */
 
@@ -282,11 +282,12 @@
 // ---------- Pure helpers (testable) ----------
 
 function lookupVal(field) {
-  // Lookup fields: {display_value, ID}. Empty lookup: {display_value:"", ID:""} (not null).
+  // Lookup fields: v2 API returns {display_value, ID}; v2.1 API (used by SDK getRecords)
+  // returns {<DisplayFieldName>, ID, zc_display_value}. Empty lookup: {} or ''.
   if (field === null || field === undefined) return '';
   if (typeof field === 'object') {
-    if (String(field.ID || '').trim() === '' && String(field.display_value || '').trim() === '') return '';
-    return String(field.display_value || '').trim();
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
   }
   return String(field).trim();
 }
@@ -548,7 +549,13 @@ async function fetchSettlementsSafe() {
   for (var i = 0; i < SETTLEMENT_REPORT_CANDIDATES.length; i++) {
     try {
       return await fetchAllPages(SETTLEMENT_REPORT_CANDIDATES[i]);
-    } catch (e) { /* try next candidate */ }
+    } catch (e) {
+      // Report exists but has zero records: v2.1 API responds HTTP 400 with code
+      // 9220 (v2 uses 3100 "No Data Available"). Treat as success with no settlements.
+      var es = String(e && e.message || '') + ' ' + ((e && e.code) || '') + ' ' + JSON.stringify(e);
+      if (/9220|3100|no data/i.test(es)) return [];
+      /* otherwise try next candidate */
+    }
   }
   return null; // no settlements report available
 }
