@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Agent Statement of Account – INSPT</title>
-<!-- agent-ledger.html v9.2 | INSPT Policy Accounting System | 2026-06-10 -->
+<!-- agent-ledger.html v10 | INSPT Policy Accounting System | 2026-06-11 | New contra logic: receivable = full Commission from placement agency (excl. Direct); payable = Commission_Shared to source agent -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -244,12 +244,12 @@
     <div class="kpi">
       <div class="label">Total Receivable</div>
       <div class="value pos" id="kpiReceivable">0.000 OMR</div>
-      <div class="hint">Agents owe INSPT</div>
+      <div class="hint">Full commission due from placement agencies</div>
     </div>
     <div class="kpi">
       <div class="label">Total Payable</div>
       <div class="value neg" id="kpiPayable">0.000 OMR</div>
-      <div class="hint">INSPT owes agents</div>
+      <div class="hint">Commission shared owed to source agents</div>
     </div>
     <div class="kpi">
       <div class="label">Settlements</div>
@@ -274,8 +274,11 @@
 
 <script>
 /* =====================================================================
-   Agent Ledger SOA Widget v9.2 — INSPT
+   Agent Ledger SOA Widget v10 — INSPT
    Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   CONTRA LOGIC (2026-06-11, per MS):
+   - Receivable: placement agency owes INSPT the FULL Commission ('Direct' excluded — no broker).
+   - Payable: Commission_Shared is ALWAYS what INSPT gives the source agent. Never a receivable.
    ===================================================================== */
 
 /*CORE-START*/
@@ -333,30 +336,33 @@ function buildLedger(policies, settlements) {
 
   (policies || []).forEach(function (p) {
     if (String(p.Agent_Commission_Status || '').trim() !== 'Unsettled') return;
-    var amount = num(p.Commission_Shared);
     var ts = parseDMY(p.Invoice_Date);
     var desc = [String(p.Insured_Name || '').trim(), String(p.Policy_Number || '').trim()]
       .filter(Boolean).join(' | ');
 
-    // SIDE 1 — placement agent owes INSPT (receivable)
+    // SIDE 1 — placement agency owes INSPT the FULL Commission (receivable).
+    // 'Direct' means INSPT placed directly with the insurer — no broker, no receivable.
     var placement = lookupVal(p.Insurer_Agents);
-    if (placement && amount !== 0) {
+    var commission = num(p.Commission);
+    if (placement && placement !== 'Direct' && commission !== 0) {
       rowsFor(placement).push({
         ts: ts, date: p.Invoice_Date || '', ref: String(p.Reference_Number || '').trim(),
-        desc: desc || 'Policy entry', type: 'Receivable', debit: amount, credit: 0
+        desc: desc || 'Policy entry', type: 'Receivable', debit: commission, credit: 0
       });
-      totals.receivable += amount;
+      totals.receivable += commission;
     }
 
-    // SIDE 2 — INSPT owes referral agent (payable)
+    // SIDE 2 — INSPT owes referral agent Commission_Shared (payable).
+    // Commission_Shared is always an outflow — never counted as receivable.
     var source = lookupVal(p.Sources_of_Business);
     var refAgent = String(p.Agent_Source_Details || '').trim();
-    if (source === 'Agent' && refAgent && amount !== 0) {
+    var shared = num(p.Commission_Shared);
+    if (source === 'Agent' && refAgent && shared !== 0) {
       rowsFor(refAgent).push({
         ts: ts, date: p.Invoice_Date || '', ref: String(p.Reference_Number || '').trim(),
-        desc: desc || 'Policy entry', type: 'Payable', debit: 0, credit: amount
+        desc: desc || 'Policy entry', type: 'Payable', debit: 0, credit: shared
       });
-      totals.payable += amount;
+      totals.payable += shared;
     }
   });
 
