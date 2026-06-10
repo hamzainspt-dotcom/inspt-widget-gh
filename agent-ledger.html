@@ -273,7 +273,7 @@ function numVal(v) {
 // ─── FETCH ALL PAGES FROM A REPORT ────────────────────────────────────────────────
 function fetchAllPages(reportName, callback) {
   var allRecords  = [];
-  var pageSize    = 200;
+  var maxRecords  = 200;
   var callbackFired = false;
 
   function done(err) {
@@ -287,22 +287,24 @@ function fetchAllPages(reportName, callback) {
     done('timeout');
   }, 12000);
 
-  function fetchPage(pageNum) {
-    log('Fetching ' + reportName + ' page ' + pageNum + '…');
-    ZOHO.CREATOR.DATA.getRecords({
-      appName:    APP,
-      reportName: reportName,
-      config: {
-        page:     pageNum,
-        pageSize: pageSize
-      }
-    }).then(function(resp) {
-      log(reportName + ' p' + pageNum + ' → code=' + resp.code + ' count=' + (resp.data ? resp.data.length : 0));
+  function fetchPage(cursor) {
+    var label = cursor ? '(cursor)' : 'page 1';
+    log('Fetching ' + reportName + ' ' + label + '…');
+    var params = {
+      app_name:    APP,
+      report_name: reportName,
+      max_records: maxRecords
+    };
+    if (cursor) params.record_cursor = cursor;
+
+    ZOHO.CREATOR.DATA.getRecords(params).then(function(resp) {
+      var count = resp.data ? resp.data.length : 0;
+      log(reportName + ' → code=' + resp.code + ' count=' + count + (resp.record_cursor ? ' [cursor]' : ''));
 
       if (resp.code === 3000 && resp.data && resp.data.length > 0) {
         allRecords = allRecords.concat(resp.data);
-        if (resp.data.length === pageSize) {
-          fetchPage(pageNum + 1);
+        if (resp.data.length === maxRecords && resp.record_cursor) {
+          fetchPage(resp.record_cursor);
         } else {
           clearTimeout(reportTimer);
           done(null);
@@ -318,7 +320,7 @@ function fetchAllPages(reportName, callback) {
     });
   }
 
-  fetchPage(1);
+  fetchPage(null);
 }
 
 // ─── AGGREGATE DATA ─────────────────────────────────────────────────────────────────
