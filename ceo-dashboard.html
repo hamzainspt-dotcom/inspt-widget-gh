@@ -4,8 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CEO Dashboard – INSPT</title>
-<!-- ceo-dashboard.html v7 | INSPT Policy Accounting System | 2026-06-11 full rebuild
-     KPI logic confirmed with Hamza 2026-06-11. MoM = vs full previous month.
+<!-- ceo-dashboard.html v8 | INSPT Policy Accounting System | 2026-06-11
+     v8 changes (Hamza CR1+CR2, decided 2026-06-11):
+       CR1: MoM deltas now compare same period — e.g. Jun 1-11 vs May 1-11 (was: vs full prev month).
+       CR2: Invoice Sync Failed KPI card removed (6-card grid) and amber receipts pill removed.
+            Red sync-failure pill kept — renders only when failures exist.
      Agent balances use NEW contra logic: receivable = full Commission (excl Direct placement),
      payable = Commission_Shared where Source = Agent. Cancelled premium-status entries excluded
      from revenue sums. Receipt Pending scoped to current month (all 979 historical = Pending Approval). -->
@@ -329,7 +332,7 @@
 
 <script>
 /* =====================================================================
-   CEO Dashboard Widget v7 — INSPT (2026-06-11 full rebuild)
+   CEO Dashboard Widget v8 — INSPT (2026-06-11: CR1 same-period MoM, CR2 6-card grid)
    Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
    ===================================================================== */
 
@@ -351,14 +354,14 @@ function num(v) {
 var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
 var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// "dd-MMM-yyyy" -> {y, m} or null
+// "dd-MMM-yyyy" -> {y, m, d} or null
 function parseMonth(s) {
   if (!s) return null;
   var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(String(s).trim());
   if (!m) return null;
   var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
   if (mon === undefined) return null;
-  return { y: parseInt(m[3], 10), m: mon };
+  return { y: parseInt(m[3], 10), m: mon, d: parseInt(m[1], 10) };
 }
 
 function monthKey(y, m) { return y * 12 + m; }
@@ -378,13 +381,14 @@ function fmtCompact(v) {
   return Math.round(v).toLocaleString('en-US');
 }
 
-// MoM % vs full previous month. Returns null when prev is 0.
+// MoM % vs same period of previous month (CR1). Returns null when prev is 0.
 function momPct(cur, prev) {
   if (!prev) return null;
   return (cur - prev) / Math.abs(prev) * 100;
 }
 
-// Build all dashboard data. `now` = {y, m} for current month.
+// Build all dashboard data. `now` = {y, m, d} — d enables same-period
+// prev-month comparison (CR1): prev sums only include entries with day <= now.d.
 function buildDashboard(policies, settlements, now) {
   var curKey = monthKey(now.y, now.m);
   var prevKey = curKey - 1;
@@ -424,7 +428,9 @@ function buildDashboard(policies, settlements, now) {
       k.netCommMTD += num(p.Net_Commission);
       k.policiesMTD += 1;
     }
-    if (!cancelled && mk === prevKey) {
+    // CR1: same-period comparison — only prev-month entries up to the same
+    // day of month. Months shorter than now.d are naturally fully included.
+    if (!cancelled && mk === prevKey && pm && pm.d <= now.d) {
       k.premiumPrev += premium;
       k.commissionPrev += num(p.Commission);
       k.netCommPrev += num(p.Net_Commission);
@@ -580,9 +586,8 @@ function renderKPIs(k, monthLbl, prevLbl) {
     { label: 'Net Commission (' + monthLbl + ')', val: k.netCommMTD, fmt: fmtOMR, meta: deltaChip(k.netCommMTD, k.netCommPrev, prevLbl) },
     { label: 'Policies Issued (' + monthLbl + ')', val: k.policiesMTD, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); }, meta: deltaChip(k.policiesMTD, k.policiesPrev, prevLbl) },
     { label: 'Receipts Pending (' + monthLbl + ')', val: k.receiptPendingMTD, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); }, meta: '<span class="hint">awaiting approval</span>', cls: k.receiptPendingMTD > 0 ? 'warn' : '' },
-    { label: 'Premium Outstanding', val: k.premiumOutstanding, fmt: fmtOMR, meta: '<span class="hint">' + k.outstandingCount + ' entries pending / partial / credit</span>', cls: 'warn' },
-    { label: 'Invoice Sync Failed', val: k.syncFailed, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); }, meta: '<span class="hint">needs attention in Creator</span>', cls: k.syncFailed > 0 ? 'bad' : '' }
-  ];
+    { label: 'Premium Outstanding', val: k.premiumOutstanding, fmt: fmtOMR, meta: '<span class="hint">' + k.outstandingCount + ' entries pending / partial / credit</span>', cls: 'warn' }
+  ]; // CR2: Invoice Sync Failed card removed — failures surface via red alert pill only
   var grid = document.getElementById('kpiGrid');
   grid.innerHTML = '';
   defs.forEach(function (d, i) {
@@ -700,16 +705,14 @@ function renderInsurers(insurers) {
   });
 }
 
-function renderAlerts(k, monthLbl) {
+function renderAlerts(k) {
+  // CR2: amber receipts pill removed. Red sync-failure pill kept —
+  // renders only when failures exist, so the layout stays clean on good days.
   var strip = document.getElementById('alertStrip');
-  var html = '';
   if (k.syncFailed > 0) {
-    html += '<span class="alert-pill red"><span class="dot"></span>' + k.syncFailed + ' invoice' + (k.syncFailed === 1 ? '' : 's') + ' failed to sync to Zoho Books</span>';
+    strip.innerHTML = '<span class="alert-pill red"><span class="dot"></span>' + k.syncFailed + ' invoice' + (k.syncFailed === 1 ? '' : 's') + ' failed to sync to Zoho Books</span>';
+    strip.style.display = 'flex';
   }
-  if (k.receiptPendingMTD > 0) {
-    html += '<span class="alert-pill amber"><span class="dot"></span>' + k.receiptPendingMTD + ' receipt' + (k.receiptPendingMTD === 1 ? '' : 's') + ' awaiting approval (' + esc(monthLbl) + ')</span>';
-  }
-  if (html) { strip.innerHTML = html; strip.style.display = 'flex'; }
 }
 
 async function boot() {
@@ -728,9 +731,11 @@ async function boot() {
     }
 
     var nowD = new Date();
-    var now = { y: nowD.getFullYear(), m: nowD.getMonth() };
+    var now = { y: nowD.getFullYear(), m: nowD.getMonth(), d: nowD.getDate() };
     var monthLbl = MONTH_NAMES[now.m];
-    var prevLbl = MONTH_NAMES[(now.m + 11) % 12];
+    var prevMonthLbl = MONTH_NAMES[(now.m + 11) % 12];
+    // CR1: chips compare same period, e.g. "vs May 1-11"
+    var prevLbl = prevMonthLbl + ' 1–' + now.d;
 
     var dash = buildDashboard(results[0], settlements, now);
 
@@ -739,9 +744,9 @@ async function boot() {
     document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
     document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     document.getElementById('footNote').textContent =
-      'MoM compares ' + monthLbl + '-to-date against full ' + prevLbl + ' · Cancelled entries excluded from revenue · Agent balances follow the contra convention agreed 11-Jun-2026';
+      'MoM compares ' + monthLbl + ' 1–' + now.d + ' against ' + prevLbl + ' (same period) · Cancelled entries excluded from revenue · Agent balances follow the contra convention agreed 11-Jun-2026';
 
-    renderAlerts(dash.kpis, monthLbl);
+    renderAlerts(dash.kpis);
     renderKPIs(dash.kpis, monthLbl, prevLbl);
     renderBars(dash.months);
     renderDonut(dash.source);
