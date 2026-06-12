@@ -4,8 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Agent Statement of Account – INSPT</title>
-<!-- agent-ledger.html v10 | INSPT Policy Accounting System | 2026-06-11 | New contra logic: receivable = full Commission from placement agency (excl. Direct); payable = Commission_Shared to source agent -->
+<!-- agent-ledger.html v11 | INSPT Policy Accounting System | 2026-06-12 | v11: Download Excel button (SheetJS) exports displayed SOA entries. Contra logic unchanged from v10. -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -93,6 +94,29 @@
   }
   select#agentSelect:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,98,42,.15); }
   .agent-count { font-size: 11px; color: var(--text2); }
+
+  /* ---------- Excel download button ---------- */
+  #excelBtn {
+    margin-left: auto;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    background: var(--primary);
+    color: #fff;
+    cursor: pointer;
+    outline: none;
+    transition: background .2s ease, transform .15s ease, box-shadow .2s ease;
+  }
+  #excelBtn:hover { background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 12px rgba(107,58,42,.25); transform: translateY(-1px); }
+  #excelBtn:active { transform: translateY(0); }
+  #excelBtn:disabled { opacity: .5; cursor: default; transform: none; box-shadow: none; }
+  #excelBtn svg { width: 14px; height: 14px; }
 
   /* ---------- SOA card ---------- */
   .soa-card {
@@ -267,6 +291,10 @@
     <label for="agentSelect">Agent:</label>
     <select id="agentSelect"></select>
     <span class="agent-count" id="agentCount"></span>
+    <button id="excelBtn" type="button" title="Download the displayed statement as an Excel file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Excel
+    </button>
   </div>
 
   <div class="soa-card fade-in" style="animation-delay:.15s" id="soaCard"></div>
@@ -531,6 +559,81 @@ function renderSOA(agentName) {
   card.innerHTML = html;
 }
 
+/* ---------- Excel export (v11) ----------
+   Exports EXACTLY the rows rendered for the selected agent, plus the
+   KPI context and net-balance footer. Real .xlsx via SheetJS. */
+function exportExcel() {
+  if (!ledger) return;
+  if (typeof XLSX === 'undefined') {
+    showWarn('Excel library failed to load — check internet connection and refresh.');
+    return;
+  }
+  var agentName = document.getElementById('agentSelect').value || '';
+  var rows = (ledger.agents[agentName] || []);
+
+  var aoa = [];
+  aoa.push(['Agent Statement of Account — INSPT']);
+  aoa.push(['Agent:', agentName]);
+  aoa.push(['Outstanding entries from 01-May-2026']);
+  aoa.push(['Generated:', new Date().toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  })]);
+  aoa.push([]);
+  aoa.push(['Date', 'Description', 'Reference', 'Type', 'Debit (OMR)', 'Credit (OMR)', 'Balance (OMR)']);
+
+  rows.forEach(function (r) {
+    aoa.push([
+      r.date || '',
+      r.desc || '',
+      r.ref || '',
+      r.type,
+      r.debit ? r.debit : null,
+      r.credit ? r.credit : null,
+      r.balance
+    ]);
+  });
+
+  var net = rows.length ? rows[rows.length - 1].balance : 0;
+  var who = net >= 0 ? 'Agent owes INSPT' : 'INSPT owes Agent';
+  if (Math.abs(net) < 0.0005) who = 'Fully settled';
+  aoa.push([]);
+  aoa.push(['', '', '', 'CURRENT NET BALANCE', '', '', net]);
+  aoa.push(['', '', '', who]);
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // 3-decimal OMR number format on Debit/Credit/Balance columns (E,F,G)
+  var headerRowIdx = 5;                       // 0-based row of the column headers
+  var firstDataRow = headerRowIdx + 1;
+  var lastRow = aoa.length - 1;
+  for (var R = firstDataRow; R <= lastRow; R++) {
+    ['E', 'F', 'G'].forEach(function (col) {
+      var cell = ws[col + (R + 1)];
+      if (cell && typeof cell.v === 'number') { cell.t = 'n'; cell.z = '#,##0.000'; }
+    });
+  }
+  ws['!cols'] = [
+    { wch: 12 },  // Date
+    { wch: 52 },  // Description
+    { wch: 26 },  // Reference
+    { wch: 22 },  // Type / footer label
+    { wch: 14 },  // Debit
+    { wch: 14 },  // Credit
+    { wch: 14 }   // Balance
+  ];
+
+  var wb = XLSX.utils.book_new();
+  var sheetName = agentName.replace(/[\\\/\?\*\[\]:]/g, ' ').slice(0, 31) || 'SOA';
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  var safe = agentName.replace(/[^A-Za-z0-9 _-]/g, '').trim().replace(/\s+/g, '_') || 'Agent';
+  var d = new Date();
+  var fname = 'INSPT_Agent_SOA_' + safe + '_' +
+    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0') + '.xlsx';
+  XLSX.writeFile(wb, fname);
+}
+
 function onAgentChange() {
   var card = document.getElementById('soaCard');
   card.classList.add('switching');
@@ -596,6 +699,7 @@ async function boot() {
       });
 
     renderKPIs(ledger.totals);
+    document.getElementById('excelBtn').addEventListener('click', exportExcel);
 
     if (!names.length) {
       document.getElementById('soaCard').innerHTML =
