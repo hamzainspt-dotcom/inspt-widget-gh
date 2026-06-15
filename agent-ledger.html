@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Agent Statement of Account – INSPT</title>
-<!-- agent-ledger.html v12.1 | INSPT Policy Accounting System | 2026-06-15 | v12: Per-policy, per-side Settle. Receivable->Commission_Claimed=Yes, Payable->Agent_Commission_Status=Settled. Scope by Invoice_Date>=01-May-2026. Per-row Settled button + multi-select. v11 Excel export preserved. | v12.1 FIX: settle write uses ZOHO.CREATOR.DATA.updateRecordById (v2 SDK method; previous 'updateRecord' does not exist in widget SDK 2.0 and would throw at runtime). -->
+<!-- agent-ledger.html v13 | INSPT Policy Accounting System | 2026-06-15 | v12: Per-policy, per-side Settle. Receivable->Commission_Claimed=Yes, Payable->Agent_Commission_Status=Settled. Scope by Invoice_Date>=01-May-2026. Per-row Settled button + multi-select. v11 Excel export preserved. | v12.1 FIX: settle write uses ZOHO.CREATOR.DATA.updateRecordById (v2 SDK method). | v13: FULL AGENT LIST — dropdown lists EVERY placement agency (Insurer_Agents) + EVERY source agent (Agent_Source_Details) from all policies, annotated with open-entry count; defaults to first agent with open entries. Empty agents render the empty state. KPIs/net unchanged (empty buckets contribute 0). -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -455,6 +455,19 @@ function buildLedger(policies, settlements) {
     return agents[name];
   }
 
+  // v13 — FULL AGENT MASTER LIST: seed a bucket for EVERY placement agency
+  // (Insurer_Agents, receivable side) and EVERY source agent (Agent_Source_Details,
+  // payable side) seen on ANY policy, regardless of date or settled status. This
+  // guarantees every agent is selectable in the dropdown so dad can settle them one
+  // by one. Agents with no OUTSTANDING entries simply render the empty state below.
+  // Seeding empty buckets does NOT affect KPIs or net (empty buckets contribute 0).
+  (policies || []).forEach(function (p) {
+    var pl = lookupVal(p.Insurer_Agents);
+    if (pl && pl !== 'Direct') rowsFor(pl);
+    var sa = String(p.Agent_Source_Details || '').trim();
+    if (sa) rowsFor(sa);
+  });
+
   (policies || []).forEach(function (p) {
     var ts = parseDMY(p.Invoice_Date);
     // SCOPE / CUTOFF: only entries on/after the go-live date are in scope.
@@ -607,17 +620,30 @@ function renderKPIs(t) {
   animateCounter(netEl, t.net, fmtOMR);
 }
 
+// v13 — count of OUTSTANDING (settleable) entries for an agent, used to annotate
+// the dropdown and to pick a sensible default agent.
+function openCountFor(name) {
+  var rows = (ledger && ledger.agents[name]) || [];
+  var c = 0;
+  for (var i = 0; i < rows.length; i++) { if (rows[i].settleable) c++; }
+  return c;
+}
+
 function renderAgentOptions(names) {
   var sel = document.getElementById('agentSelect');
   sel.innerHTML = '';
+  var withOpen = 0;
   names.forEach(function (n) {
+    var open = openCountFor(n);
+    if (open > 0) withOpen++;
     var o = document.createElement('option');
-    o.value = n;
-    o.textContent = n;
+    o.value = n; // value stays the bare agent name (used for lookups)
+    o.textContent = n + (open > 0 ? '  —  ' + open + ' open' : '  —  settled');
     sel.appendChild(o);
   });
   document.getElementById('agentCount').textContent =
-    names.length + ' agent' + (names.length === 1 ? '' : 's') + ' with activity';
+    names.length + ' agent' + (names.length === 1 ? '' : 's') +
+    ' · ' + withOpen + ' with open entries';
 }
 
 function renderSOA(agentName) {
@@ -962,7 +988,15 @@ function renderAll() {
     return;
   }
 
-  if (!selectedAgent || names.indexOf(selectedAgent) < 0) selectedAgent = names[0];
+  // v13 — default to the first agent that actually has open entries (so dad lands
+  // on something actionable), falling back to the first agent alphabetically.
+  if (!selectedAgent || names.indexOf(selectedAgent) < 0) {
+    var firstOpen = null;
+    for (var i = 0; i < names.length; i++) {
+      if (openCountFor(names[i]) > 0) { firstOpen = names[i]; break; }
+    }
+    selectedAgent = firstOpen || names[0];
+  }
   renderAgentOptions(names);
   document.getElementById('agentSelect').value = selectedAgent;
   renderSOA(selectedAgent);
