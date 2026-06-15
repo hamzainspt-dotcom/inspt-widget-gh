@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Agent Statement of Account – INSPT</title>
-<!-- agent-ledger.html v11 | INSPT Policy Accounting System | 2026-06-12 | v11: Download Excel button (SheetJS) exports displayed SOA entries. Contra logic unchanged from v10. -->
+<!-- agent-ledger.html v12 | INSPT Policy Accounting System | 2026-06-15 | v12: Per-policy, per-side Settle. Receivable->Commission_Claimed=Yes, Payable->Agent_Commission_Status=Settled. Scope by Invoice_Date>=01-May-2026. Per-row Settled button + multi-select. v11 Excel export preserved. -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -131,7 +131,7 @@
   .soa-card.switching { opacity: 0; }
 
   .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; min-width: 680px; }
+  table { width: 100%; border-collapse: collapse; min-width: 820px; }
   thead th {
     background: var(--primary);
     color: #fff;
@@ -242,6 +242,76 @@
   .empty-state .icon { font-size: 34px; margin-bottom: 8px; }
   .empty-state .big { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
 
+  /* ---------- Settle controls (v12) ---------- */
+  th.chk, td.chk { width: 34px; text-align: center; padding-left: 10px; padding-right: 4px; }
+  th.act, td.act { width: 100px; text-align: center; white-space: nowrap; }
+  .rowchk, #selAll { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); vertical-align: middle; }
+
+  .action-bar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 14px; background: var(--cream);
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .action-bar .selall { font-size: 12px; font-weight: 600; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .settle-selected {
+    font: inherit; font-size: 12px; font-weight: 700;
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--pos);
+    background: var(--pos); color: #fff; cursor: pointer;
+    transition: background .2s ease, opacity .2s ease, transform .15s ease;
+  }
+  .settle-selected:hover:not(:disabled) { background: #21663F; transform: translateY(-1px); }
+  .settle-selected:disabled { opacity: .45; cursor: default; }
+
+  .settle-btn {
+    font: inherit; font-size: 11.5px; font-weight: 700;
+    padding: 5px 13px; border-radius: 7px; border: 1px solid var(--pos);
+    background: #fff; color: var(--pos); cursor: pointer;
+    transition: background .18s ease, color .18s ease, transform .12s ease;
+  }
+  .settle-btn:hover { background: var(--pos); color: #fff; transform: translateY(-1px); }
+  .settle-btn:active { transform: translateY(0); }
+
+  /* ---------- Confirm modal ---------- */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 50;
+    background: rgba(44,24,16,.45);
+    align-items: center; justify-content: center; padding: 18px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 14px; width: 100%; max-width: 470px;
+    max-height: 86vh; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 18px 50px rgba(44,24,16,.35); animation: fadeIn .2s ease-out both;
+  }
+  .modal-head { padding: 16px 20px; font-size: 15px; font-weight: 700; color: var(--primary); border-bottom: 1px solid var(--border); }
+  .modal-body { padding: 16px 20px; overflow-y: auto; font-size: 13px; color: var(--text); }
+  .modal-body p { margin-bottom: 10px; line-height: 1.5; }
+  .m-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .m-list li { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--cream); }
+  .m-desc { font-weight: 600; font-size: 12.5px; }
+  .m-ref { font-weight: 400; color: var(--text2); font-size: 11px; }
+  .m-meta { font-size: 11.5px; color: var(--text2); margin-top: 3px; }
+  .m-eff { color: var(--accent); font-weight: 600; }
+  .modal-foot { padding: 14px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); }
+  .btn-cancel, .btn-confirm { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 18px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); }
+  .btn-cancel { background: #fff; color: var(--text2); }
+  .btn-cancel:hover { background: var(--cream); }
+  .btn-confirm { background: var(--pos); color: #fff; border-color: var(--pos); }
+  .btn-confirm:hover:not(:disabled) { background: #21663F; }
+  .btn-confirm:disabled { opacity: .55; cursor: default; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; bottom: 18px; right: 18px; z-index: 60;
+    background: var(--primary); color: #fff; padding: 12px 18px;
+    border-radius: 10px; font-size: 12.5px; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(44,24,16,.3);
+    opacity: 0; transform: translateY(10px); pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease; max-width: 340px;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.err { background: var(--neg); }
+
   #app { display: none; }
 </style>
 </head>
@@ -300,13 +370,33 @@
   <div class="soa-card fade-in" style="animation-delay:.15s" id="soaCard"></div>
 </div>
 
+<div id="confirmModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-head">Confirm settlement</div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button class="btn-cancel" id="modalCancel" type="button">Cancel</button>
+      <button class="btn-confirm" id="modalConfirm" type="button">Confirm settle</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
 <script>
 /* =====================================================================
-   Agent Ledger SOA Widget v10 — INSPT
+   Agent Ledger SOA Widget v12 — INSPT
    Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
    CONTRA LOGIC (2026-06-11, per MS):
    - Receivable: placement agency owes INSPT the FULL Commission ('Direct' excluded — no broker).
    - Payable: Commission_Shared is ALWAYS what INSPT gives the source agent. Never a receivable.
+   v12 SETTLE (2026-06-15) — per-policy, per-side:
+   - Scope = Invoice_Date >= 01-May-2026 (replaces the old single Agent_Commission_Status gate,
+     which could not keep the two sides independent).
+   - Receivable cleared by Commission_Claimed = Yes (or Not Applicable); Payable cleared by
+     Agent_Commission_Status = Settled. The two sides settle INDEPENDENTLY.
+   - Per-row "Settled" button + checkbox multi-select. Writes via ZOHO.CREATOR.DATA.updateRecord.
+   - v11 Excel export preserved.
    ===================================================================== */
 
 /*CORE-START*/
@@ -351,6 +441,9 @@ function fmtOMR(v) {
   return sign + parts[0] + '.' + parts[1] + ' OMR';
 }
 
+// Go-live cutoff: only policy entries on/after 01-May-2026 are in scope (month is 0-based).
+var CUTOFF_TS = new Date(2026, 4, 1).getTime();
+
 // Build transaction rows per agent from raw records.
 // Returns { agents: { name: [rows...] }, totals: {receivable, payable, settlements, net} }
 function buildLedger(policies, settlements) {
@@ -363,32 +456,47 @@ function buildLedger(policies, settlements) {
   }
 
   (policies || []).forEach(function (p) {
-    if (String(p.Agent_Commission_Status || '').trim() !== 'Unsettled') return;
     var ts = parseDMY(p.Invoice_Date);
+    // SCOPE / CUTOFF: only entries on/after the go-live date are in scope.
+    // Replaces the old single Agent_Commission_Status=='Unsettled' gate, which
+    // could not keep the two sides independent.
+    if (ts < CUTOFF_TS) return;
+
+    var id = String(p.ID || '').trim();
+    var ref = String(p.Reference_Number || '').trim();
     var desc = [String(p.Insured_Name || '').trim(), String(p.Policy_Number || '').trim()]
       .filter(Boolean).join(' | ');
 
-    // SIDE 1 — placement agency owes INSPT the FULL Commission (receivable).
-    // 'Direct' means INSPT placed directly with the insurer — no broker, no receivable.
+    // SIDE 1 — RECEIVABLE: placement agency owes INSPT the FULL Commission.
+    // 'Direct' = no broker, no receivable. Cleared when Commission_Claimed = Yes
+    // (or Not Applicable). Its OWN flag, independent of the payable side.
     var placement = lookupVal(p.Insurer_Agents);
     var commission = num(p.Commission);
-    if (placement && placement !== 'Direct' && commission !== 0) {
+    var claimed = String(p.Commission_Claimed || '').trim();
+    var recvOpen = claimed !== 'Yes' && claimed !== 'Not Applicable';
+    if (placement && placement !== 'Direct' && commission !== 0 && recvOpen) {
       rowsFor(placement).push({
-        ts: ts, date: p.Invoice_Date || '', ref: String(p.Reference_Number || '').trim(),
-        desc: desc || 'Policy entry', type: 'Receivable', debit: commission, credit: 0
+        ts: ts, date: p.Invoice_Date || '', ref: ref,
+        desc: desc || 'Policy entry', type: 'Receivable', debit: commission, credit: 0,
+        settleable: true, id: id, settleField: 'Commission_Claimed', settleValue: 'Yes',
+        amount: commission
       });
       totals.receivable += commission;
     }
 
-    // SIDE 2 — INSPT owes referral agent Commission_Shared (payable).
-    // Commission_Shared is always an outflow — never counted as receivable.
+    // SIDE 2 — PAYABLE: INSPT owes referral agent Commission_Shared.
+    // Cleared when Agent_Commission_Status = Settled. Its OWN flag, independent
+    // of the receivable side. Never counted as a receivable.
     var source = lookupVal(p.Sources_of_Business);
     var refAgent = String(p.Agent_Source_Details || '').trim();
     var shared = num(p.Commission_Shared);
-    if (source === 'Agent' && refAgent && shared !== 0) {
+    var payOpen = String(p.Agent_Commission_Status || '').trim() !== 'Settled';
+    if (source === 'Agent' && refAgent && shared !== 0 && payOpen) {
       rowsFor(refAgent).push({
-        ts: ts, date: p.Invoice_Date || '', ref: String(p.Reference_Number || '').trim(),
-        desc: desc || 'Policy entry', type: 'Payable', debit: 0, credit: shared
+        ts: ts, date: p.Invoice_Date || '', ref: ref,
+        desc: desc || 'Policy entry', type: 'Payable', debit: 0, credit: shared,
+        settleable: true, id: id, settleField: 'Agent_Commission_Status', settleValue: 'Settled',
+        amount: shared
       });
       totals.payable += shared;
     }
@@ -521,19 +629,37 @@ function renderSOA(agentName) {
       '<div class="empty-state">' +
         '<div class="icon">&#128203;</div>' +
         '<div class="big">No outstanding activity</div>' +
-        '<div>' + esc(agentName || 'This agent') + ' has no unsettled entries or settlements in this period.</div>' +
+        '<div>' + esc(agentName || 'This agent') + ' has no outstanding entries or settlements in this period.</div>' +
       '</div>';
     return;
   }
 
-  var html = '<div class="table-wrap"><table><thead><tr>' +
+  var settleableCount = rows.filter(function (r) { return r.settleable; }).length;
+
+  var actionBar = settleableCount
+    ? '<div class="action-bar">' +
+        '<label class="selall"><input type="checkbox" id="selAll"> Select all</label>' +
+        '<button id="settleSelectedBtn" class="settle-selected" type="button" disabled>Settle selected (0)</button>' +
+      '</div>'
+    : '';
+
+  var html = actionBar + '<div class="table-wrap"><table><thead><tr>' +
+    '<th class="chk"></th>' +
     '<th>Date</th><th>Reference / Description</th><th>Type</th>' +
     '<th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>' +
+    '<th class="act">Action</th>' +
     '</tr></thead><tbody>';
 
-  rows.forEach(function (r) {
+  rows.forEach(function (r, idx) {
     var badgeCls = r.type.toLowerCase();
-    html += '<tr>' +
+    var chkCell = r.settleable
+      ? '<td class="chk"><input type="checkbox" class="rowchk" data-idx="' + idx + '"></td>'
+      : '<td class="chk"></td>';
+    var actCell = r.settleable
+      ? '<td class="act"><button class="settle-btn" type="button" data-idx="' + idx + '">Settled</button></td>'
+      : '<td class="act"></td>';
+    html += '<tr data-idx="' + idx + '">' +
+      chkCell +
       '<td>' + esc(r.date || '—') + '</td>' +
       '<td><div class="desc">' + esc(r.desc) + '</div>' +
         (r.ref ? '<div class="ref">' + esc(r.ref) + '</div>' : '') + '</td>' +
@@ -541,6 +667,7 @@ function renderSOA(agentName) {
       '<td class="num">' + (r.debit ? '<span class="debit">' + fmtOMR(r.debit) + '</span>' : '–') + '</td>' +
       '<td class="num">' + (r.credit ? '<span class="credit">' + fmtOMR(r.credit) + '</span>' : '–') + '</td>' +
       '<td class="num bal ' + (r.balance >= 0 ? 'pos' : 'neg') + '">' + fmtOMR(r.balance) + '</td>' +
+      actCell +
       '</tr>';
   });
 
@@ -557,6 +684,130 @@ function renderSOA(agentName) {
     '</div>';
 
   card.innerHTML = html;
+  wireSoaControls();
+}
+
+// ---------- Settle UI wiring + actions (v12) ----------
+
+function currentRows() {
+  return (ledger && selectedAgent) ? (ledger.agents[selectedAgent] || []) : [];
+}
+
+function updateSelCount() {
+  var checks = document.querySelectorAll('.rowchk:checked');
+  var btn = document.getElementById('settleSelectedBtn');
+  if (btn) {
+    btn.textContent = 'Settle selected (' + checks.length + ')';
+    btn.disabled = checks.length === 0;
+  }
+}
+
+function wireSoaControls() {
+  var selAll = document.getElementById('selAll');
+  if (selAll) {
+    selAll.addEventListener('change', function () {
+      var on = this.checked;
+      Array.prototype.forEach.call(document.querySelectorAll('.rowchk'), function (c) { c.checked = on; });
+      updateSelCount();
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.rowchk'), function (c) {
+    c.addEventListener('change', updateSelCount);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.settle-btn'), function (b) {
+    b.addEventListener('click', function () {
+      var idx = parseInt(this.getAttribute('data-idx'), 10);
+      var r = currentRows()[idx];
+      if (r && r.settleable) openSettleConfirm([r]);
+    });
+  });
+  var ss = document.getElementById('settleSelectedBtn');
+  if (ss) {
+    ss.addEventListener('click', function () {
+      var rows = currentRows();
+      var sel = [];
+      Array.prototype.forEach.call(document.querySelectorAll('.rowchk:checked'), function (c) {
+        var r = rows[parseInt(c.getAttribute('data-idx'), 10)];
+        if (r && r.settleable) sel.push(r);
+      });
+      if (sel.length) openSettleConfirm(sel);
+    });
+  }
+}
+
+function openSettleConfirm(rowsToSettle) {
+  var total = rowsToSettle.reduce(function (a, r) { return a + (r.amount || 0); }, 0);
+  var listHtml = rowsToSettle.map(function (r) {
+    var effect = r.settleField === 'Commission_Claimed'
+      ? 'Commission Claimed &rarr; Yes'
+      : 'Agent Commission Status &rarr; Settled';
+    return '<li><div class="m-desc">' + esc(r.desc) +
+      (r.ref ? ' <span class="m-ref">' + esc(r.ref) + '</span>' : '') + '</div>' +
+      '<div class="m-meta"><span class="badge ' + r.type.toLowerCase() + '">' + r.type + '</span> ' +
+      fmtOMR(r.amount) + ' &middot; <span class="m-eff">' + effect + '</span></div></li>';
+  }).join('');
+
+  document.getElementById('modalBody').innerHTML =
+    '<p>Mark <strong>' + rowsToSettle.length + '</strong> ' +
+    (rowsToSettle.length === 1 ? 'entry' : 'entries') + ' as settled (total ' + fmtOMR(total) + ')? ' +
+    'This updates the policy record' + (rowsToSettle.length === 1 ? '' : 's') + ' and removes ' +
+    (rowsToSettle.length === 1 ? 'it' : 'them') + ' from this statement.</p>' +
+    '<ul class="m-list">' + listHtml + '</ul>';
+
+  document.getElementById('confirmModal').classList.add('show');
+  var confirmBtn = document.getElementById('modalConfirm');
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = 'Confirm settle';
+  confirmBtn.onclick = function () { performSettle(rowsToSettle); };
+  document.getElementById('modalCancel').onclick = closeModal;
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('show');
+}
+
+async function updateRecordField(id, field, value) {
+  var payloadData = {};
+  payloadData[field] = value;
+  return await ZOHO.CREATOR.DATA.updateRecord({
+    app_name: APP_NAME,
+    report_name: 'All_Policy_Entries',
+    id: String(id),
+    payload: { data: payloadData }
+  });
+}
+
+async function performSettle(rowsToSettle) {
+  var confirmBtn = document.getElementById('modalConfirm');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Settling…';
+  var ok = 0, fail = 0, firstErr = '';
+  for (var i = 0; i < rowsToSettle.length; i++) {
+    var r = rowsToSettle[i];
+    try {
+      var resp = await updateRecordField(r.id, r.settleField, r.settleValue);
+      if (resp && (resp.code === 3000 || resp.code === 0)) ok++;
+      else { fail++; if (!firstErr) firstErr = 'code ' + (resp && resp.code); }
+    } catch (e) {
+      fail++; if (!firstErr) firstErr = (e && e.message) ? e.message : JSON.stringify(e);
+    }
+  }
+  closeModal();
+  if (fail === 0) {
+    toast(ok + (ok === 1 ? ' entry' : ' entries') + ' settled.', false);
+  } else {
+    toast(ok + ' settled, ' + fail + ' failed (' + firstErr + ').', true);
+  }
+  await refresh();
+}
+
+var toastTimer = null;
+function toast(msg, isErr) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.className = 'toast'; }, 4500);
 }
 
 /* ---------- Excel export (v11) ----------
@@ -637,9 +888,9 @@ function exportExcel() {
 function onAgentChange() {
   var card = document.getElementById('soaCard');
   card.classList.add('switching');
-  var name = document.getElementById('agentSelect').value;
+  selectedAgent = document.getElementById('agentSelect').value;
   setTimeout(function () {
-    renderSOA(name);
+    renderSOA(selectedAgent);
     card.classList.remove('switching');
   }, 180);
 }
@@ -669,54 +920,84 @@ async function fetchSettlementsSafe() {
   return null; // no settlements report available
 }
 
+var selectedAgent = null;
+var controlsWired = false;
+
+function setRefreshedAt() {
+  document.getElementById('refreshedAt').textContent =
+    'Refreshed: ' + new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+}
+
+async function loadData() {
+  var results = await Promise.all([
+    fetchAllPages('All_Policy_Entries').catch(function (e) {
+      throw new Error('All_Policy_Entries: ' + (e && e.message ? e.message : JSON.stringify(e)));
+    }),
+    fetchSettlementsSafe()
+  ]);
+  var settlementRecords = results[1];
+  var warn = false;
+  if (settlementRecords === null) { settlementRecords = []; warn = true; }
+  ledger = buildLedger(results[0], settlementRecords);
+  return warn;
+}
+
+function renderAll() {
+  var names = Object.keys(ledger.agents).sort(function (a, b) { return a.localeCompare(b); });
+  renderKPIs(ledger.totals);
+
+  if (!names.length) {
+    document.getElementById('soaCard').innerHTML =
+      '<div class="empty-state">' +
+        '<div class="icon">&#128202;</div>' +
+        '<div class="big">No outstanding activity</div>' +
+        '<div>No outstanding policy entries or settlements found.</div>' +
+      '</div>';
+    document.getElementById('agentCount').textContent = '0 agents';
+    document.getElementById('agentSelect').innerHTML = '';
+    selectedAgent = null;
+    return;
+  }
+
+  if (!selectedAgent || names.indexOf(selectedAgent) < 0) selectedAgent = names[0];
+  renderAgentOptions(names);
+  document.getElementById('agentSelect').value = selectedAgent;
+  renderSOA(selectedAgent);
+}
+
 async function boot() {
   booted = true;
   try {
-    var results = await Promise.all([
-      fetchAllPages('All_Policy_Entries').catch(function (e) {
-        throw new Error('All_Policy_Entries: ' + (e && e.message ? e.message : JSON.stringify(e)));
-      }),
-      fetchSettlementsSafe()
-    ]);
-    var settlementRecords = results[1];
-    if (settlementRecords === null) {
-      settlementRecords = [];
+    var warn = await loadData();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    setRefreshedAt();
+    if (warn) {
       showWarn('Settlements report not found in Creator — figures below exclude settlements. ' +
         'Create a report for the Agent_Settlements form (link name: All_Agent_Settlements), then refresh.');
     }
-    ledger = buildLedger(results[0], settlementRecords);
-
-    var names = Object.keys(ledger.agents).sort(function (a, b) {
-      return a.localeCompare(b);
-    });
-
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('refreshedAt').textContent =
-      'Refreshed: ' + new Date().toLocaleString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-      });
-
-    renderKPIs(ledger.totals);
-    document.getElementById('excelBtn').addEventListener('click', exportExcel);
-
-    if (!names.length) {
-      document.getElementById('soaCard').innerHTML =
-        '<div class="empty-state">' +
-          '<div class="icon">&#128202;</div>' +
-          '<div class="big">No outstanding activity</div>' +
-          '<div>No unsettled policy entries or settlements found.</div>' +
-        '</div>';
-      document.getElementById('agentCount').textContent = '0 agents';
-      return;
+    if (!controlsWired) {
+      document.getElementById('excelBtn').addEventListener('click', exportExcel);
+      document.getElementById('agentSelect').addEventListener('change', onAgentChange);
+      controlsWired = true;
     }
-
-    renderAgentOptions(names);
-    document.getElementById('agentSelect').addEventListener('change', onAgentChange);
-    renderSOA(names[0]);
+    renderAll();
   } catch (e) {
     showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+// Re-fetch and re-render after a settle, preserving the selected agent.
+async function refresh() {
+  try {
+    await loadData();
+    renderAll();
+    setRefreshedAt();
+  } catch (e) {
+    toast('Refresh failed: ' + ((e && e.message) ? e.message : JSON.stringify(e)), true);
   }
 }
 
