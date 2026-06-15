@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Agent Statement of Account – INSPT</title>
-<!-- agent-ledger.html v12 | INSPT Policy Accounting System | 2026-06-15 | v12: Per-policy, per-side Settle. Receivable->Commission_Claimed=Yes, Payable->Agent_Commission_Status=Settled. Scope by Invoice_Date>=01-May-2026. Per-row Settled button + multi-select. v11 Excel export preserved. -->
+<!-- agent-ledger.html v12.1 | INSPT Policy Accounting System | 2026-06-15 | v12: Per-policy, per-side Settle. Receivable->Commission_Claimed=Yes, Payable->Agent_Commission_Status=Settled. Scope by Invoice_Date>=01-May-2026. Per-row Settled button + multi-select. v11 Excel export preserved. | v12.1 FIX: settle write uses ZOHO.CREATOR.DATA.updateRecordById (v2 SDK method; previous 'updateRecord' does not exist in widget SDK 2.0 and would throw at runtime). -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -395,7 +395,7 @@
      which could not keep the two sides independent).
    - Receivable cleared by Commission_Claimed = Yes (or Not Applicable); Payable cleared by
      Agent_Commission_Status = Settled. The two sides settle INDEPENDENTLY.
-   - Per-row "Settled" button + checkbox multi-select. Writes via ZOHO.CREATOR.DATA.updateRecord.
+   - Per-row "Settled" button + checkbox multi-select. Writes via ZOHO.CREATOR.DATA.updateRecordById.
    - v11 Excel export preserved.
    ===================================================================== */
 
@@ -769,7 +769,7 @@ function closeModal() {
 async function updateRecordField(id, field, value) {
   var payloadData = {};
   payloadData[field] = value;
-  return await ZOHO.CREATOR.DATA.updateRecord({
+  return await ZOHO.CREATOR.DATA.updateRecordById({
     app_name: APP_NAME,
     report_name: 'All_Policy_Entries',
     id: String(id),
