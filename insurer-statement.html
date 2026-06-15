@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Insurer Statement – INSPT</title>
+<!-- insurer-statement.html v1 | INSPT Policy Accounting System | 2026-06-15
+     Per-insurer visibility (in-system, replaces the snapshot xlsx). Reads All_Policy_Entries
+     live (read-only) and aggregates, per insurer:
+       - Commission Receivable = gross Commission on recognizable policies
+         (Commission>0 AND Premium Status != Cancelled) — matches the commission journals
+         (Dr Commission Receivable-Insurers / Cr Commission Income).
+       - Net Commission        = INSPT-retained portion (after agent share) on the same set.
+       - Premium Payable        = Premium on 'Paid to INSPT' policies — matches the premium
+         pass-through journals (Dr Bank / Cr Premium Payable-Insurers).
+     These are GROSS ACCRUED balances from policy records. They are NOT yet net of commission
+     actually received from insurers, nor premium actually remitted to them (those cash flows are
+     tracked separately and not in the policy data). Cross-checks vs Books backfill totals:
+     Commission Receivable total should be ~10,278.852 OMR; Premium Payable (held) ~35,920.270 OMR.
+     Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging). -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f4f1; --card: #ffffff; --ink: #2c2622; --muted: #8a7d74;
+    --line: #ece5df; --brand: #8c4a3a; --brand2: #b06a4f;
+    --recv: #8c4a3a; --pay: #2f6f6a; --net: #b0813a;
+    --shadow: 0 1px 2px rgba(44,38,34,.06), 0 8px 24px rgba(44,38,34,.06);
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         background: var(--bg); color: var(--ink); padding: 18px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .head { background: linear-gradient(120deg, var(--brand), var(--brand2)); color: #fff;
+          border-radius: 14px; padding: 18px 22px; display: flex; justify-content: space-between;
+          align-items: flex-end; box-shadow: var(--shadow); }
+  .head h1 { font-size: 20px; font-weight: 650; letter-spacing: .2px; }
+  .head .sub { font-size: 12.5px; opacity: .9; margin-top: 3px; }
+  .head .when { font-size: 12px; opacity: .9; text-align: right; }
+
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+  .sumcard { background: var(--card); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow);
+             border-top: 3px solid var(--line); }
+  .sumcard.recv { border-top-color: var(--recv); }
+  .sumcard.pay  { border-top-color: var(--pay); }
+  .sumcard.net  { border-top-color: var(--net); }
+  .sumcard .lbl { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .sumcard .val { font-size: 22px; font-weight: 650; margin-top: 4px; }
+  .sumcard .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); margin-top: 16px; overflow: hidden; }
+  .card-head { padding: 14px 18px 4px; }
+  .card-head h2 { font-size: 15px; font-weight: 620; }
+  .card-head .subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: right; font-weight: 600; color: var(--muted); font-size: 11.5px;
+             text-transform: uppercase; letter-spacing: .3px; padding: 10px 18px; border-bottom: 1px solid var(--line); }
+  thead th.l { text-align: left; }
+  tbody td { padding: 9px 18px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+  tbody td.l { text-align: left; font-weight: 550; }
+  tbody tr:hover { background: #faf7f4; }
+  tbody td.muted0 { color: #c4b8ae; }
+  tfoot td { padding: 11px 18px; font-weight: 680; text-align: right; border-top: 2px solid var(--line);
+             font-variant-numeric: tabular-nums; background: #faf7f4; }
+  tfoot td.l { text-align: left; }
+
+  .footnote { font-size: 11.5px; color: var(--muted); margin: 14px 4px 4px; line-height: 1.5; }
+  .loading, .empty { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 14px; }
+  .spin { width: 26px; height: 26px; border: 3px solid var(--line); border-top-color: var(--brand);
+          border-radius: 50%; margin: 0 auto 12px; animation: sp 1s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .box { display: none; margin-top: 14px; padding: 12px 16px; border-radius: 10px; font-size: 13px; }
+  #errorBox { background: #fdecea; color: #9b2c22; border: 1px solid #f5c6c0; }
+  #warnBox  { background: #fff6e6; color: #8a5a00; border: 1px solid #f3e0b2; }
+</style>
+</head>
+<body>
+  <div id="loading" class="loading"><div class="spin"></div>Loading insurer statement…</div>
+  <div id="errorBox" class="box"></div>
+
+  <div class="wrap" id="app" style="display:none">
+    <div class="head">
+      <div>
+        <h1>Insurer Statement — Receivable &amp; Payable</h1>
+        <div class="sub">Per insurer · accrued from policy records</div>
+      </div>
+      <div class="when"><div id="todayLbl"></div><div id="refreshedAt"></div></div>
+    </div>
+
+    <div id="warnBox" class="box"></div>
+
+    <div class="summary">
+      <div class="sumcard recv">
+        <div class="lbl">Commission Receivable</div>
+        <div class="val" id="sumRecv">—</div>
+        <div class="hint">gross commission owed to INSPT by insurers</div>
+      </div>
+      <div class="sumcard net">
+        <div class="lbl">Net Commission (retained)</div>
+        <div class="val" id="sumNet">—</div>
+        <div class="hint">after agent share</div>
+      </div>
+      <div class="sumcard pay">
+        <div class="lbl">Premium Payable</div>
+        <div class="val" id="sumPay">—</div>
+        <div class="hint">premium INSPT holds for insurers (Paid to INSPT)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>By insurer</h2>
+        <div class="subtitle" id="tableSub">All policy records · sorted by commission receivable</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="l">Insurer</th>
+            <th>Policies</th>
+            <th>Commission Receivable</th>
+            <th>Net Commission</th>
+            <th>Premium Payable</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+
+    <div class="footnote" id="footNote"></div>
+  </div>
+
+<script>
+/* =====================================================================
+   Insurer Statement Widget v1 — INSPT
+   Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   ===================================================================== */
+
+/*CORE-START*/
+function lookupVal(field) {
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
+  }
+  return String(field).trim();
+}
+
+function num(v) {
+  var n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtOMR(v) {
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  var parts = abs.toFixed(3).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + parts[0] + '.' + parts[1] + ' OMR';
+}
+
+// Build per-insurer statement from policy records.
+// Returns { rows:[{name, policies, commRecv, netComm, premPay}], totals:{...} }
+function buildInsurerStatement(policies) {
+  var map = {};   // insurer -> {policies, commRecv, netComm, premPay}
+  function row(name) {
+    if (!map[name]) map[name] = { name: name, policies: 0, commRecv: 0, netComm: 0, premPay: 0 };
+    return map[name];
+  }
+
+  (policies || []).forEach(function (p) {
+    var insurer = lookupVal(p.Insurers);
+    if (!insurer) return;
+    var premStatus = String(p.Dropdown1 || '').trim();
+    var cancelled = premStatus === 'Cancelled';
+    var commission = num(p.Commission);
+    var netComm = num(p.Net_Commission);
+    var premium = num(p.Premium);
+
+    var r = row(insurer);
+    // Commission receivable = gross commission on recognizable policies
+    // (Commission>0 AND not Cancelled) — matches the commission journals.
+    if (!cancelled && commission > 0) {
+      r.commRecv += commission;
+      r.netComm += netComm;
+      r.policies += 1;
+    }
+    // Premium payable = premium on 'Paid to INSPT' policies — matches the
+    // premium pass-through journals (Dr Bank / Cr Premium Payable-Insurers).
+    if (premStatus === 'Paid to INSPT') {
+      r.premPay += premium;
+    }
+  });
+
+  var rows = Object.keys(map).map(function (n) { return map[n]; })
+    .sort(function (a, b) { return b.commRecv - a.commRecv; });
+
+  var totals = { policies: 0, commRecv: 0, netComm: 0, premPay: 0 };
+  rows.forEach(function (r) {
+    totals.policies += r.policies;
+    totals.commRecv += r.commRecv;
+    totals.netComm += r.netComm;
+    totals.premPay += r.premPay;
+  });
+
+  return { rows: rows, totals: totals };
+}
+/*CORE-END*/
+
+// ---------------- DOM / SDK layer ----------------
+
+var APP_NAME = 'inspt-policy-accounting-system';
+var booted = false;
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  var el = document.getElementById('errorBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function showWarn(msg) {
+  var el = document.getElementById('warnBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function cell(v) {
+  return v === 0 ? '<td class="muted0">—</td>' : '<td>' + fmtOMR(v) + '</td>';
+}
+
+async function fetchAllPages(reportName) {
+  var all = [];
+  var cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: reportName, max_records: 200 };
+    if (cursor) params.record_cursor = cursor;
+    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) break;
+    all = all.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return all;
+}
+
+function render(stmt) {
+  document.getElementById('sumRecv').textContent = fmtOMR(stmt.totals.commRecv);
+  document.getElementById('sumNet').textContent = fmtOMR(stmt.totals.netComm);
+  document.getElementById('sumPay').textContent = fmtOMR(stmt.totals.premPay);
+
+  var tb = document.getElementById('rows');
+  if (!stmt.rows.length) {
+    tb.innerHTML = '<tr><td class="l" colspan="5" style="text-align:center;color:#c4b8ae;padding:30px">No insurer data found.</td></tr>';
+  } else {
+    tb.innerHTML = stmt.rows.map(function (r) {
+      return '<tr>' +
+        '<td class="l" title="' + esc(r.name) + '">' + esc(r.name) + '</td>' +
+        '<td>' + r.policies + '</td>' +
+        cell(r.commRecv) + cell(r.netComm) + cell(r.premPay) +
+        '</tr>';
+    }).join('');
+  }
+
+  document.getElementById('foot').innerHTML =
+    '<tr><td class="l">Total · ' + stmt.rows.length + ' insurers</td>' +
+    '<td>' + stmt.totals.policies + '</td>' +
+    '<td>' + fmtOMR(stmt.totals.commRecv) + '</td>' +
+    '<td>' + fmtOMR(stmt.totals.netComm) + '</td>' +
+    '<td>' + fmtOMR(stmt.totals.premPay) + '</td></tr>';
+}
+
+async function boot() {
+  booted = true;
+  try {
+    var policies = await fetchAllPages('All_Policy_Entries');
+    var stmt = buildInsurerStatement(policies);
+
+    var nowD = new Date();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+    document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('tableSub').textContent =
+      'All policy records (' + policies.length + ') · sorted by commission receivable';
+    document.getElementById('footNote').innerHTML =
+      'Commission Receivable = gross commission on recognizable policies (Commission &gt; 0, not Cancelled), matching the commission journals. ' +
+      'Premium Payable = premium on policies marked “Paid to INSPT”, matching the premium pass-through journals. ' +
+      'These are gross accrued balances from policy records — not yet net of commission received from insurers or premium remitted to them (those cash flows are recorded separately in Books).';
+
+    render(stmt);
+  } catch (e) {
+    showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+// ---------- Boot pattern (SDK v2 — do not change) ----------
+setTimeout(function () {
+  if (!booted) showError('Widget timed out. Not embedded in Creator?');
+}, 15000);
+
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
+    SigmaSDK.CREATOR.init(function () { if (!booted) boot(); });
+  } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
+    boot();
+  } else {
+    showError('Zoho Creator SDK not found.');
+  }
+} catch (e) {
+  showError('SDK error: ' + e.message);
+}
+</script>
+</body>
+</html>
