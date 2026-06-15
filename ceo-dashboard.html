@@ -4,8 +4,15 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CEO Dashboard – INSPT</title>
-<!-- ceo-dashboard.html v9 | INSPT Policy Accounting System | 2026-06-15
-     v9 change (Hamza): the "Last 6 Months" monthly bar chart now plots COMMISSION (actual income)
+<!-- ceo-dashboard.html v10 | INSPT Policy Accounting System | 2026-06-15
+     v10 changes (Hamza, dad's request — gross commission looked overstated):
+       (1) "Last 6 Months" bar chart now plots NET COMMISSION (was gross Commission in v9).
+           Title -> "Net Commission — Last 6 Months".
+       (2) Bottom-right insurer chart now plots NET COMMISSION (was Premium).
+           Title -> "Net Commission by Insurer".
+       Business Source Split + KPI cards unchanged. Only the 6-month aggregate (monthly) and
+       the insurer aggregate now use num(p.Net_Commission); source split still uses premium.
+     v9 change (Hamza): the "Last 6 Months" monthly bar chart plotted COMMISSION (actual income)
      instead of Premium Written. Title -> "Commission Earned — Last 6 Months". Everything else
      unchanged — Business Source Split and "Premium by Insurer" still show premium; KPI cards unchanged.
      v8 changes (Hamza CR1+CR2, decided 2026-06-11):
@@ -299,8 +306,8 @@
   <div class="row charts">
     <div class="card fade-up" style="animation-delay:.18s">
       <div class="card-head">
-        <h2>Commission Earned — Last 6 Months</h2>
-        <div class="subtitle">Monthly commission in OMR (cancelled entries excluded)</div>
+        <h2>Net Commission — Last 6 Months</h2>
+        <div class="subtitle">Monthly net commission in OMR (cancelled entries excluded)</div>
       </div>
       <div class="bars" id="barChart"></div>
     </div>
@@ -323,8 +330,8 @@
     </div>
     <div class="card fade-up" style="animation-delay:.36s">
       <div class="card-head">
-        <h2>Premium by Insurer</h2>
-        <div class="subtitle">Last 6 months · top insurers</div>
+        <h2>Net Commission by Insurer</h2>
+        <div class="subtitle">Last 6 months · top insurers (net commission)</div>
       </div>
       <div id="insurerList"></div>
     </div>
@@ -453,13 +460,13 @@ function buildDashboard(policies, settlements, now) {
 
     // --- 6-month aggregates (cancelled excluded) ---
     if (!cancelled && mk !== null && mk >= sixStart && mk <= curKey) {
-      // v9: monthly trend now tracks COMMISSION (actual income), not premium.
-      // Source split + insurer breakdown below remain premium (unchanged).
-      monthly[mk] = (monthly[mk] || 0) + num(p.Commission);
+      // v10 (Hamza, dad): monthly trend + insurer breakdown now track NET COMMISSION
+      // (gross commission looked overstated). Business Source Split below stays premium.
+      monthly[mk] = (monthly[mk] || 0) + num(p.Net_Commission);
       var src = lookupVal(p.Sources_of_Business) || 'Other';
       source[src] = (source[src] || 0) + premium;
       var ins = lookupVal(p.Insurers);
-      if (ins) insurers[ins] = (insurers[ins] || 0) + premium;
+      if (ins) insurers[ins] = (insurers[ins] || 0) + num(p.Net_Commission);
     }
 
     // --- Agent balances (NEW contra logic, unsettled only) ---
