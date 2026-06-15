@@ -4,7 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CEO Dashboard – INSPT</title>
-<!-- ceo-dashboard.html v8 | INSPT Policy Accounting System | 2026-06-11
+<!-- ceo-dashboard.html v9 | INSPT Policy Accounting System | 2026-06-15
+     v9 change (Hamza): the "Last 6 Months" monthly bar chart now plots COMMISSION (actual income)
+     instead of Premium Written. Title -> "Commission Earned — Last 6 Months". Everything else
+     unchanged — Business Source Split and "Premium by Insurer" still show premium; KPI cards unchanged.
      v8 changes (Hamza CR1+CR2, decided 2026-06-11):
        CR1: MoM deltas now compare same period — e.g. Jun 1-11 vs May 1-11 (was: vs full prev month).
        CR2: Invoice Sync Failed KPI card removed (6-card grid) and amber receipts pill removed.
@@ -296,8 +299,8 @@
   <div class="row charts">
     <div class="card fade-up" style="animation-delay:.18s">
       <div class="card-head">
-        <h2>Premium Written — Last 6 Months</h2>
-        <div class="subtitle">Monthly totals in OMR (cancelled entries excluded)</div>
+        <h2>Commission Earned — Last 6 Months</h2>
+        <div class="subtitle">Monthly commission in OMR (cancelled entries excluded)</div>
       </div>
       <div class="bars" id="barChart"></div>
     </div>
@@ -450,7 +453,9 @@ function buildDashboard(policies, settlements, now) {
 
     // --- 6-month aggregates (cancelled excluded) ---
     if (!cancelled && mk !== null && mk >= sixStart && mk <= curKey) {
-      monthly[mk] = (monthly[mk] || 0) + premium;
+      // v9: monthly trend now tracks COMMISSION (actual income), not premium.
+      // Source split + insurer breakdown below remain premium (unchanged).
+      monthly[mk] = (monthly[mk] || 0) + num(p.Commission);
       var src = lookupVal(p.Sources_of_Business) || 'Other';
       source[src] = (source[src] || 0) + premium;
       var ins = lookupVal(p.Insurers);
