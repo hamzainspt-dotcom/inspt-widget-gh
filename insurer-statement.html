@@ -4,19 +4,23 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Insurer Statement – INSPT</title>
-<!-- insurer-statement.html v1 | INSPT Policy Accounting System | 2026-06-15
-     Per-insurer visibility (in-system, replaces the snapshot xlsx). Reads All_Policy_Entries
-     live (read-only) and aggregates, per insurer:
-       - Commission Receivable = gross Commission on recognizable policies
-         (Commission>0 AND Premium Status != Cancelled) — matches the commission journals
-         (Dr Commission Receivable-Insurers / Cr Commission Income).
-       - Net Commission        = INSPT-retained portion (after agent share) on the same set.
-       - Premium Payable        = Premium on 'Paid to INSPT' policies — matches the premium
-         pass-through journals (Dr Bank / Cr Premium Payable-Insurers).
-     These are GROSS ACCRUED balances from policy records. They are NOT yet net of commission
-     actually received from insurers, nor premium actually remitted to them (those cash flows are
-     tracked separately and not in the policy data). Cross-checks vs Books backfill totals:
-     Commission Receivable total should be ~10,278.852 OMR; Premium Payable (held) ~35,920.270 OMR.
+<!-- insurer-statement.html v2 | INSPT Policy Accounting System | 2026-06-16
+     Per-insurer visibility (in-system). Reads All_Policy_Entries live (read-only) and shows,
+     per insurer, both GROSS ACCRUED balances and TRUE OUTSTANDING (accrued − settled in cash):
+       COMMISSION (insurer -> INSPT)
+         - Accrued     = gross Commission on recognizable policies (Commission>0, not Cancelled)
+                         — matches commission-recognition journals (Dr Comm Receivable / Cr Comm Income).
+         - Received    = same set where Commission_Received_from_Insurer == 'Received'
+                         — matches commission-receipt journals (Dr Bank / Cr Comm Receivable).
+         - Outstanding = Accrued − Received (insurer still owes INSPT).
+       PREMIUM (INSPT -> insurer)
+         - Held        = Premium on 'Paid to INSPT' policies (Dr Bank / Cr Premium Payable).
+         - Remitted    = those where Premium_Paid_to_Insurer == 'Paid'
+                         — matches remit journals (Dr Premium Payable / Cr Bank).
+         - Outstanding = Held − Remitted (INSPT still owes insurer).
+       Net Commission = INSPT-retained portion (after agent share) on the recognizable set.
+     v2 adds the Received/Remitted/Outstanding columns now that those two fields + their journals
+     exist (sessions 27-29). Per-policy accruals; bulk insurer settlements not yet modelled.
      Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging). -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
@@ -54,12 +58,18 @@
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th { text-align: right; font-weight: 600; color: var(--muted); font-size: 11.5px;
-             text-transform: uppercase; letter-spacing: .3px; padding: 10px 18px; border-bottom: 1px solid var(--line); }
+             text-transform: uppercase; letter-spacing: .3px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
   thead th.l { text-align: left; }
-  tbody td { padding: 9px 18px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+  thead tr.grouphead th { padding: 8px 14px 3px; border-bottom: none; }
+  thead th.grp { text-align: center; font-size: 11px; font-weight: 680; letter-spacing: .3px; }
+  thead th.grp-comm { color: var(--recv); border-bottom: 2px solid var(--recv); }
+  thead th.grp-prem { color: var(--pay); border-bottom: 2px solid var(--pay); }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
   tbody td.l { text-align: left; font-weight: 550; }
+  tbody td.out { font-weight: 680; color: var(--ink); }
   tbody tr:hover { background: #faf7f4; }
-  tbody td.muted0 { color: #c4b8ae; }
+  tbody td.muted0 { color: #c4b8ae; font-weight: 400; }
+  tfoot td.out { font-weight: 760; }
   tfoot td { padding: 11px 18px; font-weight: 680; text-align: right; border-top: 2px solid var(--line);
              font-variant-numeric: tabular-nums; background: #faf7f4; }
   tfoot td.l { text-align: left; }
@@ -81,8 +91,8 @@
   <div class="wrap" id="app" style="display:none">
     <div class="head">
       <div>
-        <h1>Insurer Statement — Receivable &amp; Payable</h1>
-        <div class="sub">Per insurer · accrued from policy records</div>
+        <h1>Insurer Statement — Outstanding &amp; Accrued</h1>
+        <div class="sub">Per insurer · commission owed to INSPT &amp; premium owed to insurers</div>
       </div>
       <div class="when"><div id="todayLbl"></div><div id="refreshedAt"></div></div>
     </div>
@@ -91,19 +101,19 @@
 
     <div class="summary">
       <div class="sumcard recv">
-        <div class="lbl">Commission Receivable</div>
-        <div class="val" id="sumRecv">—</div>
-        <div class="hint">gross commission owed to INSPT by insurers</div>
+        <div class="lbl">Commission Outstanding</div>
+        <div class="val" id="sumCommOut">—</div>
+        <div class="hint" id="sumCommOutHint">insurers still owe INSPT</div>
       </div>
       <div class="sumcard net">
         <div class="lbl">Net Commission (retained)</div>
         <div class="val" id="sumNet">—</div>
-        <div class="hint">after agent share</div>
+        <div class="hint">after agent share, on accrued commission</div>
       </div>
       <div class="sumcard pay">
-        <div class="lbl">Premium Payable</div>
-        <div class="val" id="sumPay">—</div>
-        <div class="hint">premium INSPT holds for insurers (Paid to INSPT)</div>
+        <div class="lbl">Premium Outstanding</div>
+        <div class="val" id="sumPremOut">—</div>
+        <div class="hint" id="sumPremOutHint">INSPT still owes insurers</div>
       </div>
     </div>
 
@@ -114,12 +124,21 @@
       </div>
       <table>
         <thead>
+          <tr class="grouphead">
+            <th class="l"></th>
+            <th></th>
+            <th colspan="3" class="grp grp-comm">Commission (insurer → INSPT)</th>
+            <th colspan="3" class="grp grp-prem">Premium (INSPT → insurer)</th>
+          </tr>
           <tr>
             <th class="l">Insurer</th>
             <th>Policies</th>
-            <th>Commission Receivable</th>
-            <th>Net Commission</th>
-            <th>Premium Payable</th>
+            <th>Accrued</th>
+            <th>Received</th>
+            <th>Outstanding</th>
+            <th>Held</th>
+            <th>Remitted</th>
+            <th>Outstanding</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -160,11 +179,26 @@ function fmtOMR(v) {
 }
 
 // Build per-insurer statement from policy records.
-// Returns { rows:[{name, policies, commRecv, netComm, premPay}], totals:{...} }
+// Tracks, per insurer, the GROSS accrued balances AND the portions already
+// settled in cash, so it can show TRUE OUTSTANDING = accrued − settled.
+//   commRecv   gross commission accrued (Commission>0, not Cancelled) — matches the
+//              commission-recognition journals (Dr Comm Receivable / Cr Comm Income).
+//   commRecd   gross commission already RECEIVED from the insurer — the same recognizable
+//              set where Commission_Received_from_Insurer == 'Received' (matches the
+//              commission-receipt journals Dr Bank / Cr Comm Receivable).
+//   commOut    = commRecv − commRecd  (what the insurer still owes INSPT).
+//   premPay    premium INSPT holds on 'Paid to INSPT' policies (Dr Bank / Cr Premium Payable).
+//   premRemit  premium already REMITTED to the insurer — 'Paid to INSPT' policies where
+//              Premium_Paid_to_Insurer == 'Paid' (matches the remit journals
+//              Dr Premium Payable / Cr Bank).
+//   premOut    = premPay − premRemit  (what INSPT still owes the insurer).
+//   netComm    INSPT-retained commission (after agent share) on the recognizable set.
 function buildInsurerStatement(policies) {
-  var map = {};   // insurer -> {policies, commRecv, netComm, premPay}
+  var map = {};
   function row(name) {
-    if (!map[name]) map[name] = { name: name, policies: 0, commRecv: 0, netComm: 0, premPay: 0 };
+    if (!map[name]) map[name] = { name: name, policies: 0,
+      commRecv: 0, commRecd: 0, commOut: 0, netComm: 0,
+      premPay: 0, premRemit: 0, premOut: 0 };
     return map[name];
   }
 
@@ -176,31 +210,38 @@ function buildInsurerStatement(policies) {
     var commission = num(p.Commission);
     var netComm = num(p.Net_Commission);
     var premium = num(p.Premium);
+    var commReceived = String(p.Commission_Received_from_Insurer || '').trim() === 'Received';
+    var premRemitted = String(p.Premium_Paid_to_Insurer || '').trim() === 'Paid';
 
     var r = row(insurer);
-    // Commission receivable = gross commission on recognizable policies
-    // (Commission>0 AND not Cancelled) — matches the commission journals.
+    // Commission side — recognizable set (Commission>0 AND not Cancelled).
     if (!cancelled && commission > 0) {
       r.commRecv += commission;
       r.netComm += netComm;
       r.policies += 1;
+      if (commReceived) r.commRecd += commission;   // insurer has paid this commission
     }
-    // Premium payable = premium on 'Paid to INSPT' policies — matches the
-    // premium pass-through journals (Dr Bank / Cr Premium Payable-Insurers).
+    // Premium side — premium INSPT holds for 'Paid to INSPT' policies.
     if (premStatus === 'Paid to INSPT') {
       r.premPay += premium;
+      if (premRemitted) r.premRemit += premium;      // INSPT has remitted this premium
     }
   });
 
-  var rows = Object.keys(map).map(function (n) { return map[n]; })
-    .sort(function (a, b) { return b.commRecv - a.commRecv; });
+  var rows = Object.keys(map).map(function (n) {
+    var r = map[n];
+    r.commOut = r.commRecv - r.commRecd;
+    r.premOut = r.premPay - r.premRemit;
+    return r;
+  }).sort(function (a, b) { return b.commOut - a.commOut; });
 
-  var totals = { policies: 0, commRecv: 0, netComm: 0, premPay: 0 };
+  var totals = { policies: 0, commRecv: 0, commRecd: 0, commOut: 0,
+    netComm: 0, premPay: 0, premRemit: 0, premOut: 0 };
   rows.forEach(function (r) {
     totals.policies += r.policies;
-    totals.commRecv += r.commRecv;
+    totals.commRecv += r.commRecv; totals.commRecd += r.commRecd; totals.commOut += r.commOut;
     totals.netComm += r.netComm;
-    totals.premPay += r.premPay;
+    totals.premPay += r.premPay; totals.premRemit += r.premRemit; totals.premOut += r.premOut;
   });
 
   return { rows: rows, totals: totals };
@@ -231,8 +272,10 @@ function esc(s) {
   });
 }
 
-function cell(v) {
-  return v === 0 ? '<td class="muted0">—</td>' : '<td>' + fmtOMR(v) + '</td>';
+function cell(v, extra) {
+  var cls = (v === 0 ? 'muted0' : '') + (extra ? (v === 0 ? ' ' : '') + extra : '');
+  var attr = cls ? ' class="' + cls + '"' : '';
+  return '<td' + attr + '>' + (v === 0 ? '—' : fmtOMR(v)) + '</td>';
 }
 
 async function fetchAllPages(reportName) {
@@ -251,29 +294,38 @@ async function fetchAllPages(reportName) {
 }
 
 function render(stmt) {
-  document.getElementById('sumRecv').textContent = fmtOMR(stmt.totals.commRecv);
-  document.getElementById('sumNet').textContent = fmtOMR(stmt.totals.netComm);
-  document.getElementById('sumPay').textContent = fmtOMR(stmt.totals.premPay);
+  var t = stmt.totals;
+  document.getElementById('sumCommOut').textContent = fmtOMR(t.commOut);
+  document.getElementById('sumCommOutHint').textContent =
+    'insurers still owe INSPT · ' + fmtOMR(t.commRecd) + ' received of ' + fmtOMR(t.commRecv);
+  document.getElementById('sumNet').textContent = fmtOMR(t.netComm);
+  document.getElementById('sumPremOut').textContent = fmtOMR(t.premOut);
+  document.getElementById('sumPremOutHint').textContent =
+    'INSPT still owes insurers · ' + fmtOMR(t.premRemit) + ' remitted of ' + fmtOMR(t.premPay);
 
   var tb = document.getElementById('rows');
   if (!stmt.rows.length) {
-    tb.innerHTML = '<tr><td class="l" colspan="5" style="text-align:center;color:#c4b8ae;padding:30px">No insurer data found.</td></tr>';
+    tb.innerHTML = '<tr><td class="l" colspan="8" style="text-align:center;color:#c4b8ae;padding:30px">No insurer data found.</td></tr>';
   } else {
     tb.innerHTML = stmt.rows.map(function (r) {
       return '<tr>' +
         '<td class="l" title="' + esc(r.name) + '">' + esc(r.name) + '</td>' +
         '<td>' + r.policies + '</td>' +
-        cell(r.commRecv) + cell(r.netComm) + cell(r.premPay) +
+        cell(r.commRecv) + cell(r.commRecd) + cell(r.commOut, 'out') +
+        cell(r.premPay) + cell(r.premRemit) + cell(r.premOut, 'out') +
         '</tr>';
     }).join('');
   }
 
   document.getElementById('foot').innerHTML =
     '<tr><td class="l">Total · ' + stmt.rows.length + ' insurers</td>' +
-    '<td>' + stmt.totals.policies + '</td>' +
-    '<td>' + fmtOMR(stmt.totals.commRecv) + '</td>' +
-    '<td>' + fmtOMR(stmt.totals.netComm) + '</td>' +
-    '<td>' + fmtOMR(stmt.totals.premPay) + '</td></tr>';
+    '<td>' + t.policies + '</td>' +
+    '<td>' + fmtOMR(t.commRecv) + '</td>' +
+    '<td>' + fmtOMR(t.commRecd) + '</td>' +
+    '<td class="out">' + fmtOMR(t.commOut) + '</td>' +
+    '<td>' + fmtOMR(t.premPay) + '</td>' +
+    '<td>' + fmtOMR(t.premRemit) + '</td>' +
+    '<td class="out">' + fmtOMR(t.premOut) + '</td></tr>';
 }
 
 async function boot() {
@@ -288,11 +340,14 @@ async function boot() {
     document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
     document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     document.getElementById('tableSub').textContent =
-      'All policy records (' + policies.length + ') · sorted by commission receivable';
+      'All policy records (' + policies.length + ') · sorted by commission outstanding';
     document.getElementById('footNote').innerHTML =
-      'Commission Receivable = gross commission on recognizable policies (Commission &gt; 0, not Cancelled), matching the commission journals. ' +
-      'Premium Payable = premium on policies marked “Paid to INSPT”, matching the premium pass-through journals. ' +
-      'These are gross accrued balances from policy records — not yet net of commission received from insurers or premium remitted to them (those cash flows are recorded separately in Books).';
+      '<b>Commission</b> — Accrued = gross commission on recognizable policies (Commission &gt; 0, not Cancelled). ' +
+      'Received = those policies marked “Commission Received from Insurer = Received”. Outstanding = Accrued − Received (what insurers still owe INSPT). ' +
+      '<b>Premium</b> — Held = premium on “Paid to INSPT” policies. Remitted = those marked “Premium Paid to Insurer = Paid”. ' +
+      'Outstanding = Held − Remitted (what INSPT still owes insurers). ' +
+      'Each column mirrors a Books journal: commission recognition &amp; receipt, premium pass-through &amp; remittance. ' +
+      'Figures are per-policy accruals; bulk insurer settlements not yet modelled.';
 
     render(stmt);
   } catch (e) {
