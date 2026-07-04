@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Agent Statement of Account – INSPT</title>
-<!-- agent-ledger.html v13 | INSPT Policy Accounting System | 2026-06-15 | v12: Per-policy, per-side Settle. Receivable->Commission_Claimed=Yes, Payable->Agent_Commission_Status=Settled. Scope by Invoice_Date>=01-May-2026. Per-row Settled button + multi-select. v11 Excel export preserved. | v12.1 FIX: settle write uses ZOHO.CREATOR.DATA.updateRecordById (v2 SDK method). | v13: FULL AGENT LIST — dropdown lists EVERY placement agency (Insurer_Agents) + EVERY source agent (Agent_Source_Details) from all policies, annotated with open-entry count; defaults to first agent with open entries. Empty agents render the empty state. KPIs/net unchanged (empty buckets contribute 0). -->
+<!-- agent-ledger.html v14 | INSPT Policy Accounting System | 2026-07-04 | v12: Per-policy, per-side Settle. Receivable->Commission_Claimed=Yes, Payable->Agent_Commission_Status=Settled. Scope by Invoice_Date>=01-May-2026. Per-row Settled button + multi-select. v11 Excel export preserved. | v12.1 FIX: settle write uses ZOHO.CREATOR.DATA.updateRecordById (v2 SDK method). | v13: FULL AGENT LIST — dropdown lists EVERY placement agency (Insurer_Agents) + EVERY source agent (Agent_Source_Details) from all policies, annotated with open-entry count; defaults to first agent with open entries. Empty agents render the empty state. KPIs/net unchanged (empty buckets contribute 0). | v14: added reference-only Premium column (from Policy_Entry.Premium) between Reference/Description and Type in both the on-screen table and the Excel export (blank/"–" for Settlement rows, which have no premium); renamed per-row action button "Settled"->"Settle" (was grammatically a state, not an action). No logic/contra/KPI changes. -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -131,7 +131,7 @@
   .soa-card.switching { opacity: 0; }
 
   .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; min-width: 820px; }
+  table { width: 100%; border-collapse: collapse; min-width: 900px; }
   thead th {
     background: var(--primary);
     color: #fff;
@@ -487,12 +487,13 @@ function buildLedger(policies, settlements) {
     var commission = num(p.Commission);
     var claimed = String(p.Commission_Claimed || '').trim();
     var recvOpen = claimed !== 'Yes' && claimed !== 'Not Applicable';
+    var premium = num(p.Premium);
     if (placement && placement !== 'Direct' && commission !== 0 && recvOpen) {
       rowsFor(placement).push({
         ts: ts, date: p.Invoice_Date || '', ref: ref,
         desc: desc || 'Policy entry', type: 'Receivable', debit: commission, credit: 0,
         settleable: true, id: id, settleField: 'Commission_Claimed', settleValue: 'Yes',
-        amount: commission
+        amount: commission, premium: premium
       });
       totals.receivable += commission;
     }
@@ -509,7 +510,7 @@ function buildLedger(policies, settlements) {
         ts: ts, date: p.Invoice_Date || '', ref: ref,
         desc: desc || 'Policy entry', type: 'Payable', debit: 0, credit: shared,
         settleable: true, id: id, settleField: 'Agent_Commission_Status', settleValue: 'Settled',
-        amount: shared
+        amount: shared, premium: premium
       });
       totals.payable += shared;
     }
@@ -671,7 +672,7 @@ function renderSOA(agentName) {
 
   var html = actionBar + '<div class="table-wrap"><table><thead><tr>' +
     '<th class="chk"></th>' +
-    '<th>Date</th><th>Reference / Description</th><th>Type</th>' +
+    '<th>Date</th><th>Reference / Description</th><th class="num">Premium</th><th>Type</th>' +
     '<th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>' +
     '<th class="act">Action</th>' +
     '</tr></thead><tbody>';
@@ -682,13 +683,15 @@ function renderSOA(agentName) {
       ? '<td class="chk"><input type="checkbox" class="rowchk" data-idx="' + idx + '"></td>'
       : '<td class="chk"></td>';
     var actCell = r.settleable
-      ? '<td class="act"><button class="settle-btn" type="button" data-idx="' + idx + '">Settled</button></td>'
+      ? '<td class="act"><button class="settle-btn" type="button" data-idx="' + idx + '">Settle</button></td>'
       : '<td class="act"></td>';
+    var premCell = typeof r.premium === 'number' ? fmtOMR(r.premium) : '&ndash;';
     html += '<tr data-idx="' + idx + '">' +
       chkCell +
       '<td>' + esc(r.date || '—') + '</td>' +
       '<td><div class="desc">' + esc(r.desc) + '</div>' +
         (r.ref ? '<div class="ref">' + esc(r.ref) + '</div>' : '') + '</td>' +
+      '<td class="num">' + premCell + '</td>' +
       '<td><span class="badge ' + badgeCls + '">' + r.type + '</span></td>' +
       '<td class="num">' + (r.debit ? '<span class="debit">' + fmtOMR(r.debit) + '</span>' : '–') + '</td>' +
       '<td class="num">' + (r.credit ? '<span class="credit">' + fmtOMR(r.credit) + '</span>' : '–') + '</td>' +
@@ -856,13 +859,14 @@ function exportExcel() {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   })]);
   aoa.push([]);
-  aoa.push(['Date', 'Description', 'Reference', 'Type', 'Debit (OMR)', 'Credit (OMR)', 'Balance (OMR)']);
+  aoa.push(['Date', 'Description', 'Reference', 'Premium (OMR)', 'Type', 'Debit (OMR)', 'Credit (OMR)', 'Balance (OMR)']);
 
   rows.forEach(function (r) {
     aoa.push([
       r.date || '',
       r.desc || '',
       r.ref || '',
+      typeof r.premium === 'number' ? r.premium : null,
       r.type,
       r.debit ? r.debit : null,
       r.credit ? r.credit : null,
@@ -874,17 +878,17 @@ function exportExcel() {
   var who = net >= 0 ? 'Agent owes INSPT' : 'INSPT owes Agent';
   if (Math.abs(net) < 0.0005) who = 'Fully settled';
   aoa.push([]);
-  aoa.push(['', '', '', 'CURRENT NET BALANCE', '', '', net]);
-  aoa.push(['', '', '', who]);
+  aoa.push(['', '', '', '', 'CURRENT NET BALANCE', '', '', net]);
+  aoa.push(['', '', '', '', who]);
 
   var ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // 3-decimal OMR number format on Debit/Credit/Balance columns (E,F,G)
+  // 3-decimal OMR number format on Premium/Debit/Credit/Balance columns (D,F,G,H)
   var headerRowIdx = 5;                       // 0-based row of the column headers
   var firstDataRow = headerRowIdx + 1;
   var lastRow = aoa.length - 1;
   for (var R = firstDataRow; R <= lastRow; R++) {
-    ['E', 'F', 'G'].forEach(function (col) {
+    ['D', 'F', 'G', 'H'].forEach(function (col) {
       var cell = ws[col + (R + 1)];
       if (cell && typeof cell.v === 'number') { cell.t = 'n'; cell.z = '#,##0.000'; }
     });
@@ -893,6 +897,7 @@ function exportExcel() {
     { wch: 12 },  // Date
     { wch: 52 },  // Description
     { wch: 26 },  // Reference
+    { wch: 14 },  // Premium
     { wch: 22 },  // Type / footer label
     { wch: 14 },  // Debit
     { wch: 14 },  // Credit
