@@ -21,7 +21,16 @@
             Red sync-failure pill kept — renders only when failures exist.
      Agent balances use NEW contra logic: receivable = full Commission (excl Direct placement),
      payable = Commission_Shared where Source = Agent. Cancelled premium-status entries excluded
-     from revenue sums. Receipt Pending scoped to current month (all 979 historical = Pending Approval). -->
+     from revenue sums. Receipt Pending scoped to current month (all 979 historical = Pending Approval).
+     v11 changes (2026-07-10, OI-42 fix — Hamza's decision after dad flagged a live mismatch on Azeem):
+       Agent Net Balances panel was using a single old flag (Agent_Commission_Status=="Unsettled") to
+       gate BOTH receivable and payable, with no date cutoff — agent-ledger.html moved to a two
+       INDEPENDENT-flag model + a 01-May-2026 scope cutoff back on 2026-06-15 and this dashboard was
+       never updated to match, so the two panels silently diverged. v11 matches the Dashboard's agent
+       balance logic exactly to agent-ledger.html's buildLedger(): receivable clears on
+       Commission_Claimed (Yes/Not Applicable), payable clears on Agent_Commission_Status=="Settled",
+       tracked independently; only Invoice_Date >= 01-May-2026 counted (matches Ledger's CUTOFF_TS).
+       Everything else (KPIs, 6-month chart, source split, insurer chart) unchanged. -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -324,7 +333,7 @@
     <div class="card fade-up" style="animation-delay:.30s">
       <div class="card-head">
         <h2>Agent Net Balances</h2>
-        <div class="subtitle">Unsettled entries + settlements · receivable = full commission (placement) · payable = commission shared</div>
+        <div class="subtitle">Open entries from 01-May-2026 + settlements · receivable = full commission (placement) · payable = commission shared</div>
       </div>
       <div id="agentTable"></div>
     </div>
@@ -375,6 +384,16 @@ function parseMonth(s) {
 }
 
 function monthKey(y, m) { return y * 12 + m; }
+
+// OI-42 fix (2026-07-10): same go-live cutoff as agent-ledger.html's CUTOFF_TS
+// (new Date(2026,4,1) = 01-May-2026). {y,m,d} from parseMonth(), month 0-based.
+var CUTOFF_Y = 2026, CUTOFF_M = 4, CUTOFF_D = 1;
+function inAgentScope(pm) {
+  if (!pm) return false;
+  if (pm.y !== CUTOFF_Y) return pm.y > CUTOFF_Y;
+  if (pm.m !== CUTOFF_M) return pm.m > CUTOFF_M;
+  return pm.d >= CUTOFF_D;
+}
 
 function fmtOMR(v) {
   var sign = v < 0 ? '-' : '';
@@ -469,17 +488,23 @@ function buildDashboard(policies, settlements, now) {
       if (ins) insurers[ins] = (insurers[ins] || 0) + num(p.Net_Commission);
     }
 
-    // --- Agent balances (NEW contra logic, unsettled only) ---
-    if (String(p.Agent_Commission_Status || '').trim() === 'Unsettled') {
+    // --- Agent balances (v11, OI-42 fix 2026-07-10) ---
+    // Matched exactly to agent-ledger.html's buildLedger(): receivable and payable
+    // are cleared by their OWN independent flag, and only policies on/after the
+    // 01-May-2026 go-live cutoff are counted (same as the Ledger's CUTOFF_TS).
+    if (inAgentScope(pm)) {
       var placement = lookupVal(p.Insurer_Agents);
       var commission = num(p.Commission);
-      if (placement && placement !== 'Direct' && commission !== 0) {
+      var claimed = String(p.Commission_Claimed || '').trim();
+      var recvOpen = claimed !== 'Yes' && claimed !== 'Not Applicable';
+      if (placement && placement !== 'Direct' && commission !== 0 && recvOpen) {
         agentFor(placement).recv += commission;
       }
       var srcType = lookupVal(p.Sources_of_Business);
       var refAgent = String(p.Agent_Source_Details || '').trim();
       var shared = num(p.Commission_Shared);
-      if (srcType === 'Agent' && refAgent && shared !== 0) {
+      var payOpen = String(p.Agent_Commission_Status || '').trim() !== 'Settled';
+      if (srcType === 'Agent' && refAgent && shared !== 0 && payOpen) {
         agentFor(refAgent).pay += shared;
       }
     }
@@ -756,7 +781,7 @@ async function boot() {
     document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
     document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     document.getElementById('footNote').textContent =
-      'MoM compares ' + monthLbl + ' 1–' + now.d + ' against ' + prevLbl + ' (same period) · Cancelled entries excluded from revenue · Agent balances follow the contra convention agreed 11-Jun-2026';
+      'MoM compares ' + monthLbl + ' 1–' + now.d + ' against ' + prevLbl + ' (same period) · Cancelled entries excluded from revenue · Agent balances match Agent_Ledger\'s contra convention (independent receivable/payable flags, from 01-May-2026), aligned 10-Jul-2026';
 
     renderAlerts(dash.kpis);
     renderKPIs(dash.kpis, monthLbl, prevLbl);
