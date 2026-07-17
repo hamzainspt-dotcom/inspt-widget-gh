@@ -340,7 +340,7 @@ async function boot() {
     document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
     document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     document.getElementById('tableSub').textContent =
-      'All policy records (' + policies.length + ') · sorted by commission outstanding';
+      stmt.totals.policies + ' of ' + policies.length + ' records shown · commission-recognizable (named insurer, not cancelled, commission > 0) · sorted by commission outstanding';
     document.getElementById('footNote').innerHTML =
       '<b>Commission</b> — Accrued = gross commission on recognizable policies (Commission &gt; 0, not Cancelled). ' +
       'Received = those policies marked “Commission Received from Insurer = Received”. Outstanding = Accrued − Received (what insurers still owe INSPT). ' +
