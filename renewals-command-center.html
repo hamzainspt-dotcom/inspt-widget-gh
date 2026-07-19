@@ -452,7 +452,17 @@ async function fetchAllPages(reportName) {
   while (true) {
     var params = { app_name: APP_NAME, report_name: reportName, max_records: 200 };
     if (cursor) params.record_cursor = cursor;
-    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    var resp;
+    try {
+      resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    } catch (e) {
+      // Empty report: v2.1 API responds HTTP 400 code 9220 "No records exist in this
+      // report" (v2 used code 3100) — this is the expected, correct state before the
+      // "Renewals - Flag Upcoming" schedule has ever run, not a real failure.
+      var es = String(e && e.message || '') + ' ' + ((e && e.code) || '') + ' ' + JSON.stringify(e || {});
+      if (/9220|3100|no records|no data/i.test(es)) break;
+      throw e;
+    }
     if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) break;
     allRecords = allRecords.concat(resp.data);
     if (resp.data.length < 200 || !resp.record_cursor) break;
