@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Renewals Command Center – INSPT</title>
+<!-- renewals-command-center.html v1 | INSPT Policy Accounting System | 2026-07-19 |
+     v1: Renewals Due list + KPIs + Renew action (creates a new Policy_Entry from the expiring
+     policy via ZOHO.CREATOR.DATA.addRecords, sets Renewal_Source so the live "Add Policy -
+     Renewal Write Back" workflow flips the Renewals record to Renewed). OI-51 Stage 3. -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #F8F4EF;
+    --card: #FFFFFF;
+    --primary: #6B3A2A;
+    --accent: #B5622A;
+    --pos: #2A7D4F;
+    --neg: #C0392B;
+    --warn: #B5622A;
+    --text: #2C1810;
+    --text2: #8B6B5A;
+    --border: #E8DDD5;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #FFFFFF;
+    color: var(--text);
+    font-size: 13px;
+    padding: 14px;
+  }
+
+  .fade-in { animation: fadeIn .45s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .header {
+    background: linear-gradient(120deg, #6B3A2A 0%, #8A4A30 70%, #B5622A 100%);
+    border-radius: 12px;
+    padding: 18px 22px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
+  .header .sub { font-size: 12px; opacity: .85; margin-top: 3px; }
+  .header .refreshed { font-size: 11px; opacity: .75; text-align: right; }
+
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .kpi {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: box-shadow .25s ease, transform .25s ease;
+  }
+  .kpi:hover { box-shadow: 0 6px 16px rgba(107,58,42,.14); transform: translateY(-2px); }
+  .kpi .label { font-size: 10.5px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  .kpi .value { font-size: 22px; font-weight: 700; margin-top: 4px; color: var(--primary); font-variant-numeric: tabular-nums; }
+  .kpi .value.warn { color: var(--neg); }
+  .kpi .hint { font-size: 10.5px; color: var(--text2); margin-top: 2px; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  #searchBox {
+    font: inherit;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    min-width: 220px;
+    outline: none;
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  #searchBox:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,98,42,.15); }
+  .result-count { font-size: 11px; color: var(--text2); }
+
+  .table-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 5px rgba(107,58,42,.07);
+  }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 780px; }
+  thead th {
+    background: var(--primary);
+    color: #fff;
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tbody tr:hover { background: #FBF7F2; }
+  tbody tr.overdue td.period { color: var(--neg); font-weight: 700; }
+  .ref { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .desc { font-weight: 500; }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge.pending { background: rgba(181,98,42,.14); color: var(--accent); }
+  .badge.contacted { background: rgba(107,58,42,.12); color: var(--primary); }
+  .badge.quoted { background: rgba(42,125,79,.12); color: var(--pos); }
+
+  .renew-btn {
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border: 1px solid var(--primary);
+    border-radius: 7px;
+    background: var(--primary);
+    color: #fff;
+    cursor: pointer;
+    outline: none;
+    transition: background .2s ease, transform .15s ease;
+    white-space: nowrap;
+  }
+  .renew-btn:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+  .renew-btn:disabled { opacity: .5; cursor: default; }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(44,24,16,.45);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 22px 24px;
+    max-width: 440px;
+    width: 90%;
+    box-shadow: 0 12px 40px rgba(44,24,16,.25);
+  }
+  .modal h2 { font-size: 15px; color: var(--primary); margin-bottom: 10px; }
+  .modal p { font-size: 12.5px; color: var(--text); line-height: 1.55; margin-bottom: 8px; }
+  .modal .fields-note {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11.5px;
+    color: var(--text2);
+    margin: 10px 0 14px;
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+  .btn-secondary, .btn-primary {
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    outline: none;
+  }
+  .btn-secondary { background: #fff; border: 1px solid var(--border); color: var(--text2); }
+  .btn-secondary:hover { background: var(--cream); }
+  .btn-primary { background: var(--primary); border: 1px solid var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+  .btn-primary:disabled { opacity: .6; cursor: default; }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    display: none;
+    position: fixed;
+    bottom: 20px; left: 50%; transform: translateX(-50%);
+    max-width: 480px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--pos);
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 10px 30px rgba(44,24,16,.2);
+    z-index: 1100;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  #toast.error { border-left-color: var(--neg); }
+  #toast .t-title { font-weight: 700; color: var(--primary); margin-bottom: 3px; }
+  #toast.error .t-title { color: var(--neg); }
+
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 60px 0;
+    color: var(--text2);
+  }
+  .spinner {
+    width: 34px; height: 34px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #errorBox {
+    display: none;
+    background: rgba(192,57,43,.08);
+    border: 1px solid rgba(192,57,43,.3);
+    color: var(--neg);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    font-size: 12.5px;
+  }
+
+  .empty-state { text-align: center; padding: 48px 16px; color: var(--text2); }
+  .empty-state .icon { font-size: 34px; margin-bottom: 8px; }
+  .empty-state .big { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
+
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Loading renewals due…</div>
+</div>
+
+<div id="errorBox"></div>
+
+<div id="app">
+  <div class="header fade-in">
+    <div>
+      <h1>Renewals Command Center</h1>
+      <div class="sub">Policies due for renewal — Pending / Contacted / Quoted</div>
+    </div>
+    <div class="refreshed" id="refreshedAt"></div>
+  </div>
+
+  <div class="kpis fade-in" style="animation-delay:.05s">
+    <div class="kpi">
+      <div class="label">Total Due</div>
+      <div class="value" id="kpiTotal">0</div>
+      <div class="hint">Not yet renewed, lost, or lapsed</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Overdue</div>
+      <div class="value warn" id="kpiOverdue">0</div>
+      <div class="hint">Period To already passed</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Due within 7 days</div>
+      <div class="value" id="kpiWeek">0</div>
+      <div class="hint">Needs action soon</div>
+    </div>
+  </div>
+
+  <div class="toolbar fade-in" style="animation-delay:.1s">
+    <input id="searchBox" type="text" placeholder="Search insured name, policy number, insurer…" />
+    <span class="result-count" id="resultCount"></span>
+  </div>
+
+  <div class="table-card fade-in" style="animation-delay:.15s" id="tableCard"></div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Renew this policy?</h2>
+    <p id="modalBody"></p>
+    <div class="fields-note">
+      Copies Insured, Vehicle, Insurer, and Agent/Source details from the expiring policy.
+      Premium, Commission, Invoice Date, Period dates, Policy Number, and Insurer Invoice Number
+      are left as placeholders — open the new record in Add Policy to finish entering them.
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="modalCancel" type="button">Cancel</button>
+      <button class="btn-primary" id="modalConfirm" type="button">Renew</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =====================================================================
+   Renewals Command Center — INSPT
+   Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   ===================================================================== */
+
+/*CORE-START*/
+function lookupVal(field) {
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
+  }
+  return String(field).trim();
+}
+
+function lookupPayloadValue(field) {
+  // Lookup fields come back as {DisplayField, ID, zc_display_value}; a plain Drop Down
+  // would come back as a bare string — handle both without assuming which this is.
+  if (field && typeof field === 'object') {
+    var id = field.ID || field.id;
+    return id ? String(id) : '';
+  }
+  if (field) return String(field).trim();
+  return '';
+}
+
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function parseDMY(s) {
+  if (!s) return 0;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(String(s).trim());
+  if (!m) {
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  if (mon === undefined) return 0;
+  return new Date(parseInt(m[3], 10), mon, parseInt(m[1], 10)).getTime();
+}
+
+function todayDMY() {
+  var d = new Date();
+  return String(d.getDate()).padStart(2, '0') + '-' + MONTH_NAMES[d.getMonth()] + '-' + d.getFullYear();
+}
+
+function todayMidnight() {
+  var d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+// Build the new Policy_Entry payload from the expiring policy's full record + the
+// Renewals record's own ID. Field-copy list confirmed with Hamza 2026-07-19; the four
+// Mandatory-but-intentionally-blank fields (Policy_Number, Insurer_Invoice_Number,
+// Premium, Commission) get explicit placeholders since Zoho's Add Records API rejects
+// a record that omits a Mandatory field entirely — there is no true "leave blank" option.
+function buildRenewPayload(orig, renewalId) {
+  var d = {};
+  function copyText(key) {
+    var v = orig[key];
+    if (v !== undefined && v !== null && String(v).trim() !== '') d[key] = String(v).trim();
+  }
+  function copyLookup(key) {
+    var v = lookupPayloadValue(orig[key]);
+    if (v) d[key] = v;
+  }
+
+  // Genuinely unchanged year over year — copied from the expiring policy
+  copyText('Insured_Name');
+  copyText('Contact_Number');
+  copyText('License_CR_Number');
+  copyText('Email');
+  copyLookup('Insurance_Types');
+  copyText('Interest_Insured1');
+  copyLookup('Vehicle_Brands');
+  copyLookup('Vehicle_Models');
+  copyText('Registration_Number');
+  copyText('Chassis_Number');
+  copyLookup('Insurers');
+  copyLookup('Sources_of_Business');
+  copyLookup('Insurer_Agents');
+  copyText('Agent_Source_Details');
+  copyText('Direct_Source_Details');
+  copyText('Other_Source_of_Business');
+  copyText('Currency');
+
+  // Mandatory on Add Policy, but not meaningfully known at Renew time — explicit
+  // placeholders. Invoice_Date / Period_From / Dropdown1 (Premium Status) mirror the
+  // native form's own Initial Value defaults, so this is not a deviation for those three.
+  d.Invoice_Date = todayDMY();
+  d.Period_From = todayDMY();
+  d.Dropdown1 = 'Pending';                       // link name for "Premium Status" (confirmed OI-51 Stage 2.1)
+  d.Policy_Number = 'RENEW-' + renewalId;
+  d.Insurer_Invoice_Number = 'RENEW-' + renewalId;
+  d.Premium = 0;
+  d.Commission = 0;
+
+  // Linkage back to the Renewals record — the live "Add Policy - Renewal Write Back"
+  // workflow (built OI-51 Stage 2.4) reads this on Created and flips Renewal_Status.
+  d.Renewal_Source = String(renewalId);
+
+  return d;
+}
+/*CORE-END*/
+
+// ---------- DOM / SDK layer ----------
+
+var APP_NAME = 'inspt-policy-accounting-system';
+var POLICY_FORM = 'Policy_Entry';
+var POLICY_REPORT = 'All_Policy_Entries';
+var RENEWALS_REPORT = 'Renewals_Due';
+
+var booted = false;
+var allRows = [];
+var filteredRows = [];
+var pendingRenewal = null;
+
+function showError(msg) {
+  var el = document.getElementById('errorBox');
+  document.getElementById('loading').style.display = 'none';
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+async function fetchAllPages(reportName) {
+  var allRecords = [];
+  var cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: reportName, max_records: 200 };
+    if (cursor) params.record_cursor = cursor;
+    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) break;
+    allRecords = allRecords.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return allRecords;
+}
+
+function statusBadgeClass(status) {
+  var s = String(status || '').toLowerCase();
+  if (s === 'contacted') return 'contacted';
+  if (s === 'quoted') return 'quoted';
+  return 'pending';
+}
+
+function renderKPIs(rows) {
+  var today = todayMidnight();
+  var weekOut = today + 7 * 86400000;
+  var overdue = 0, dueWeek = 0;
+  rows.forEach(function (r) {
+    var ts = parseDMY(r.Period_To);
+    if (!ts) return;
+    if (ts < today) overdue++;
+    else if (ts <= weekOut) dueWeek++;
+  });
+  document.getElementById('kpiTotal').textContent = rows.length;
+  document.getElementById('kpiOverdue').textContent = overdue;
+  document.getElementById('kpiWeek').textContent = dueWeek;
+}
+
+function renderTable(rows) {
+  var card = document.getElementById('tableCard');
+  document.getElementById('resultCount').textContent =
+    rows.length + ' of ' + allRows.length + ' shown';
+
+  if (!rows.length) {
+    card.innerHTML =
+      '<div class="empty-state">' +
+        '<div class="icon">&#128203;</div>' +
+        '<div class="big">No renewals due</div>' +
+        '<div>Nothing matches right now — check back after the next daily flag run.</div>' +
+      '</div>';
+    return;
+  }
+
+  var today = todayMidnight();
+  var html = '<div class="table-wrap"><table><thead><tr>' +
+    '<th>Insured Name</th><th>Policy Number</th><th>Insurer</th><th>Period To</th>' +
+    '<th>Assigned To</th><th>Status</th><th></th>' +
+    '</tr></thead><tbody>';
+
+  rows.forEach(function (r, idx) {
+    var ts = parseDMY(r.Period_To);
+    var overdueCls = (ts && ts < today) ? ' overdue' : '';
+    html += '<tr class="' + overdueCls.trim() + '">' +
+      '<td class="desc">' + esc(r.Insured_Name || '—') + '</td>' +
+      '<td>' + esc(r.Policy_Number || '—') + '</td>' +
+      '<td>' + esc(r.Insurer || '—') + '</td>' +
+      '<td class="period">' + esc(r.Period_To || '—') + '</td>' +
+      '<td>' + esc(lookupVal(r.Assigned_To) || '—') + '</td>' +
+      '<td><span class="badge ' + statusBadgeClass(r.Renewal_Status) + '">' + esc(r.Renewal_Status || '—') + '</span></td>' +
+      '<td><button class="renew-btn" data-idx="' + idx + '" type="button">Renew</button></td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  card.innerHTML = html;
+
+  Array.prototype.forEach.call(card.querySelectorAll('.renew-btn'), function (btn) {
+    btn.addEventListener('click', function () {
+      openRenewModal(rows[parseInt(btn.getAttribute('data-idx'), 10)]);
+    });
+  });
+}
+
+function applyFilter() {
+  var q = document.getElementById('searchBox').value.trim().toLowerCase();
+  if (!q) {
+    filteredRows = allRows.slice();
+  } else {
+    filteredRows = allRows.filter(function (r) {
+      return (String(r.Insured_Name || '').toLowerCase().indexOf(q) !== -1) ||
+        (String(r.Policy_Number || '').toLowerCase().indexOf(q) !== -1) ||
+        (String(r.Insurer || '').toLowerCase().indexOf(q) !== -1);
+    });
+  }
+  renderTable(filteredRows);
+}
+
+function showToast(title, msg, isError) {
+  var el = document.getElementById('toast');
+  el.className = isError ? 'error' : '';
+  el.innerHTML = '<div class="t-title">' + esc(title) + '</div><div>' + msg + '</div>';
+  el.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(function () { el.style.display = 'none'; }, isError ? 9000 : 7000);
+}
+
+function openRenewModal(renewal) {
+  pendingRenewal = renewal;
+  document.getElementById('modalTitle').textContent = 'Renew this policy?';
+  document.getElementById('modalBody').innerHTML =
+    'Create a new Policy Entry for <strong>' + esc(renewal.Insured_Name || 'this insured') + '</strong> ' +
+    '(expiring policy ' + esc(renewal.Policy_Number || '—') + ', ' + esc(renewal.Insurer || '—') +
+    ', Period To ' + esc(renewal.Period_To || '—') + ').';
+  document.getElementById('modalConfirm').disabled = false;
+  document.getElementById('modalConfirm').textContent = 'Renew';
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+  pendingRenewal = null;
+}
+
+async function confirmRenew() {
+  if (!pendingRenewal) return;
+  var renewal = pendingRenewal;
+  var confirmBtn = document.getElementById('modalConfirm');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Renewing…';
+
+  try {
+    var origId = lookupPayloadValue(renewal.Original_Policy);
+    if (!origId) throw new Error('This renewal has no linked original policy — cannot copy details.');
+
+    var origResp = await ZOHO.CREATOR.DATA.getRecordById({
+      app_name: APP_NAME, report_name: POLICY_REPORT, id: origId
+    });
+    if (!origResp || origResp.code !== 3000 || !origResp.data) {
+      throw new Error('Could not load the original policy (ID ' + origId + ').');
+    }
+
+    var payload = buildRenewPayload(origResp.data, renewal.ID);
+
+    var addResp = await ZOHO.CREATOR.DATA.addRecords({
+      app_name: APP_NAME,
+      form_name: POLICY_FORM,
+      payload: {
+        data: payload,
+        result: { fields: ['Reference_Number', 'Insured_Name'], message: true }
+      }
+    });
+
+    var recData = null;
+    if (addResp && addResp.code === 3000) {
+      recData = addResp.data || (addResp.result && addResp.result[0] && addResp.result[0].data) || null;
+    }
+    if (!recData) {
+      var errMsg = (addResp && (addResp.message || JSON.stringify(addResp))) || 'Unknown error';
+      throw new Error(errMsg);
+    }
+
+    var refNum = recData.Reference_Number || '(reference pending)';
+    closeModal();
+    showToast(
+      'Renewed — ' + esc(refNum),
+      'New Policy Entry created for ' + esc(recData.Insured_Name || renewal.Insured_Name) +
+      '. Open <strong>Add Policy</strong> and search for <strong>' + esc(refNum) +
+      '</strong> (or Policy Number <strong>RENEW-' + esc(renewal.ID) + '</strong>) to finish entering ' +
+      'Premium, Commission, Invoice Date, and Period dates.',
+      false
+    );
+
+    // Optimistic removal — the live "Add Policy - Renewal Write Back" workflow should
+    // flip this Renewals record's status server-side; remove it from view now rather
+    // than waiting on a re-fetch. If it reappears after a manual refresh, the write-back
+    // workflow needs checking (per the standing OI-51 Stage 2.4 note).
+    allRows = allRows.filter(function (r) { return r.ID !== renewal.ID; });
+    renderKPIs(allRows);
+    applyFilter();
+  } catch (e) {
+    showToast('Renew failed', esc(e && e.message ? e.message : String(e)), true);
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Renew';
+  }
+}
+
+async function boot() {
+  booted = true;
+  try {
+    var rows = await fetchAllPages(RENEWALS_REPORT);
+    allRows = rows;
+    filteredRows = rows.slice();
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('refreshedAt').textContent =
+      'Refreshed: ' + new Date().toLocaleString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+
+    renderKPIs(allRows);
+    renderTable(filteredRows);
+
+    document.getElementById('searchBox').addEventListener('input', applyFilter);
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    document.getElementById('modalConfirm').addEventListener('click', confirmRenew);
+    document.getElementById('modalOverlay').addEventListener('click', function (e) {
+      if (e.target === this) closeModal();
+    });
+  } catch (e) {
+    showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+setTimeout(function () {
+  if (!booted) showError('Widget timed out. Not embedded in Creator?');
+}, 15000);
+
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
+    SigmaSDK.CREATOR.init(function () {
+      if (!booted) boot();
+    });
+  } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
+    boot();
+  } else {
+    showError('Zoho Creator SDK not found.');
+  }
+} catch (e) {
+  showError('SDK error: ' + e.message);
+}
+</script>
+</body>
+</html>
