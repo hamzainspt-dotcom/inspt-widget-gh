@@ -384,8 +384,40 @@ function renderTable(){
 function render(){ renderKpis(); renderChart(); renderChips(); renderTable(); }
 
 document.getElementById("q").addEventListener("input", function(e){ state.q = e.target.value; renderTable(); });
-document.getElementById("refresh").addEventListener("click", load);
-load();
+document.getElementById("refresh").addEventListener("click", boot);
+
+function showError(msg){
+  document.getElementById("err").innerHTML = '<div class="err"><strong>Could not load data.</strong> '+esc(msg)+'</div>';
+  document.getElementById("sub").textContent = "Load failed";
+}
+
+// The widget SDK script loads asynchronously — calling ZOHO.CREATOR.init() at parse time
+// throws before any promise exists, which leaves the page stuck on "Loading…" forever with
+// no visible error (the widget is cross-origin, so its console is not observable from the
+// host page either). Wait for both the DOM and the SDK, and always fail loudly.
+function boot(){
+  var tries = 0;
+  (function poll(){
+    if(window.ZOHO && ZOHO.CREATOR && typeof ZOHO.CREATOR.init === "function"){
+      var done = false;
+      var timer = setTimeout(function(){
+        if(!done) showError("Timed out after 45s waiting for Zoho Creator data.");
+      }, 45000);
+      load().then(function(){ done = true; clearTimeout(timer); })
+            .catch(function(e){ done = true; clearTimeout(timer);
+                                showError(e && (e.message || e.code || JSON.stringify(e))); });
+      return;
+    }
+    if(tries++ > 150){ showError("Zoho Creator widget SDK did not load after 15s."); return; }
+    setTimeout(poll, 100);
+  })();
+}
+
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", boot);
+} else {
+  boot();
+}
 </script>
 </body>
 </html>
