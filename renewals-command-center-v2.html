@@ -183,8 +183,10 @@ async function fetchAll(reportName){
 function load(){
   document.getElementById("err").innerHTML = "";
   document.getElementById("sub").textContent = "Loading…";
-  return ZOHO.CREATOR.init()
-    .then(function(){ return Promise.all([ fetchAll(POLICY_REPORT), fetchAll(RENEWALS_REPORT) ]); })
+  // NOTE: widget SDK v2.0 has NO ZOHO.CREATOR.init() — verified live against the real SDK
+  // surface, which exposes only DATA / META / FILE / PUBLISH / UTIL. Calling init() throws
+  // "is not a function". Call DATA.getRecords directly.
+  return Promise.all([ fetchAll(POLICY_REPORT), fetchAll(RENEWALS_REPORT) ])
     .then(function(res){ build(res[0]||[], res[1]||[]); })
     .catch(function(e){
       document.getElementById("err").innerHTML =
@@ -398,7 +400,8 @@ function showError(msg){
 function boot(){
   var tries = 0;
   (function poll(){
-    if(window.ZOHO && ZOHO.CREATOR && typeof ZOHO.CREATOR.init === "function"){
+    if(window.ZOHO && ZOHO.CREATOR && ZOHO.CREATOR.DATA
+       && typeof ZOHO.CREATOR.DATA.getRecords === "function"){
       var done = false;
       var timer = setTimeout(function(){
         if(!done) showError("Timed out after 45s waiting for Zoho Creator data.");
