@@ -33,8 +33,10 @@
        Everything else (KPIs, 6-month chart, source split, insurer chart) unchanged.
      v12 changes (2026-07-21, OI-75 — Hamza's go-ahead): header gains a "Reconciliation Health" button
        linking to the Reconciliation_Health Creator page (the P1 control panel built 2026-07-21).
-       Navigation goes through ZOHO.CREATOR.UTIL.navigateParentURL (the widget runs in an iframe, so a
-       plain anchor would navigate the iframe, not the app) with a window.open fallback.
+       v12.1: navigateParentURL({action:'open',url,window:'same'}) proved a silent no-op on the live
+       embed (call shape matched the v2 docs exactly; click verified reaching the handler). The widget
+       iframe carries NO sandbox attribute (verified live via the parent DOM), so navigation is now a
+       plain anchor with an absolute URL + target="_top" — native browser behaviour, no SDK dependency.
        No data/figure logic touched. -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
@@ -102,7 +104,7 @@
     display: inline-flex; align-items: center; gap: 6px;
     margin-top: 8px; padding: 6px 12px;
     font-size: 11.5px; font-weight: 700; letter-spacing: .3px;
-    color: #fff; background: rgba(255,255,255,.14);
+    color: #fff; text-decoration: none; background: rgba(255,255,255,.14);
     border: 1px solid rgba(255,255,255,.35); border-radius: 8px;
     cursor: pointer; user-select: none;
     transition: background .2s ease, transform .2s ease;
@@ -319,7 +321,7 @@
     <div class="right">
       <div class="today" id="todayLbl"></div>
       <div class="refreshed" id="refreshedAt"></div>
-      <div class="nav-btn" id="reconHealthBtn" title="Open the Reconciliation Health control panel">Reconciliation Health &rarr;</div>
+      <a class="nav-btn" id="reconHealthBtn" href="https://creatorapp.zoho.com/mohammadhamza383/inspt-policy-accounting-system#Page:Reconciliation_Health" target="_top" title="Open the Reconciliation Health control panel">Reconciliation Health &rarr;</a>
     </div>
   </div>
 
@@ -810,17 +812,10 @@ async function boot() {
   }
 }
 
-// ---------- Reconciliation Health link (v12, OI-75) ----------
-document.getElementById('reconHealthBtn').addEventListener('click', function () {
-  var appUrl = 'https://creatorapp.zoho.com/mohammadhamza383/inspt-policy-accounting-system#Page:Reconciliation_Health';
-  try {
-    if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.UTIL && ZOHO.CREATOR.UTIL.navigateParentURL) {
-      ZOHO.CREATOR.UTIL.navigateParentURL({ action: 'open', url: appUrl, window: 'same' });
-      return;
-    }
-  } catch (e) { /* fall through to window.open */ }
-  window.open(appUrl, '_blank');
-});
+// ---------- Reconciliation Health link (v12.1, OI-75) ----------
+// Plain anchor with target="_top" — the widget iframe has no sandbox attribute, so native
+// top-level navigation works without any SDK call. (navigateParentURL was a silent no-op
+// on the live embed despite matching the documented v2 config shape — do not reintroduce.)
 
 // ---------- Boot pattern (SDK v2 — do not change) ----------
 setTimeout(function () {
