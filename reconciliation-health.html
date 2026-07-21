@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Reconciliation Health – INSPT</title>
-<!-- reconciliation-health.html v1 | INSPT Policy Accounting System | 2026-07-21
+<!-- reconciliation-health.html v1.1 | INSPT Policy Accounting System | 2026-07-21
      Turns the manual dual-sided audit checks (see INSPT_DeepAudit_Findings_2026-07-20.md) into a
      standing, on-demand control panel. Spec: INSPT_NextPhase_Roadmap_2026-07-20.md P1 / redesign doc §6.2.
      Checks 1-6 (bank tie-out / check 7 deliberately deferred per roadmap sequencing):
@@ -298,13 +298,33 @@ async function fetchAllPages(reportName, criteria) {
     };
     if (criteria) params.criteria = criteria;
     if (cursor) params.record_cursor = cursor;
-    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    var resp;
+    try {
+      resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    } catch (e) {
+      // The SDK rejects (rather than resolving with a soft code) on some criteria errors,
+      // e.g. HTTP 400 / code 9280 "No records found matching the given criteria." Treat any
+      // rejection here as "no rows" rather than letting it bubble up and crash the whole panel.
+      break;
+    }
     if (!resp || (resp.code !== 3000 && resp.code !== 3100) || !resp.data || resp.data.length === 0) break;
     allRecords = allRecords.concat(resp.data);
     if (resp.data.length < 200 || !resp.record_cursor) break;
     cursor = resp.record_cursor;
   }
   return allRecords;
+}
+
+// Wraps fetchAllPages so one bad report/criteria pairing can never take down the whole
+// panel — matches the graceful-degradation principle already used for the Books balances
+// call. Returns { records, error } instead of throwing.
+async function fetchAllPagesSafe(reportName, criteria) {
+  try {
+    var records = await fetchAllPages(reportName, criteria);
+    return { records: records, error: null };
+  } catch (e) {
+    return { records: [], error: (e && e.message) ? e.message : JSON.stringify(e) };
+  }
 }
 
 async function fetchBooksBalances() {
@@ -372,22 +392,38 @@ function renderChecks(checks) {
 }
 
 async function loadAndCompute() {
-  // Fire the Books-side custom API and all Creator-side pulls concurrently.
+  // Fire the Books-side custom API and all Creator-side pulls concurrently. Every Creator-side
+  // pull goes through fetchAllPagesSafe so a single bad report/criteria pairing degrades just
+  // that check instead of crashing the whole panel (see fetchAllPagesSafe comment above).
+  // Note: journal coverage (check 6) deliberately does NOT use a Books_Journal_ID == "" criteria —
+  // the Creator API criteria engine cannot reliably match blank values (known project quirk), so
+  // that gap is derived client-side from the unfiltered allPolicies pull instead.
   var booksP = fetchBooksBalances();
-  var premRemP = fetchAllPages('Premium_Pending_Remittance_to_Insurer', null);
-  var agentRecvSummaryP = fetchAllPages('Agent_Receivable_Summary', null);
-  var allPoliciesP = fetchAllPages('All_Policy_Entries', null);
-  var journalGapP = fetchAllPages('All_Policy_Entries', 'Commission > 0 && Books_Journal_ID == ""');
-  var expFailedP = fetchAllPages('All_Expenses', 'Books_Sync_Status == "Failed"');
-  var polSyncFailedP = fetchAllPages('All_Policy_Entries', 'Policy_Status == "Invoice Sync Failed"');
+  var premRemP = fetchAllPagesSafe('Premium_Pending_Remittance_to_Insurer', null);
+  var agentRecvSummaryP = fetchAllPagesSafe('Agent_Receivable_Summary', null);
+  var allPoliciesP = fetchAllPagesSafe('All_Policy_Entries', null);
+  var expFailedP = fetchAllPagesSafe('All_Expenses', 'Books_Sync_Status == "Failed"');
+  var polSyncFailedP = fetchAllPagesSafe('All_Policy_Entries', 'Policy_Status == "Invoice Sync Failed"');
 
   var books = await booksP;
-  var premRem = await premRemP;
-  var agentRecvSummary = await agentRecvSummaryP;
-  var allPolicies = await allPoliciesP;
-  var journalGap = await journalGapP;
-  var expFailed = await expFailedP;
-  var polSyncFailed = await polSyncFailedP;
+  var premRemR = await premRemP;
+  var agentRecvSummaryR = await agentRecvSummaryP;
+  var allPoliciesR = await allPoliciesP;
+  var expFailedR = await expFailedP;
+  var polSyncFailedR = await polSyncFailedP;
+
+  var premRem = premRemR.records;
+  var agentRecvSummary = agentRecvSummaryR.records;
+  var allPolicies = allPoliciesR.records;
+  var expFailed = expFailedR.records;
+  var polSyncFailed = polSyncFailedR.records;
+  var journalGap = allPolicies.filter(function (p) {
+    return num(p.Commission) > 0 && !lookupVal(p.Books_Journal_ID);
+  });
+
+  var fetchErrors = [premRemR, agentRecvSummaryR, allPoliciesR, expFailedR, polSyncFailedR]
+    .map(function (r) { return r.error; })
+    .filter(Boolean);
 
   var checks = [];
 
@@ -519,8 +555,15 @@ async function loadAndCompute() {
 
   renderChecks(checks);
 
+  var warnParts = [];
   if (!books.ok) {
-    showWarn('Books balances API did not return data (' + (books.error || 'unknown error') + '). Checks 1 and 2 are showing Creator-side figures only — click Refresh to retry.');
+    warnParts.push('Books balances API did not return data (' + (books.error || 'unknown error') + '). Checks 1 and 2 are showing Creator-side figures only.');
+  }
+  if (fetchErrors.length) {
+    warnParts.push('Some Creator report pulls failed and are showing partial/zero data: ' + fetchErrors.join(' | '));
+  }
+  if (warnParts.length) {
+    showWarn(warnParts.join(' ') + ' Click Refresh to retry.');
   } else {
     document.getElementById('warnBox').style.display = 'none';
   }
