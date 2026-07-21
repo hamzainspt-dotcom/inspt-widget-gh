@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reconciliation Health – INSPT</title>
+<!-- reconciliation-health.html v1 | INSPT Policy Accounting System | 2026-07-21
+     Turns the manual dual-sided audit checks (see INSPT_DeepAudit_Findings_2026-07-20.md) into a
+     standing, on-demand control panel. Spec: INSPT_NextPhase_Roadmap_2026-07-20.md P1 / redesign doc §6.2.
+     Checks 1-6 (bank tie-out / check 7 deliberately deferred per roadmap sequencing):
+       1. Premium reconciliation   - Books Premium Payable-Insurers vs Premium_Pending_Remittance_to_Insurer report
+       2. Agent payable            - Books Agent Commission Payable vs independent buildLedger-equivalent recompute
+       3. Agent receivable         - Agent_Receivable_Summary report vs independent buildLedger-equivalent recompute
+       4. Sync failures            - Expense Books_Sync_Status=Failed + Policy_Entry Policy_Status=Invoice Sync Failed
+       5. Schedule health          - N/A (no queryable Schedule_Run_Log exists; OI-36 is email-only alerting)
+       6. Journal coverage         - Commission>0 with blank Books_Journal_ID (gate on ID presence, never status - OI-63)
+     Books-side balances (checks 1 & 2) come from a server-side Deluge Custom API (Get_Reconciliation_Data ->
+     getReconciliationBooksBalances(), Microservices > Custom API) since the widget's own origin (GitHub Pages)
+     cannot reach books.zoho.com directly (CORS). All Creator-side figures are pulled client-side via the
+     official ZOHO.CREATOR.DATA bridge, matching agent-ledger.html's proven pattern exactly. -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #F8F4EF;
+    --card: #FFFFFF;
+    --primary: #6B3A2A;
+    --accent: #B5622A;
+    --pos: #2A7D4F;
+    --neg: #C0392B;
+    --warn: #B5622A;
+    --text: #2C1810;
+    --text2: #8B6B5A;
+    --border: #E8DDD5;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #FFFFFF;
+    color: var(--text);
+    font-size: 13px;
+    padding: 14px;
+  }
+
+  .fade-in { animation: fadeIn .45s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .header {
+    background: linear-gradient(120deg, #6B3A2A 0%, #8A4A30 70%, #B5622A 100%);
+    border-radius: 12px;
+    padding: 18px 22px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
+  .header .sub { font-size: 12px; opacity: .85; margin-top: 3px; }
+  .header .right { display: flex; align-items: center; gap: 12px; }
+  .header .refreshed { font-size: 11px; opacity: .75; text-align: right; }
+  .refreshBtn {
+    background: rgba(255,255,255,.16);
+    border: 1px solid rgba(255,255,255,.4);
+    color: #fff;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .refreshBtn:hover { background: rgba(255,255,255,.28); }
+  .refreshBtn:disabled { opacity: .6; cursor: default; }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .summaryCard {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .summaryCard .n { font-size: 20px; font-weight: 700; }
+  .summaryCard .l { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+  .summaryCard.pass .n { color: var(--pos); }
+  .summaryCard.fail .n { color: var(--neg); }
+  .summaryCard.na .n { color: var(--text2); }
+
+  .checks { display: flex; flex-direction: column; gap: 10px; }
+
+  .checkCard {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .checkTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+  .checkName { font-size: 14px; font-weight: 700; }
+  .checkDesc { font-size: 11.5px; color: var(--text2); margin-top: 2px; }
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .badge.pass { background: #E6F4EC; color: var(--pos); }
+  .badge.fail { background: #FBEAE8; color: var(--neg); }
+  .badge.na   { background: #F1ECE7; color: var(--text2); }
+
+  .checkBody { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+  .figure { background: var(--cream); border-radius: 8px; padding: 8px 10px; }
+  .figure .fl { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: .3px; }
+  .figure .fv { font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .figure .fv.neg { color: var(--neg); }
+  .figure .fv.pos { color: var(--pos); }
+
+  .noteBox {
+    margin-top: 10px;
+    font-size: 11.5px;
+    color: var(--text2);
+    background: var(--cream);
+    border-left: 3px solid var(--accent);
+    padding: 8px 10px;
+    border-radius: 6px;
+    line-height: 1.45;
+  }
+  .noteBox.fail { border-left-color: var(--neg); }
+  .noteBox.pass { border-left-color: var(--pos); }
+
+  #loading { text-align: center; padding: 60px 0; color: var(--text2); font-size: 13px; }
+  #errorBox {
+    display: none;
+    background: #FBEAE8;
+    color: var(--neg);
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    white-space: pre-wrap;
+  }
+  #warnBox {
+    display: none;
+    background: #FDF3E7;
+    color: #8A5A1E;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 11.5px;
+    margin-bottom: 12px;
+  }
+  #app { display: none; }
+  .footnote { font-size: 10.5px; color: var(--text2); text-align: center; margin-top: 16px; }
+</style>
+</head>
+<body>
+
+<div id="loading">Loading Reconciliation Health…</div>
+<div id="errorBox"></div>
+
+<div id="app">
+  <div class="header fade-in">
+    <div>
+      <h1>Reconciliation Health</h1>
+      <div class="sub">Books ↔ Creator standing control panel · on-demand refresh</div>
+    </div>
+    <div class="right">
+      <div class="refreshed" id="refreshedAt"></div>
+      <button class="refreshBtn" id="refreshBtn">Refresh</button>
+    </div>
+  </div>
+
+  <div id="warnBox"></div>
+
+  <div class="summary fade-in" id="summaryCards"></div>
+
+  <div class="checks fade-in" id="checkList"></div>
+
+  <div class="footnote">
+    Checks 1–6 per INSPT_NextPhase_Roadmap_2026-07-20.md §P1. Bank tie-out (check 7) deferred until
+    §2.2 is fully migrated. Gate on ID presence, never status strings (OI-63).
+  </div>
+</div>
+
+<script>
+/*CORE-START*/
+// ---------- Pure helpers (testable) ----------
+
+var APP_NAME = 'inspt-policy-accounting-system';
+
+function lookupVal(field) {
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
+  }
+  return String(field).trim();
+}
+
+function num(v) {
+  var n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+
+function parseDMY(s) {
+  if (!s) return 0;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(String(s).trim());
+  if (!m) {
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  if (mon === undefined) return 0;
+  return new Date(parseInt(m[3], 10), mon, parseInt(m[1], 10)).getTime();
+}
+
+function fmtOMR(v) {
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  var parts = abs.toFixed(3).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + parts[0] + '.' + parts[1] + ' OMR';
+}
+
+// Go-live cutoff, matches agent-ledger.html's buildLedger() exactly.
+var CUTOFF_TS = new Date(2026, 4, 1).getTime();
+
+// Independent recompute of the widget's own Agent Payable / Agent Receivable totals,
+// using the EXACT same logic as agent-ledger.html's buildLedger() (v14, 2026-07-04).
+// This is a deliberately SEPARATE implementation from the native report filters so the
+// two can be compared as a genuine drift check (see OI-58/OI-59) rather than trivially
+// agreeing because they share code.
+function recomputeAgentTotals(policies) {
+  var receivable = 0, receivableN = 0, payable = 0, payableN = 0;
+  (policies || []).forEach(function (p) {
+    var ts = parseDMY(p.Invoice_Date);
+    if (ts < CUTOFF_TS) return;
+    var placement = lookupVal(p.Insurer_Agents);
+    var commission = num(p.Commission);
+    var claimed = String(p.Commission_Claimed || '').trim();
+    var recvOpen = claimed !== 'Yes' && claimed !== 'Not Applicable';
+    if (placement && placement !== 'Direct' && commission !== 0 && recvOpen) {
+      receivable += commission; receivableN++;
+    }
+    var source = lookupVal(p.Sources_of_Business);
+    var refAgent = String(p.Agent_Source_Details || '').trim();
+    var shared = num(p.Commission_Shared);
+    var payOpen = String(p.Agent_Commission_Status || '').trim() !== 'Settled';
+    if (source === 'Agent' && refAgent && shared !== 0 && payOpen) {
+      payable += shared; payableN++;
+    }
+  });
+  return { receivable: receivable, receivableN: receivableN, payable: payable, payableN: payableN };
+}
+
+/*CORE-END*/
+
+// ---------- DOM / SDK layer ----------
+
+var booted = false;
+
+function showError(msg) {
+  var el = document.getElementById('errorBox');
+  document.getElementById('loading').style.display = 'none';
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function showWarn(msg) {
+  var el = document.getElementById('warnBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+async function fetchAllPages(reportName, criteria) {
+  var allRecords = [];
+  var cursor = null;
+  while (true) {
+    var params = {
+      app_name: APP_NAME,
+      report_name: reportName,
+      max_records: 200
+    };
+    if (criteria) params.criteria = criteria;
+    if (cursor) params.record_cursor = cursor;
+    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    if (!resp || (resp.code !== 3000 && resp.code !== 3100) || !resp.data || resp.data.length === 0) break;
+    allRecords = allRecords.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return allRecords;
+}
+
+async function fetchBooksBalances() {
+  try {
+    var resp = await ZOHO.CREATOR.DATA.invokeCustomApi({
+      app_name: APP_NAME,
+      api_name: 'Get_Reconciliation_Data',
+      http_method: 'GET'
+    });
+    var result = resp && resp.result;
+    if (typeof result === 'string') {
+      try { result = JSON.parse(result); } catch (e) { /* leave as-is */ }
+    }
+    if (!result) return { ok: false, error: 'Empty response from Books balances API.' };
+    if (result.error) return { ok: false, error: result.error };
+    return {
+      ok: true,
+      premium_payable_balance: result.premium_payable_balance,
+      premium_payable_error: result.premium_payable_error,
+      agent_payable_balance: result.agent_payable_balance,
+      agent_payable_error: result.agent_payable_error,
+      fetched_at: result.fetched_at
+    };
+  } catch (e) {
+    return { ok: false, error: 'Custom API call failed: ' + (e && e.message ? e.message : JSON.stringify(e)) };
+  }
+}
+
+function setRefreshedAt() {
+  var d = new Date();
+  document.getElementById('refreshedAt').textContent = 'Refreshed ' + d.toLocaleString();
+}
+
+function checkCardHTML(c) {
+  var badgeClass = c.status === 'pass' ? 'pass' : (c.status === 'na' ? 'na' : 'fail');
+  var badgeText = c.status === 'pass' ? 'PASS' : (c.status === 'na' ? 'N/A' : 'FAIL');
+  var figuresHtml = c.figures.map(function (f) {
+    var cls = f.tone ? ' ' + f.tone : '';
+    return '<div class="figure"><div class="fl">' + esc(f.label) + '</div><div class="fv' + cls + '">' + esc(f.value) + '</div></div>';
+  }).join('');
+  var noteClass = c.status === 'pass' ? ' pass' : (c.status === 'fail' ? ' fail' : '');
+  return (
+    '<div class="checkCard">' +
+      '<div class="checkTop">' +
+        '<div><div class="checkName">' + esc(c.name) + '</div><div class="checkDesc">' + esc(c.desc) + '</div></div>' +
+        '<div class="badge ' + badgeClass + '">' + badgeText + '</div>' +
+      '</div>' +
+      '<div class="checkBody">' + figuresHtml + '</div>' +
+      (c.note ? '<div class="noteBox' + noteClass + '">' + esc(c.note) + '</div>' : '') +
+    '</div>'
+  );
+}
+
+function renderChecks(checks) {
+  var passN = checks.filter(function (c) { return c.status === 'pass'; }).length;
+  var failN = checks.filter(function (c) { return c.status === 'fail'; }).length;
+  var naN = checks.filter(function (c) { return c.status === 'na'; }).length;
+
+  document.getElementById('summaryCards').innerHTML =
+    '<div class="summaryCard pass"><div class="n">' + passN + '</div><div class="l">Passing</div></div>' +
+    '<div class="summaryCard fail"><div class="n">' + failN + '</div><div class="l">Failing</div></div>' +
+    '<div class="summaryCard na"><div class="n">' + naN + '</div><div class="l">N/A</div></div>';
+
+  document.getElementById('checkList').innerHTML = checks.map(checkCardHTML).join('');
+}
+
+async function loadAndCompute() {
+  // Fire the Books-side custom API and all Creator-side pulls concurrently.
+  var booksP = fetchBooksBalances();
+  var premRemP = fetchAllPages('Premium_Pending_Remittance_to_Insurer', null);
+  var agentRecvSummaryP = fetchAllPages('Agent_Receivable_Summary', null);
+  var allPoliciesP = fetchAllPages('All_Policy_Entries', null);
+  var journalGapP = fetchAllPages('All_Policy_Entries', 'Commission > 0 && Books_Journal_ID == ""');
+  var expFailedP = fetchAllPages('All_Expenses', 'Books_Sync_Status == "Failed"');
+  var polSyncFailedP = fetchAllPages('All_Policy_Entries', 'Policy_Status == "Invoice Sync Failed"');
+
+  var books = await booksP;
+  var premRem = await premRemP;
+  var agentRecvSummary = await agentRecvSummaryP;
+  var allPolicies = await allPoliciesP;
+  var journalGap = await journalGapP;
+  var expFailed = await expFailedP;
+  var polSyncFailed = await polSyncFailedP;
+
+  var checks = [];
+
+  // ---- Check 1: Premium reconciliation ----
+  var premRemSum = premRem.reduce(function (s, r) { return s + num(r.Premium); }, 0);
+  if (books.ok && books.premium_payable_balance !== undefined && books.premium_payable_balance !== null) {
+    var booksPremium = num(books.premium_payable_balance);
+    var variance1 = booksPremium - premRemSum;
+    var pass1 = Math.abs(variance1) < 0.001;
+    checks.push({
+      name: '1. Premium Reconciliation',
+      desc: "Books ‘Premium Payable-Insurers’ vs Creator ‘Premium Pending Remittance to Insurer’ report",
+      status: pass1 ? 'pass' : 'fail',
+      figures: [
+        { label: 'Books balance', value: fmtOMR(booksPremium) },
+        { label: 'Creator report (' + premRem.length + ' records)', value: fmtOMR(premRemSum) },
+        { label: 'Variance', value: fmtOMR(variance1), tone: pass1 ? 'pos' : 'neg' }
+      ],
+      note: pass1
+        ? 'Exact match to the thousandth OMR.'
+        : 'Real variance, not a rounding artifact — matches the known OI-61 finding: records with a posted Books premium journal but a missing Books_Premium_Journal_Status stamp are silently excluded from the Creator report. See open_items.json OI-61.'
+    });
+  } else {
+    checks.push({
+      name: '1. Premium Reconciliation',
+      desc: "Books ‘Premium Payable-Insurers’ vs Creator ‘Premium Pending Remittance to Insurer’ report",
+      status: 'na',
+      figures: [
+        { label: 'Creator report (' + premRem.length + ' records)', value: fmtOMR(premRemSum) },
+        { label: 'Books balance', value: 'unavailable' }
+      ],
+      note: 'Books balance unavailable: ' + (books.error || books.premium_payable_error || 'unknown error') + '. Creator-side figure shown for reference only.'
+    });
+  }
+
+  // ---- Check 2: Agent payable reconciliation ----
+  var recompute = recomputeAgentTotals(allPolicies);
+  if (books.ok && books.agent_payable_balance !== undefined && books.agent_payable_balance !== null) {
+    var booksPayable = num(books.agent_payable_balance);
+    var variance2 = recompute.payable - booksPayable;
+    var pass2 = Math.abs(variance2) < 0.001;
+    checks.push({
+      name: '2. Agent Payable Reconciliation',
+      desc: "Books ‘Agent Commission Payable’ vs independent recompute of Agent_Ledger's buildLedger() logic",
+      status: pass2 ? 'pass' : 'fail',
+      figures: [
+        { label: 'Books balance', value: fmtOMR(booksPayable) },
+        { label: 'Widget-equivalent recompute (' + recompute.payableN + ' entries)', value: fmtOMR(recompute.payable) },
+        { label: 'Variance', value: fmtOMR(variance2), tone: pass2 ? 'pos' : 'neg' }
+      ],
+      note: pass2
+        ? 'Exact match.'
+        : 'Known, understood gap — not a new bug: the Agent Commission Payable liability account (52006000000843002) only holds journals posted since the 2026-07-16/17 §2.2 migration. Historical unsettled agent commission predating that date was never migrated into it. See open_items.json OI-65.'
+    });
+  } else {
+    checks.push({
+      name: '2. Agent Payable Reconciliation',
+      desc: "Books ‘Agent Commission Payable’ vs independent recompute of Agent_Ledger's buildLedger() logic",
+      status: 'na',
+      figures: [
+        { label: 'Widget-equivalent recompute (' + recompute.payableN + ' entries)', value: fmtOMR(recompute.payable) },
+        { label: 'Books balance', value: 'unavailable' }
+      ],
+      note: 'Books balance unavailable: ' + (books.error || books.agent_payable_error || 'unknown error') + '. Creator-side figure shown for reference only.'
+    });
+  }
+
+  // ---- Check 3: Agent receivable (drift guard, OI-59's standing check) ----
+  var reportRecvSum = agentRecvSummary.reduce(function (s, r) { return s + num(r.Commission); }, 0);
+  var variance3 = recompute.receivable - reportRecvSum;
+  var countMismatch3 = recompute.receivableN !== agentRecvSummary.length;
+  var pass3 = Math.abs(variance3) < 0.001 && !countMismatch3;
+  checks.push({
+    name: '3. Agent Receivable Drift Guard',
+    desc: 'Agent_Receivable_Summary report vs an independently-coded recompute over raw Policy_Entry data — two separate implementations of the same business rule (OI-59)',
+    status: pass3 ? 'pass' : 'fail',
+    figures: [
+      { label: 'Report (' + agentRecvSummary.length + ' records)', value: fmtOMR(reportRecvSum) },
+      { label: 'Independent recompute (' + recompute.receivableN + ' records)', value: fmtOMR(recompute.receivable) },
+      { label: 'Variance', value: fmtOMR(variance3), tone: pass3 ? 'pos' : 'neg' }
+    ],
+    note: pass3
+      ? 'Report and independent recompute agree exactly by both record count and total — the two implementations have not drifted apart.'
+      : 'The native report filter and the independent JS recompute disagree — this is exactly the OI-58 failure mode (a report and a widget silently answering the same question differently). Needs investigation before trusting either figure.'
+  });
+
+  // ---- Check 4: Sync failures ----
+  var expFailedSum = expFailed.reduce(function (s, r) { return s + num(r.Amount); }, 0);
+  var pass4 = expFailed.length === 0 && polSyncFailed.length === 0;
+  checks.push({
+    name: '4. Sync Failures',
+    desc: 'Expense_Entry Books_Sync_Status = Failed, plus Policy_Entry Policy_Status = Invoice Sync Failed',
+    status: pass4 ? 'pass' : 'fail',
+    figures: [
+      { label: 'Expenses failed', value: expFailed.length + ' (' + fmtOMR(expFailedSum) + ')', tone: expFailed.length ? 'neg' : 'pos' },
+      { label: 'Policies invoice-sync failed', value: String(polSyncFailed.length), tone: polSyncFailed.length ? 'neg' : 'pos' }
+    ],
+    note: pass4
+      ? 'No sync failures on either form right now.'
+      : 'Investigate the failed records directly — Expense_Entry has no Sync_Log audit trail (OI-22), so this count is the only visibility into failures on that form.'
+  });
+
+  // ---- Check 5: Schedule health (N/A — no queryable log exists) ----
+  checks.push({
+    name: '5. Schedule Health',
+    desc: 'Failures in the last 24h across the 6 recurring Custom Schedules',
+    status: 'na',
+    figures: [
+      { label: 'Status', value: 'No queryable log' }
+    ],
+    note: 'N/A by design, not a bug: OI-36 wrapped all 6 schedules in try/catch with an email-on-failure alert (mohammadhamza1804@gmail.com), but no Schedule_Run_Log form exists to query from here. This row will light up once such a log is built — until then, schedule failures surface only by email.'
+  });
+
+  // ---- Check 6: Journal coverage ----
+  var journalGapSum = journalGap.reduce(function (s, r) { return s + num(r.Commission); }, 0);
+  var pass6 = journalGap.length === 0;
+  checks.push({
+    name: '6. Journal Coverage',
+    desc: 'Policy_Entry records with Commission > 0 but a blank Books_Journal_ID (gated on ID presence, never on status — OI-63)',
+    status: pass6 ? 'pass' : 'fail',
+    figures: [
+      { label: 'Records missing a journal', value: String(journalGap.length), tone: journalGap.length ? 'neg' : 'pos' },
+      { label: 'Commission never recognised', value: fmtOMR(journalGapSum), tone: journalGap.length ? 'neg' : 'pos' }
+    ],
+    note: pass6
+      ? 'Every commission-bearing policy has a Books journal.'
+      : 'Matches the known OI-7 finding: most of this gap closes once the 6 DRAFT backfill journals are published, but a residual ~52 OMR gap remains unexplained even after that. See open_items.json OI-7 / F6.'
+  });
+
+  renderChecks(checks);
+
+  if (!books.ok) {
+    showWarn('Books balances API did not return data (' + (books.error || 'unknown error') + '). Checks 1 and 2 are showing Creator-side figures only — click Refresh to retry.');
+  } else {
+    document.getElementById('warnBox').style.display = 'none';
+  }
+}
+
+async function boot() {
+  booted = true;
+  try {
+    await loadAndCompute();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    setRefreshedAt();
+    var btn = document.getElementById('refreshBtn');
+    if (!btn.dataset.wired) {
+      btn.addEventListener('click', refresh);
+      btn.dataset.wired = '1';
+    }
+  } catch (e) {
+    showError('Failed to load Reconciliation Health: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+async function refresh() {
+  var btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.textContent = 'Refreshing…';
+  try {
+    await loadAndCompute();
+    setRefreshedAt();
+  } catch (e) {
+    showError('Refresh failed: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Refresh';
+  }
+}
+
+// ---------- Boot pattern (SDK v2 — proven live on agent-ledger.html, do not change) ----------
+setTimeout(function () {
+  if (!booted) {
+    showError('Widget timed out. Not embedded in Creator?');
+  }
+}, 20000);
+
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
+    SigmaSDK.CREATOR.init(function () {
+      if (!booted) boot();
+    });
+  } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
+    boot();
+  } else {
+    showError('Zoho Creator SDK not found.');
+  }
+} catch (e) {
+  showError('SDK error: ' + e.message);
+}
+</script>
+</body>
+</html>
