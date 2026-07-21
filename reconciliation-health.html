@@ -4,7 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Reconciliation Health – INSPT</title>
-<!-- reconciliation-health.html v1.1 | INSPT Policy Accounting System | 2026-07-21
+<!-- reconciliation-health.html v1.2 | INSPT Policy Accounting System | 2026-07-21
+     v1.2 (OI-74 fix): check 6 no longer filters allPolicies client-side on p.Books_Journal_ID —
+     that field is NOT in the All_Policy_Entries report layout, so it is absent from the v2 API
+     payload and every record looked uncovered (overcounted 1,042 vs true ~809). Coverage is now
+     derived by subtraction: (Commission>0, client-side) minus a hidden-field criteria fetch
+     'Books_Journal_ID != "" && Commission > 0' — non-blank matching via criteria is reliable
+     (proven OI-63); only BLANK matching is not (OI-58).
      Turns the manual dual-sided audit checks (see INSPT_DeepAudit_Findings_2026-07-20.md) into a
      standing, on-demand control panel. Spec: INSPT_NextPhase_Roadmap_2026-07-20.md P1 / redesign doc §6.2.
      Checks 1-6 (bank tie-out / check 7 deliberately deferred per roadmap sequencing):
@@ -13,7 +19,7 @@
        3. Agent receivable         - Agent_Receivable_Summary report vs independent buildLedger-equivalent recompute
        4. Sync failures            - Expense Books_Sync_Status=Failed + Policy_Entry Policy_Status=Invoice Sync Failed
        5. Schedule health          - N/A (no queryable Schedule_Run_Log exists; OI-36 is email-only alerting)
-       6. Journal coverage         - Commission>0 with blank Books_Journal_ID (gate on ID presence, never status - OI-63)
+       6. Journal coverage         - Commission>0 minus criteria-counted covered records (gate on ID presence, never status - OI-63)
      Books-side balances (checks 1 & 2) come from a server-side Deluge Custom API (Get_Reconciliation_Data ->
      getReconciliationBooksBalances(), Microservices > Custom API) since the widget's own origin (GitHub Pages)
      cannot reach books.zoho.com directly (CORS). All Creator-side figures are pulled client-side via the
@@ -395,13 +401,17 @@ async function loadAndCompute() {
   // Fire the Books-side custom API and all Creator-side pulls concurrently. Every Creator-side
   // pull goes through fetchAllPagesSafe so a single bad report/criteria pairing degrades just
   // that check instead of crashing the whole panel (see fetchAllPagesSafe comment above).
-  // Note: journal coverage (check 6) deliberately does NOT use a Books_Journal_ID == "" criteria —
-  // the Creator API criteria engine cannot reliably match blank values (known project quirk), so
-  // that gap is derived client-side from the unfiltered allPolicies pull instead.
+  // Note: journal coverage (check 6) CANNOT be derived client-side from the allPolicies pull —
+  // Books_Journal_ID is not in the All_Policy_Entries report layout, so the v2 API never returns
+  // it (v1.1 tried this and overcounted the gap by treating every record as uncovered; OI-74).
+  // Instead: covered records are counted via a hidden-field criteria fetch (non-blank matching
+  // is reliable, per OI-63's audit method; only blank matching is broken, per OI-58), and the
+  // gap is (Commission>0 records) - (covered records), by subtraction.
   var booksP = fetchBooksBalances();
   var premRemP = fetchAllPagesSafe('Premium_Pending_Remittance_to_Insurer', null);
   var agentRecvSummaryP = fetchAllPagesSafe('Agent_Receivable_Summary', null);
   var allPoliciesP = fetchAllPagesSafe('All_Policy_Entries', null);
+  var coveredP = fetchAllPagesSafe('All_Policy_Entries', 'Books_Journal_ID != "" && Commission > 0');
   var expFailedP = fetchAllPagesSafe('All_Expenses', 'Books_Sync_Status == "Failed"');
   var polSyncFailedP = fetchAllPagesSafe('All_Policy_Entries', 'Policy_Status == "Invoice Sync Failed"');
 
@@ -409,6 +419,7 @@ async function loadAndCompute() {
   var premRemR = await premRemP;
   var agentRecvSummaryR = await agentRecvSummaryP;
   var allPoliciesR = await allPoliciesP;
+  var coveredR = await coveredP;
   var expFailedR = await expFailedP;
   var polSyncFailedR = await polSyncFailedP;
 
@@ -417,11 +428,13 @@ async function loadAndCompute() {
   var allPolicies = allPoliciesR.records;
   var expFailed = expFailedR.records;
   var polSyncFailed = polSyncFailedR.records;
-  var journalGap = allPolicies.filter(function (p) {
-    return num(p.Commission) > 0 && !lookupVal(p.Books_Journal_ID);
-  });
 
-  var fetchErrors = [premRemR, agentRecvSummaryR, allPoliciesR, expFailedR, polSyncFailedR]
+  var commBearing = allPolicies.filter(function (p) { return num(p.Commission) > 0; });
+  var commBearingSum = commBearing.reduce(function (s, r) { return s + num(r.Commission); }, 0);
+  var coveredCount = coveredR.records.length;
+  var coveredSum = coveredR.records.reduce(function (s, r) { return s + num(r.Commission); }, 0);
+
+  var fetchErrors = [premRemR, agentRecvSummaryR, allPoliciesR, coveredR, expFailedR, polSyncFailedR]
     .map(function (r) { return r.error; })
     .filter(Boolean);
 
@@ -538,19 +551,28 @@ async function loadAndCompute() {
   });
 
   // ---- Check 6: Journal coverage ----
-  var journalGapSum = journalGap.reduce(function (s, r) { return s + num(r.Commission); }, 0);
-  var pass6 = journalGap.length === 0;
+  // Derived by subtraction (see loadAndCompute header note): Books_Journal_ID is not in the
+  // report layout, so covered records come from a hidden-field criteria fetch, not from
+  // reading p.Books_Journal_ID off the unfiltered pull (that always reads undefined — OI-74).
+  var journalGapCount = Math.max(0, commBearing.length - coveredCount);
+  var journalGapSum = Math.max(0, commBearingSum - coveredSum);
+  var check6Degraded = !!coveredR.error || !!allPoliciesR.error;
+  var pass6 = journalGapCount === 0;
   checks.push({
     name: '6. Journal Coverage',
-    desc: 'Policy_Entry records with Commission > 0 but a blank Books_Journal_ID (gated on ID presence, never on status — OI-63)',
-    status: pass6 ? 'pass' : 'fail',
+    desc: 'Commission > 0 policies minus those with a non-blank Books_Journal_ID, counted via hidden-field criteria (gated on ID presence, never on status — OI-63)',
+    status: check6Degraded ? 'na' : (pass6 ? 'pass' : 'fail'),
     figures: [
-      { label: 'Records missing a journal', value: String(journalGap.length), tone: journalGap.length ? 'neg' : 'pos' },
-      { label: 'Commission never recognised', value: fmtOMR(journalGapSum), tone: journalGap.length ? 'neg' : 'pos' }
+      { label: 'Commission-bearing policies', value: String(commBearing.length) },
+      { label: 'Covered by a Books journal', value: String(coveredCount), tone: 'pos' },
+      { label: 'Records missing a journal', value: check6Degraded ? '—' : String(journalGapCount), tone: journalGapCount ? 'neg' : 'pos' },
+      { label: 'Commission never recognised', value: check6Degraded ? '—' : fmtOMR(journalGapSum), tone: journalGapCount ? 'neg' : 'pos' }
     ],
-    note: pass6
-      ? 'Every commission-bearing policy has a Books journal.'
-      : 'Matches the known OI-7 finding: most of this gap closes once the 6 DRAFT backfill journals are published, but a residual ~52 OMR gap remains unexplained even after that. See open_items.json OI-7 / F6.'
+    note: check6Degraded
+      ? 'One of the two fetches this check depends on failed, so the gap cannot be computed this run — see the warning banner.'
+      : (pass6
+        ? 'Every commission-bearing policy has a Books journal.'
+        : 'Matches the known OI-7 finding: most of this gap closes once the 6 DRAFT backfill journals are published, leaving a small unexplained residual. See open_items.json OI-7 / OI-67 / OI-74.')
   });
 
   renderChecks(checks);

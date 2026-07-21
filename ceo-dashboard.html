@@ -30,7 +30,12 @@
        balance logic exactly to agent-ledger.html's buildLedger(): receivable clears on
        Commission_Claimed (Yes/Not Applicable), payable clears on Agent_Commission_Status=="Settled",
        tracked independently; only Invoice_Date >= 01-May-2026 counted (matches Ledger's CUTOFF_TS).
-       Everything else (KPIs, 6-month chart, source split, insurer chart) unchanged. -->
+       Everything else (KPIs, 6-month chart, source split, insurer chart) unchanged.
+     v12 changes (2026-07-21, OI-75 — Hamza's go-ahead): header gains a "Reconciliation Health" button
+       linking to the Reconciliation_Health Creator page (the P1 control panel built 2026-07-21).
+       Navigation goes through ZOHO.CREATOR.UTIL.navigateParentURL (the widget runs in an iframe, so a
+       plain anchor would navigate the iframe, not the app) with a window.open fallback.
+       No data/figure logic touched. -->
 <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -93,6 +98,16 @@
   .header h1 { font-size: 20px; font-weight: 800; letter-spacing: .2px; }
   .header .sub { font-size: 12.5px; opacity: .85; margin-top: 4px; font-weight: 500; }
   .header .right { text-align: right; }
+  .nav-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 8px; padding: 6px 12px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .3px;
+    color: #fff; background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.35); border-radius: 8px;
+    cursor: pointer; user-select: none;
+    transition: background .2s ease, transform .2s ease;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,.26); transform: translateY(-1px); }
   .header .today { font-size: 13px; font-weight: 700; }
   .header .refreshed { font-size: 11px; opacity: .7; margin-top: 3px; }
 
@@ -304,6 +319,7 @@
     <div class="right">
       <div class="today" id="todayLbl"></div>
       <div class="refreshed" id="refreshedAt"></div>
+      <div class="nav-btn" id="reconHealthBtn" title="Open the Reconciliation Health control panel">Reconciliation Health &rarr;</div>
     </div>
   </div>
 
@@ -793,6 +809,18 @@ async function boot() {
     showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
   }
 }
+
+// ---------- Reconciliation Health link (v12, OI-75) ----------
+document.getElementById('reconHealthBtn').addEventListener('click', function () {
+  var appUrl = 'https://creatorapp.zoho.com/mohammadhamza383/inspt-policy-accounting-system#Page:Reconciliation_Health';
+  try {
+    if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.UTIL && ZOHO.CREATOR.UTIL.navigateParentURL) {
+      ZOHO.CREATOR.UTIL.navigateParentURL({ action: 'open', url: appUrl, window: 'same' });
+      return;
+    }
+  } catch (e) { /* fall through to window.open */ }
+  window.open(appUrl, '_blank');
+});
 
 // ---------- Boot pattern (SDK v2 — do not change) ----------
 setTimeout(function () {

@@ -4,7 +4,20 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Renewals Command Center</title>
-<script src="https://js.zohostatic.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<!-- renewals-command-center-v2.html v2.1 | INSPT Policy Accounting System | 2026-07-21
+     v2.1 hardening pass (pre-first-fair-test; v2.0 was never actually exercised live — Zoho served a
+     stale cached iframe throughout the 2026-07-20 session, see OI-68):
+       - getRecords cfg now includes app_name, byte-matching the call shape PROVEN live in
+         reconciliation-health.html v1.1+ (the only widget whose SDK calls have been verified
+         end-to-end against real data since the SDK v2.0 surface was mapped).
+       - SDK script src switched to static.zohocdn.com (the URL the proven widgets load from).
+       - Empty-report codes 9280 and 3100 now treated like 9220 (valid empty state, not a failure) —
+         9280 observed live 2026-07-21 crashing reconciliation-health v1.0.
+       - Renewals_Report fetch failure now degrades gracefully (forward book still renders from
+         Policy_Entry with a warning) instead of failing the whole panel via Promise.all.
+       - dv() falls back to zc_display_value (v2.1 API lookups may carry either key).
+     Shell/header paints immediately from static markup (OI-71 fix is structural in this file). -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root{
@@ -134,7 +147,11 @@ var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov",
 var state = { rows:[], filter:"all", q:"", sort:"days", dir:1, chart:null };
 
 /* ---------- helpers ---------- */
-function dv(v){ if(v && typeof v === "object") return v.display_value==null ? "" : String(v.display_value);
+function dv(v){ if(v && typeof v === "object"){
+                  if(v.display_value!=null) return String(v.display_value);
+                  if(v.zc_display_value!=null) return String(v.zc_display_value);
+                  return "";
+                }
                 return v==null ? "" : String(v); }
 function num(v){ var n = parseFloat(String(v==null?"":v).replace(/,/g,"")); return isNaN(n)?0:n; }
 function parseDate(s){
@@ -162,14 +179,16 @@ function bucketOf(days){
 async function fetchAll(reportName){
   var out = [], cursor = null, guard = 0;
   while(guard++ < 60){
-    var cfg = { report_name: reportName, max_records: 200 };
+    var cfg = { app_name: APP_NAME, report_name: reportName, max_records: 200 };
     if(cursor) cfg.record_cursor = cursor;
     var res;
     try {
       res = await ZOHO.CREATOR.DATA.getRecords(cfg);
     } catch(e){
       var code = e && (e.code || (e.responseText && e.responseText.code));
-      if(code == 9220) return out;               // empty report is a valid state, not a failure
+      // 9220 (v2.1) / 3100 (v2) / 9280 (criteria-no-match) are all "no rows", not failures.
+      // 9280 was observed LIVE rejecting (throwing) rather than resolving — see lessons.md.
+      if(code == 9220 || code == 3100 || code == 9280) return out;
       throw e;
     }
     var data = (res && res.data) ? res.data : [];
@@ -186,8 +205,25 @@ function load(){
   // NOTE: widget SDK v2.0 has NO ZOHO.CREATOR.init() — verified live against the real SDK
   // surface, which exposes only DATA / META / FILE / PUBLISH / UTIL. Calling init() throws
   // "is not a function". Call DATA.getRecords directly.
-  return Promise.all([ fetchAll(POLICY_REPORT), fetchAll(RENEWALS_REPORT) ])
-    .then(function(res){ build(res[0]||[], res[1]||[]); })
+  // Policy_Entry is the load-bearing fetch; Renewals_Report is auxiliary (in-progress badges
+  // only). If the auxiliary fetch fails, render the forward book anyway with a warning rather
+  // than failing the whole panel — same graceful-degradation pattern as reconciliation-health.
+  var renewalsWarn = null;
+  return Promise.all([
+      fetchAll(POLICY_REPORT),
+      fetchAll(RENEWALS_REPORT).catch(function(e){
+        renewalsWarn = e && (e.message || e.code || JSON.stringify(e));
+        return [];
+      })
+    ])
+    .then(function(res){
+      build(res[0]||[], res[1]||[]);
+      if(renewalsWarn){
+        document.getElementById("err").innerHTML =
+          '<div class="err"><strong>Partial data:</strong> in-progress renewal statuses could not be loaded ('
+          + esc(renewalsWarn) + '). The forward book below is complete; only the "in progress" badges are missing.</div>';
+      }
+    })
     .catch(function(e){
       document.getElementById("err").innerHTML =
         '<div class="err"><strong>Could not load data.</strong> '+esc(e && (e.message||e.code||JSON.stringify(e)))+'</div>';
