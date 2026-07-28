@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>All Entries Explorer – INSPT</title>
+<!-- all-entries-explorer.html v1 | INSPT Policy Accounting System | 2026-07-23
+     Built for Hamza (Cowork session): read-only data explorer for MS (dad) so he never has to
+     sort/edit inside the live All_Policy_Entries report grid again (that grid supports inline bulk
+     edit — a sort + accidental "Save Changes" there can overwrite real records). This widget is
+     STRICTLY READ-ONLY: it only ever calls ZOHO.CREATOR.DATA.getRecords(). There is no addRecords,
+     updateRecords, updateRecordById or deleteRecords call anywhere in this file, by design — that is
+     the actual fix for the risk, not a UI nicety on top of it.
+
+     Column set is CURATED, not the full raw 40-field report. Logic used (confirmed live against the
+     All_Policy_Entries report layout via a same-origin field probe, 2026-07-23):
+       - EXCLUDED: ID (internal Zoho record id, no business meaning to MS), Zoho_Books_Sync_Status
+         (= "Invoice Sync (Legacy)" — confirmed legacy/pre-Stage-2, known-problems.md),
+         Receipt_Approval_Status
+         (confirmed dead subsystem — ~979 records permanently stuck at "Pending Approval", adds noise
+         not signal, per dashboards.md finding).
+       - CORRECTION 2026-07-27: the field with link name "Currency" IS the Discount field (proved
+         by the live Net Commission formula, Commission - Commission_Shared - Currency, and by the
+         Daily Sales Report email Deluge). It was previously mis-excluded here as vestigial. It is
+         now included as the "Discount" column.
+       - VAT REMOVED 2026-07-27: INSPT is not VAT registered. VAT calculation was switched off from
+         01-Jul-2026 (formula returns 0 from that date) and the VAT column was removed from the
+         All_Policy_Entries report layout, so the API no longer returns it at all.
+       - Everything else real and business-relevant is included, split into CORE (always visible —
+         the fields MS actually scans day to day) and MORE DETAILS (toggle-able — conditional /
+         secondary fields like vehicle detail, address/contact, source breakdowns).
+     Visual system matches ceo-dashboard.html / agent-ledger.html (same CSS variables, same boot
+     pattern, same fetchAllPages cursor-paging helper) so this feels like part of the same suite. -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #F8F4EF;
+    --card: #FFFFFF;
+    --primary: #6B3A2A;
+    --primary-soft: #8A4A30;
+    --accent: #B5622A;
+    --gold: #C9954A;
+    --pos: #2A7D4F;
+    --neg: #C0392B;
+    --amber: #B07818;
+    --text: #2C1810;
+    --text2: #8B6B5A;
+    --border: #EDE3DA;
+    --shadow-sm: 0 1px 3px rgba(107,58,42,.06), 0 1px 2px rgba(107,58,42,.04);
+    --shadow-md: 0 4px 14px rgba(107,58,42,.10), 0 2px 5px rgba(107,58,42,.06);
+    --shadow-lg: 0 10px 28px rgba(107,58,42,.14), 0 4px 10px rgba(107,58,42,.08);
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #FFFFFF; /* must stay white — Zoho iframe border behaviour */
+    color: var(--text);
+    font-size: 13px;
+    padding: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .fade-up { opacity: 0; transform: translateY(10px); animation: fadeUp .5s cubic-bezier(.22,.61,.36,1) forwards; }
+  @keyframes fadeUp { to { opacity: 1; transform: none; } }
+
+  /* ---------------- Header ---------------- */
+  .header {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(118deg, #5C3023 0%, #6B3A2A 38%, #8A4A30 72%, #B5622A 100%);
+    border-radius: 16px;
+    padding: 22px 26px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-md);
+  }
+  .header::after {
+    content: '';
+    position: absolute;
+    right: -60px; top: -90px;
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 70%);
+    pointer-events: none;
+  }
+  .header h1 { font-size: 20px; font-weight: 800; letter-spacing: .2px; }
+  .header .sub { font-size: 12.5px; opacity: .88; margin-top: 4px; font-weight: 500; max-width: 480px; }
+  .header .right { text-align: right; }
+  .header .today { font-size: 13px; font-weight: 700; }
+  .header .refreshed { font-size: 11px; opacity: .7; margin-top: 3px; }
+  .safe-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
+    border-radius: 20px; padding: 4px 11px; font-size: 10.5px; font-weight: 700;
+    margin-top: 8px; letter-spacing: .2px;
+  }
+  .safe-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: #7EE0A8; }
+
+  /* ---------------- KPI grid ---------------- */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .kpi {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 13px 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .kpi .label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
+  .kpi .value { font-size: 19px; font-weight: 800; margin-top: 5px; color: var(--primary); font-variant-numeric: tabular-nums; line-height: 1.15; }
+
+  /* ---------------- Toolbar ---------------- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 14px;
+  }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .field-group { display: flex; flex-direction: column; gap: 4px; }
+  .field-group label { font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; }
+  .field-group input[type=text], .field-group input[type=date], .field-group select {
+    font-family: inherit; font-size: 12.5px; color: var(--text);
+    border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px;
+    background: #fff; min-width: 130px; outline: none; transition: border-color .15s ease;
+  }
+  .field-group input:focus, .field-group select:focus { border-color: var(--accent); }
+  #searchBox { min-width: 220px; }
+  .btn {
+    font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+    border-radius: 9px; padding: 8px 14px; border: 1px solid var(--border);
+    background: #fff; color: var(--primary); transition: all .15s ease;
+  }
+  .btn:hover { background: var(--cream); box-shadow: var(--shadow-sm); }
+  .btn.primary { background: linear-gradient(120deg, var(--accent), var(--primary)); color: #fff; border: none; }
+  .btn.primary:hover { filter: brightness(1.06); box-shadow: var(--shadow-md); }
+  .btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .toolbar-right { margin-left: auto; display: flex; gap: 8px; align-items: flex-end; }
+  .result-line { font-size: 11.5px; color: var(--text2); margin-top: 10px; font-weight: 600; }
+
+  /* ---------------- Table ---------------- */
+  .table-wrap { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; min-width: 100%; }
+  thead th {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--text2); font-weight: 800;
+    text-align: left; padding: 9px 10px;
+    background: var(--cream);
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap; cursor: pointer; user-select: none;
+    position: sticky; top: 0; z-index: 1;
+  }
+  thead th:hover { color: var(--primary); }
+  thead th.num { text-align: right; }
+  thead th .arrow { font-size: 9px; margin-left: 3px; opacity: .5; }
+  thead th.sorted .arrow { opacity: 1; color: var(--accent); }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr { transition: background .12s ease; }
+  tbody tr:hover { background: #FBF7F2; }
+  tbody td.wrap { white-space: normal; min-width: 160px; }
+  .name-cell { font-weight: 700; color: var(--text); }
+
+  .chip {
+    display: inline-block; font-size: 9.5px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .3px; border-radius: 20px; padding: 3px 9px; white-space: nowrap;
+  }
+  .chip.c-pos { background: rgba(42,125,79,.12); color: var(--pos); }
+  .chip.c-neg { background: rgba(192,57,43,.10); color: var(--neg); }
+  .chip.c-amber { background: rgba(176,120,24,.10); color: var(--amber); }
+  .chip.c-neutral { background: rgba(139,107,90,.12); color: var(--text2); }
+
+  /* ---------------- Pagination ---------------- */
+  .pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 14px; }
+  .pager button {
+    font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+    border-radius: 8px; padding: 6px 12px; border: 1px solid var(--border); background: #fff; color: var(--primary);
+  }
+  .pager button:disabled { opacity: .35; cursor: default; }
+  .pager button:not(:disabled):hover { background: var(--cream); }
+  .pager .pageinfo { font-size: 11.5px; color: var(--text2); font-weight: 600; }
+
+  .footnote { font-size: 10.5px; color: var(--text2); margin-top: 10px; text-align: center; }
+
+  /* ---------------- Loading / error ---------------- */
+  #loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 70px 0; color: var(--text2); }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #errorBox {
+    display: none;
+    background: rgba(192,57,43,.08);
+    border: 1px solid rgba(192,57,43,.3);
+    color: var(--neg);
+    border-radius: 12px; padding: 14px 16px; margin: 12px 0; font-size: 12.5px;
+  }
+  .empty-mini { color: var(--text2); font-size: 12.5px; padding: 30px 0; text-align: center; }
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Loading all entries…</div>
+</div>
+
+<div id="errorBox"></div>
+
+<div id="app">
+  <div class="header fade-up">
+    <div>
+      <h1>All Entries Explorer</h1>
+      <div class="sub">Every policy entry — search, sort, filter and export. Nothing you do here can change the live data.</div>
+      <div class="safe-pill"><span class="dot"></span>Read-only — view &amp; export only</div>
+    </div>
+    <div class="right">
+      <div class="today" id="todayLbl"></div>
+      <div class="refreshed" id="refreshedAt"></div>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpiGrid"></div>
+
+  <div class="card fade-up" style="animation-delay:.08s">
+    <div class="toolbar">
+      <div class="field-group">
+        <label>Search</label>
+        <input type="text" id="searchBox" placeholder="Name, policy #, reference #, contact, reg. number…" />
+      </div>
+      <div class="field-group">
+        <label>Insurer</label>
+        <select id="f_Insurers"><option value="">All</option></select>
+      </div>
+      <div class="field-group">
+        <label>Insurance Type</label>
+        <select id="f_Insurance_Types"><option value="">All</option></select>
+      </div>
+      <div class="field-group">
+        <label>Policy Status</label>
+        <select id="f_Policy_Status"><option value="">All</option></select>
+      </div>
+      <div class="field-group">
+        <label>Premium Status</label>
+        <select id="f_Dropdown1"><option value="">All</option></select>
+      </div>
+      <div class="field-group">
+        <label>Agent Commission</label>
+        <select id="f_Agent_Commission_Status"><option value="">All</option></select>
+      </div>
+      <div class="field-group">
+        <label>Source</label>
+        <select id="f_Sources_of_Business"><option value="">All</option></select>
+      </div>
+      <div class="field-group">
+        <label>Invoice date from</label>
+        <input type="date" id="f_dateFrom" />
+      </div>
+      <div class="field-group">
+        <label>Invoice date to</label>
+        <input type="date" id="f_dateTo" />
+      </div>
+      <div class="toolbar-right">
+        <button class="btn" id="resetBtn">Reset filters</button>
+        <button class="btn" id="colToggleBtn">Show more details</button>
+        <button class="btn primary" id="exportBtn">Export to Excel</button>
+      </div>
+    </div>
+    <div class="result-line" id="resultLine"></div>
+  </div>
+
+  <div class="card fade-up" style="animation-delay:.14s">
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="bodyRows"></tbody>
+      </table>
+    </div>
+    <div id="emptyState"></div>
+    <div class="pager" id="pager"></div>
+  </div>
+
+  <div class="footnote" id="footNote"></div>
+</div>
+
+<script>
+/* =====================================================================
+   All Entries Explorer — INSPT (2026-07-23)
+   Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   READ-ONLY BY DESIGN: only ZOHO.CREATOR.DATA.getRecords() is ever called.
+   ===================================================================== */
+
+/*CORE-START*/
+function lookupVal(field) {
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
+  }
+  return String(field).trim();
+}
+
+function num(v) {
+  var n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+
+// "dd-MMM-yyyy" -> epoch ms (UTC) for sorting/filtering, or null
+function parseDateVal(s) {
+  if (!s) return null;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(String(s).trim());
+  if (!m) return null;
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  if (mon === undefined) return null;
+  return Date.UTC(parseInt(m[3], 10), mon, parseInt(m[1], 10));
+}
+
+function fmtOMR(v) {
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  var parts = abs.toFixed(3).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + parts[0] + '.' + parts[1];
+}
+
+// -------- Column definitions (curated — see file header for the exclusion logic) --------
+// type: text | date | currency | chip | lookup
+var CORE_COLS = [
+  { key: 'Reference_Number', label: 'Reference #', type: 'text' },
+  { key: 'Invoice_Date', label: 'Invoice Date', type: 'date' },
+  { key: 'Insured_Name', label: 'Insured Name', type: 'text', cls: 'name-cell' },
+  { key: 'Insurance_Types', label: 'Insurance Type', type: 'lookup' },
+  { key: 'Insurers', label: 'Insurer', type: 'lookup' },
+  { key: 'Policy_Number', label: 'Policy Number', type: 'text' },
+  { key: 'Premium', label: 'Premium', type: 'currency' },
+  { key: 'Commission', label: 'Commission', type: 'currency' },
+  { key: 'Commission_Shared', label: 'Commission Shared', type: 'currency' },
+  { key: 'Currency', label: 'Discount', type: 'currency' },
+  { key: 'Net_Commission', label: 'Net Commission', type: 'currency' },
+  { key: 'Total_Commission', label: 'Total Commission', type: 'currency' },
+  { key: 'Policy_Status', label: 'Policy Status', type: 'chip' },
+  { key: 'Dropdown1', label: 'Premium Status', type: 'chip' },
+  { key: 'Agent_Commission_Status', label: 'Agent Commission', type: 'chip' },
+  { key: 'Commission_Claimed', label: 'Commission Claimed', type: 'chip' }
+];
+
+var MORE_COLS = [
+  { key: 'Contact_Number', label: 'Contact Number', type: 'text' },
+  { key: 'License_CR_Number', label: 'License / CR Number', type: 'text' },
+  { key: 'Email', label: 'Email', type: 'text' },
+  { key: 'Interest_Insured1', label: 'Interest Insured', type: 'text' },
+  { key: 'Vehicle_Brands', label: 'Vehicle Make', type: 'lookup' },
+  { key: 'Vehicle_Models', label: 'Vehicle Model', type: 'lookup' },
+  { key: 'Registration_Number', label: 'Registration Number', type: 'text' },
+  { key: 'Chassis_Number', label: 'Chassis Number', type: 'text' },
+  { key: 'Sum_Insured', label: 'Sum Insured', type: 'currency' },
+  { key: 'Insurer_Agents', label: 'Placement Agency', type: 'lookup' },
+  { key: 'Endorsement_Number', label: 'Endorsement Number', type: 'text' },
+  { key: 'Period_From', label: 'Period From', type: 'date' },
+  { key: 'Period_To', label: 'Period To', type: 'date' },
+  { key: 'Insurer_Invoice_Number', label: 'Insurer Invoice #', type: 'text' },
+  { key: 'Sources_of_Business', label: 'Source of Business', type: 'chip' },
+  { key: 'Other_Source_of_Business', label: 'Other Source (detail)', type: 'text' },
+  { key: 'Agent_Source_Details', label: 'Agent Source', type: 'text' },
+  { key: 'Direct_Source_Details', label: 'Direct Source (detail)', type: 'text' },
+  { key: 'Payment_Modes', label: 'Payment Mode', type: 'lookup' },
+  { key: 'Payment_Reference_Number', label: 'Payment Reference #', type: 'text' }
+];
+
+var ALL_COLS = CORE_COLS.concat(MORE_COLS);
+
+var SEARCH_KEYS = ['Reference_Number', 'Insured_Name', 'Policy_Number', 'Contact_Number',
+  'Registration_Number', 'Chassis_Number', 'Insurer_Invoice_Number', 'Payment_Reference_Number',
+  'Email', 'License_CR_Number', 'Endorsement_Number'];
+
+var FILTER_KEYS = ['Insurers', 'Insurance_Types', 'Policy_Status', 'Dropdown1', 'Agent_Commission_Status', 'Sources_of_Business'];
+
+var CHIP_MAP = {
+  Policy_Status: { 'Submitted': 'c-pos', 'Cancelled': 'c-neg' },
+  Dropdown1: { 'Paid to INSPT': 'c-pos', 'Paid Directly to Insurer': 'c-pos', 'Pending': 'c-amber', 'Partially Paid': 'c-amber', 'Credit': 'c-amber', 'Cancelled': 'c-neg' },
+  Agent_Commission_Status: { 'Settled': 'c-pos', 'Unsettled': 'c-amber' },
+  Commission_Claimed: { 'Yes': 'c-pos', 'No': 'c-amber' }
+};
+
+function rawText(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'object') return lookupVal(v);
+  return String(v).trim();
+}
+
+function chipClass(colKey, value) {
+  var map = CHIP_MAP[colKey];
+  if (map && map[value] !== undefined) return map[value];
+  return 'c-neutral';
+}
+
+function cellValue(row, col) {
+  var raw = row[col.key];
+  if (col.type === 'lookup') return lookupVal(raw);
+  return rawText(raw);
+}
+
+function cellSortKey(row, col) {
+  if (col.type === 'currency') return num(row[col.key]);
+  if (col.type === 'date') return parseDateVal(row[col.key]) === null ? -Infinity : parseDateVal(row[col.key]);
+  return cellValue(row, col).toLowerCase();
+}
+
+function buildSearchBlob(row) {
+  return SEARCH_KEYS.map(function (k) { return rawText(row[k]); }).join(' ').toLowerCase();
+}
+
+// Applies search + dropdown filters + date range, returns filtered array (does not sort).
+function applyFilters(rows, state) {
+  var q = state.search.trim().toLowerCase();
+  var dFrom = state.dateFrom ? Date.UTC.apply(null, state.dateFrom.split('-').map(Number).reduce(function (a, v, i) { a[i === 0 ? 0 : (i === 1 ? 1 : 2)] = i === 1 ? v - 1 : v; return a; }, [0, 0, 1])) : null;
+  var dTo = state.dateTo ? Date.UTC.apply(null, state.dateTo.split('-').map(Number).reduce(function (a, v, i) { a[i === 0 ? 0 : (i === 1 ? 1 : 2)] = i === 1 ? v - 1 : v; return a; }, [0, 0, 1])) : null;
+  return rows.filter(function (r) {
+    if (q && r.__blob.indexOf(q) === -1) return false;
+    for (var i = 0; i < FILTER_KEYS.length; i++) {
+      var k = FILTER_KEYS[i];
+      if (state.filters[k] && cellValue(r, { key: k, type: (k === 'Insurers' || k === 'Insurance_Types') ? 'lookup' : 'text' }) !== state.filters[k]) return false;
+    }
+    if (dFrom !== null || dTo !== null) {
+      var dv = parseDateVal(r.Invoice_Date);
+      if (dv === null) return false;
+      if (dFrom !== null && dv < dFrom) return false;
+      if (dTo !== null && dv > dTo) return false;
+    }
+    return true;
+  });
+}
+
+function computeKPIs(rows) {
+  var k = { count: rows.length, premium: 0, commission: 0, net: 0, discount: 0 };
+  rows.forEach(function (r) {
+    k.premium += num(r.Premium);
+    k.commission += num(r.Commission);
+    k.net += num(r.Net_Commission);
+    k.discount += num(r.Currency);
+  });
+  return k;
+}
+/*CORE-END*/
+
+// ---------------- DOM / SDK layer ----------------
+
+var APP_NAME = 'inspt-policy-accounting-system';
+var REPORT_NAME = 'All_Policy_Entries';
+var PAGE_SIZE = 50;
+var booted = false;
+
+var allRows = [];
+var view = { rows: [], page: 1 };
+var sortState = { key: 'Invoice_Date', dir: 'desc' };
+var showMore = false;
+var filterState = { search: '', filters: {}, dateFrom: '', dateTo: '' };
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  var el = document.getElementById('errorBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+async function fetchAllPages(reportName) {
+  var all = [];
+  var cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: reportName, max_records: 200 };
+    if (cursor) params.record_cursor = cursor;
+    var resp;
+    try {
+      resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    } catch (e) {
+      var es = String((e && e.message) || '') + ' ' + ((e && e.code) || '') + ' ' + JSON.stringify(e || {});
+      if (/9220|3100|9280|no data|no records/i.test(es)) break; // empty report — not an error for us
+      throw e;
+    }
+    if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) break;
+    all = all.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return all;
+}
+
+function animateCounter(el, target, formatter) {
+  var start = null, dur = 600;
+  function step(t) {
+    if (start === null) start = t;
+    var p = Math.min((t - start) / dur, 1);
+    var eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = formatter(target * eased);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderKPIs(k) {
+  var defs = [
+    { label: 'Entries Shown', val: k.count, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); } },
+    { label: 'Total Premium', val: k.premium, fmt: function (v) { return fmtOMR(v) + ' OMR'; } },
+    { label: 'Total Commission', val: k.commission, fmt: function (v) { return fmtOMR(v) + ' OMR'; } },
+    { label: 'Total Net Commission', val: k.net, fmt: function (v) { return fmtOMR(v) + ' OMR'; } },
+    { label: 'Total Discount', val: k.discount, fmt: function (v) { return fmtOMR(v) + ' OMR'; } }
+  ];
+  var grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '';
+  defs.forEach(function (d, i) {
+    var div = document.createElement('div');
+    div.className = 'kpi fade-up';
+    div.style.animationDelay = (0.04 + i * 0.04) + 's';
+    div.innerHTML = '<div class="label">' + esc(d.label) + '</div><div class="value"></div>';
+    grid.appendChild(div);
+    animateCounter(div.querySelector('.value'), d.val, d.fmt);
+  });
+}
+
+function activeCols() { return showMore ? ALL_COLS : CORE_COLS; }
+
+function renderHead() {
+  var cols = activeCols();
+  var tr = document.getElementById('headRow');
+  tr.innerHTML = '';
+  cols.forEach(function (c) {
+    var th = document.createElement('th');
+    var isNum = c.type === 'currency';
+    th.className = (isNum ? 'num ' : '') + (sortState.key === c.key ? 'sorted' : '');
+    var arrow = sortState.key === c.key ? (sortState.dir === 'asc' ? '▲' : '▼') : '↕';
+    th.innerHTML = esc(c.label) + '<span class="arrow">' + arrow + '</span>';
+    th.addEventListener('click', function () {
+      if (sortState.key === c.key) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      else { sortState.key = c.key; sortState.dir = c.type === 'date' ? 'desc' : 'asc'; }
+      refresh();
+    });
+    tr.appendChild(th);
+  });
+}
+
+function renderRows(pageRows) {
+  var cols = activeCols();
+  var tbody = document.getElementById('bodyRows');
+  tbody.innerHTML = '';
+  pageRows.forEach(function (r) {
+    var tr = document.createElement('tr');
+    var html = '';
+    cols.forEach(function (c) {
+      var v = cellValue(r, c);
+      if (c.type === 'currency') {
+        html += '<td class="num">' + fmtOMR(num(r[c.key])) + '</td>';
+      } else if (c.type === 'chip') {
+        if (!v) { html += '<td>—</td>'; }
+        else { html += '<td><span class="chip ' + chipClass(c.key, v) + '">' + esc(v) + '</span></td>'; }
+      } else {
+        html += '<td' + (c.key === 'Insured_Name' ? ' class="name-cell wrap"' : '') + '>' + (v ? esc(v) : '<span style="color:var(--text2)">—</span>') + '</td>';
+      }
+    });
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderPager(totalRows) {
+  var totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  if (view.page > totalPages) view.page = totalPages;
+  var el = document.getElementById('pager');
+  el.innerHTML = '';
+  if (totalRows === 0) return;
+  var prev = document.createElement('button');
+  prev.textContent = '← Prev';
+  prev.disabled = view.page <= 1;
+  prev.onclick = function () { view.page--; renderTable(); };
+  var info = document.createElement('span');
+  info.className = 'pageinfo';
+  info.textContent = 'Page ' + view.page + ' of ' + totalPages;
+  var next = document.createElement('button');
+  next.textContent = 'Next →';
+  next.disabled = view.page >= totalPages;
+  next.onclick = function () { view.page++; renderTable(); };
+  el.appendChild(prev); el.appendChild(info); el.appendChild(next);
+}
+
+function sortRows(rows) {
+  var col = ALL_COLS.filter(function (c) { return c.key === sortState.key; })[0];
+  if (!col) return rows;
+  var dir = sortState.dir === 'asc' ? 1 : -1;
+  return rows.slice().sort(function (a, b) {
+    var av = cellSortKey(a, col), bv = cellSortKey(b, col);
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  });
+}
+
+function renderTable() {
+  var start = (view.page - 1) * PAGE_SIZE;
+  var pageRows = view.rows.slice(start, start + PAGE_SIZE);
+  renderHead();
+  renderRows(pageRows);
+  renderPager(view.rows.length);
+  document.getElementById('emptyState').innerHTML = view.rows.length === 0
+    ? '<div class="empty-mini">No entries match these filters. Try Reset filters.</div>' : '';
+}
+
+function refresh() {
+  var filtered = applyFilters(allRows, filterState);
+  view.rows = sortRows(filtered);
+  view.page = 1;
+  document.getElementById('resultLine').textContent =
+    'Showing ' + view.rows.length.toLocaleString('en-US') + ' of ' + allRows.length.toLocaleString('en-US') + ' total entries';
+  renderKPIs(computeKPIs(filtered));
+  renderTable();
+}
+
+function populateFilterDropdowns() {
+  FILTER_KEYS.forEach(function (k) {
+    var sel = document.getElementById('f_' + k);
+    if (!sel) return;
+    var col = ALL_COLS.filter(function (c) { return c.key === k; })[0];
+    var vals = {};
+    allRows.forEach(function (r) { var v = cellValue(r, col); if (v) vals[v] = true; });
+    Object.keys(vals).sort().forEach(function (v) {
+      var opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function () {
+      filterState.filters[k] = sel.value;
+      refresh();
+    });
+  });
+}
+
+function wireToolbar() {
+  document.getElementById('searchBox').addEventListener('input', function (e) {
+    filterState.search = e.target.value;
+    refresh();
+  });
+  document.getElementById('f_dateFrom').addEventListener('change', function (e) {
+    filterState.dateFrom = e.target.value; refresh();
+  });
+  document.getElementById('f_dateTo').addEventListener('change', function (e) {
+    filterState.dateTo = e.target.value; refresh();
+  });
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    filterState = { search: '', filters: {}, dateFrom: '', dateTo: '' };
+    document.getElementById('searchBox').value = '';
+    document.getElementById('f_dateFrom').value = '';
+    document.getElementById('f_dateTo').value = '';
+    FILTER_KEYS.forEach(function (k) { var sel = document.getElementById('f_' + k); if (sel) sel.value = ''; });
+    refresh();
+  });
+  document.getElementById('colToggleBtn').addEventListener('click', function (e) {
+    showMore = !showMore;
+    e.target.textContent = showMore ? 'Show core columns only' : 'Show more details';
+    e.target.className = 'btn' + (showMore ? ' active' : '');
+    renderTable();
+  });
+  document.getElementById('exportBtn').addEventListener('click', exportToExcel);
+}
+
+// Export ALWAYS includes the full curated field set (all 36 columns), regardless of the
+// on-screen "core vs more details" toggle, and always respects the current search/filter/sort —
+// this is meant to fully replace MS's current export-from-the-raw-report workflow.
+function exportToExcel() {
+  var rows = view.rows;
+  var header = ALL_COLS.map(function (c) { return c.label; });
+  var data = rows.map(function (r) {
+    return ALL_COLS.map(function (c) {
+      if (c.type === 'currency') return num(r[c.key]);
+      return cellValue(r, c);
+    });
+  });
+  var ws = XLSX.utils.aoa_to_sheet([header].concat(data));
+  ws['!cols'] = ALL_COLS.map(function (c) { return { wch: c.type === 'currency' ? 14 : (c.label.length + 4) }; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'All Entries');
+  var d = new Date();
+  var stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  XLSX.writeFile(wb, 'INSPT_All_Entries_' + stamp + '.xlsx');
+}
+
+async function boot() {
+  booted = true;
+  try {
+    var rows = await fetchAllPages(REPORT_NAME);
+    rows.forEach(function (r) { r.__blob = buildSearchBlob(r); });
+    allRows = rows;
+
+    var nowD = new Date();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+    document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('footNote').textContent =
+      'Sort: click any column header. Search + filters combine. Export downloads exactly what is currently shown (search/filters/sort applied), with every field, as an Excel file.';
+
+    populateFilterDropdowns();
+    wireToolbar();
+    refresh();
+  } catch (e) {
+    showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+// ---------- Boot pattern (SDK v2 — matches ceo-dashboard.html / agent-ledger.html) ----------
+setTimeout(function () {
+  if (!booted) showError('Widget timed out. Not embedded in Creator?');
+}, 15000);
+
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
+    SigmaSDK.CREATOR.init(function () { if (!booted) boot(); });
+  } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
+    boot();
+  } else {
+    showError('Zoho Creator SDK not found.');
+  }
+} catch (e) {
+  showError('SDK error: ' + e.message);
+}
+</script>
+</body>
+</html>
