@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent Statement of Account – INSPT</title>
+<!-- agent-ledger-v15.html | v15 (2026-08-01): PREMIUM POSITION panel per agent — 4 reference boxes (premium not yet collected / held by INSPT owed to insurer / paid straight to insurer / total) shown above the ledger table AND on the empty state. Premium deliberately does NOT touch debit/credit/balance: it is client->insurer money, not owed between INSPT and the agent. Depends on Premium_Paid_to_Insurer being in the All_Policy_Entries layout (added 2026-08-01, OI-91) — widget warns on screen if the field is missing. Agents on both sides of one policy are counted under both, so per-agent premium does not sum to a company total. | PREVIOUS: agent-ledger.html v14 | INSPT Policy Accounting System | 2026-07-04 | v12: Per-policy, per-side Settle. Receivable->Commission_Claimed=Yes, Payable->Agent_Commission_Status=Settled. Scope by Invoice_Date>=01-May-2026. Per-row Settled button + multi-select. v11 Excel export preserved. | v12.1 FIX: settle write uses ZOHO.CREATOR.DATA.updateRecordById (v2 SDK method). | v13: FULL AGENT LIST — dropdown lists EVERY placement agency (Insurer_Agents) + EVERY source agent (Agent_Source_Details) from all policies, annotated with open-entry count; defaults to first agent with open entries. Empty agents render the empty state. KPIs/net unchanged (empty buckets contribute 0). | v14: added reference-only Premium column (from Policy_Entry.Premium) between Reference/Description and Type in both the on-screen table and the Excel export (blank/"–" for Settlement rows, which have no premium); renamed per-row action button "Settled"->"Settle" (was grammatically a state, not an action). No logic/contra/KPI changes. -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #F8F4EF;
+    --card: #FFFFFF;
+    --primary: #6B3A2A;
+    --accent: #B5622A;
+    --pos: #2A7D4F;
+    --neg: #C0392B;
+    --text: #2C1810;
+    --text2: #8B6B5A;
+    --border: #E8DDD5;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #FFFFFF; /* must stay white — Zoho iframe border behaviour */
+    color: var(--text);
+    font-size: 13px;
+    padding: 14px;
+  }
+
+  .fade-in { animation: fadeIn .45s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- Header ---------- */
+  .header {
+    background: linear-gradient(120deg, #6B3A2A 0%, #8A4A30 70%, #B5622A 100%);
+    border-radius: 12px;
+    padding: 18px 22px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
+  .header .sub { font-size: 12px; opacity: .85; margin-top: 3px; }
+  .header .refreshed { font-size: 11px; opacity: .75; text-align: right; }
+
+
+  /* ---------- v15 premium strip ---------- */
+  .prem-wrap { margin: 0 0 14px 0; }
+  .prem-head { font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+    font-weight: 700; color: var(--text2); margin-bottom: 6px; }
+  .prem { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .prem .box { border: 1px solid rgba(107,58,42,.15); border-radius: 10px; padding: 10px 12px;
+    background: rgba(255,255,255,.6); }
+  .prem .box .l { font-size: 10.5px; color: var(--text2); text-transform: uppercase;
+    letter-spacing: .4px; font-weight: 600; }
+  .prem .box .v { font-size: 16px; font-weight: 700; margin-top: 3px;
+    font-variant-numeric: tabular-nums; color: var(--primary); }
+  .prem .box .h { font-size: 10px; color: var(--text2); margin-top: 2px; line-height: 1.35; }
+  .prem .box.warn .v { color: var(--neg); }
+  .prem-note { font-size: 10.5px; color: var(--text2); margin-top: 6px; line-height: 1.4; }
+  /* ---------- KPI cards ---------- */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .kpi {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: box-shadow .25s ease, transform .25s ease;
+  }
+  .kpi:hover { box-shadow: 0 6px 16px rgba(107,58,42,.14); transform: translateY(-2px); }
+  .kpi .label { font-size: 10.5px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  .kpi .value { font-size: 19px; font-weight: 700; margin-top: 4px; color: var(--primary); font-variant-numeric: tabular-nums; }
+  .kpi .value.pos { color: var(--pos); }
+  .kpi .value.neg { color: var(--neg); }
+  .kpi .hint { font-size: 10.5px; color: var(--text2); margin-top: 2px; }
+
+  /* ---------- Agent selector ---------- */
+  .selector-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .selector-row label { font-size: 12px; font-weight: 600; color: var(--primary); }
+  select#agentSelect {
+    font: inherit;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    min-width: 260px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  select#agentSelect:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,98,42,.15); }
+  .agent-count { font-size: 11px; color: var(--text2); }
+
+  /* ---------- Excel download button ---------- */
+  #excelBtn {
+    margin-left: auto;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    background: var(--primary);
+    color: #fff;
+    cursor: pointer;
+    outline: none;
+    transition: background .2s ease, transform .15s ease, box-shadow .2s ease;
+  }
+  #excelBtn:hover { background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 12px rgba(107,58,42,.25); transform: translateY(-1px); }
+  #excelBtn:active { transform: translateY(0); }
+  #excelBtn:disabled { opacity: .5; cursor: default; transform: none; box-shadow: none; }
+  #excelBtn svg { width: 14px; height: 14px; }
+
+  /* ---------- SOA card ---------- */
+  .soa-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 5px rgba(107,58,42,.07);
+    opacity: 1;
+    transition: opacity .25s ease;
+  }
+  .soa-card.switching { opacity: 0; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 900px; }
+  thead th {
+    background: var(--primary);
+    color: #fff;
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+  thead th.num { text-align: right; }
+  tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr { transition: background .15s ease; }
+  tbody tr:hover { background: #FBF7F2; }
+  .ref { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .desc { font-weight: 500; }
+  td.bal { font-weight: 700; }
+  td.bal.pos { color: var(--pos); }
+  td.bal.neg { color: var(--neg); }
+  .debit { color: var(--pos); }
+  .credit { color: var(--neg); }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge.receivable { background: rgba(42,125,79,.12); color: var(--pos); }
+  .badge.payable { background: rgba(192,57,43,.12); color: var(--neg); }
+  .badge.settlement { background: rgba(181,98,42,.14); color: var(--accent); }
+
+  /* ---------- Sticky balance footer ---------- */
+  .balance-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--cream);
+    border-top: 2px solid var(--border);
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .balance-footer .lbl { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
+  .balance-footer .amt { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .balance-footer .amt.pos { color: var(--pos); }
+  .balance-footer .amt.neg { color: var(--neg); }
+  .balance-footer .who { font-size: 11.5px; font-weight: 600; }
+  .balance-footer .who.pos { color: var(--pos); }
+  .balance-footer .who.neg { color: var(--neg); }
+
+  /* ---------- Loading / error / empty ---------- */
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 60px 0;
+    color: var(--text2);
+  }
+  .spinner {
+    width: 34px; height: 34px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #errorBox {
+    display: none;
+    background: rgba(192,57,43,.08);
+    border: 1px solid rgba(192,57,43,.3);
+    color: var(--neg);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    font-size: 12.5px;
+  }
+
+  #warnBox {
+    display: none;
+    background: rgba(181,98,42,.1);
+    border: 1px solid rgba(181,98,42,.35);
+    color: #8A4A20;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--text2);
+  }
+  .empty-state .icon { font-size: 34px; margin-bottom: 8px; }
+  .empty-state .big { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
+
+  /* ---------- Settle controls (v12) ---------- */
+  th.chk, td.chk { width: 34px; text-align: center; padding-left: 10px; padding-right: 4px; }
+  th.act, td.act { width: 100px; text-align: center; white-space: nowrap; }
+  .rowchk, #selAll { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); vertical-align: middle; }
+
+  .action-bar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 14px; background: var(--cream);
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .action-bar .selall { font-size: 12px; font-weight: 600; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .settle-selected {
+    font: inherit; font-size: 12px; font-weight: 700;
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--pos);
+    background: var(--pos); color: #fff; cursor: pointer;
+    transition: background .2s ease, opacity .2s ease, transform .15s ease;
+  }
+  .settle-selected:hover:not(:disabled) { background: #21663F; transform: translateY(-1px); }
+  .settle-selected:disabled { opacity: .45; cursor: default; }
+
+  .settle-btn {
+    font: inherit; font-size: 11.5px; font-weight: 700;
+    padding: 5px 13px; border-radius: 7px; border: 1px solid var(--pos);
+    background: #fff; color: var(--pos); cursor: pointer;
+    transition: background .18s ease, color .18s ease, transform .12s ease;
+  }
+  .settle-btn:hover { background: var(--pos); color: #fff; transform: translateY(-1px); }
+  .settle-btn:active { transform: translateY(0); }
+
+  /* ---------- Confirm modal ---------- */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 50;
+    background: rgba(44,24,16,.45);
+    align-items: center; justify-content: center; padding: 18px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 14px; width: 100%; max-width: 470px;
+    max-height: 86vh; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 18px 50px rgba(44,24,16,.35); animation: fadeIn .2s ease-out both;
+  }
+  .modal-head { padding: 16px 20px; font-size: 15px; font-weight: 700; color: var(--primary); border-bottom: 1px solid var(--border); }
+  .modal-body { padding: 16px 20px; overflow-y: auto; font-size: 13px; color: var(--text); }
+  .modal-body p { margin-bottom: 10px; line-height: 1.5; }
+  .m-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .m-list li { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--cream); }
+  .m-desc { font-weight: 600; font-size: 12.5px; }
+  .m-ref { font-weight: 400; color: var(--text2); font-size: 11px; }
+  .m-meta { font-size: 11.5px; color: var(--text2); margin-top: 3px; }
+  .m-eff { color: var(--accent); font-weight: 600; }
+  .modal-foot { padding: 14px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); }
+  .btn-cancel, .btn-confirm { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 18px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); }
+  .btn-cancel { background: #fff; color: var(--text2); }
+  .btn-cancel:hover { background: var(--cream); }
+  .btn-confirm { background: var(--pos); color: #fff; border-color: var(--pos); }
+  .btn-confirm:hover:not(:disabled) { background: #21663F; }
+  .btn-confirm:disabled { opacity: .55; cursor: default; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; bottom: 18px; right: 18px; z-index: 60;
+    background: var(--primary); color: #fff; padding: 12px 18px;
+    border-radius: 10px; font-size: 12.5px; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(44,24,16,.3);
+    opacity: 0; transform: translateY(10px); pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease; max-width: 340px;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.err { background: var(--neg); }
+
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Loading statement of account…</div>
+</div>
+
+<div id="errorBox"></div>
+
+<div id="app">
+  <div id="warnBox"></div>
+  <div class="header fade-in">
+    <div>
+      <h1>Agent Statement of Account</h1>
+      <div class="sub">Outstanding entries from 01-May-2026</div>
+    </div>
+    <div class="refreshed" id="refreshedAt"></div>
+  </div>
+
+  <div class="kpis fade-in" style="animation-delay:.05s">
+    <div class="kpi">
+      <div class="label">Total Receivable</div>
+      <div class="value pos" id="kpiReceivable">0.000 OMR</div>
+      <div class="hint">Full commission due from placement agencies</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Total Payable</div>
+      <div class="value neg" id="kpiPayable">0.000 OMR</div>
+      <div class="hint">Commission shared owed to source agents</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Settlements</div>
+      <div class="value" id="kpiSettlements">0.000 OMR</div>
+      <div class="hint">Total this period</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Net Position</div>
+      <div class="value" id="kpiNet">0.000 OMR</div>
+      <div class="hint" id="kpiNetHint">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="selector-row fade-in" style="animation-delay:.1s">
+    <label for="agentSelect">Agent:</label>
+    <select id="agentSelect"></select>
+    <span class="agent-count" id="agentCount"></span>
+    <button id="excelBtn" type="button" title="Download the displayed statement as an Excel file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Excel
+    </button>
+  </div>
+
+  <div class="soa-card fade-in" style="animation-delay:.15s" id="soaCard"></div>
+</div>
+
+<div id="confirmModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-head">Confirm settlement</div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button class="btn-cancel" id="modalCancel" type="button">Cancel</button>
+      <button class="btn-confirm" id="modalConfirm" type="button">Confirm settle</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* =====================================================================
+   Agent Ledger SOA Widget v12 — INSPT
+   Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   CONTRA LOGIC (2026-06-11, per MS):
+   - Receivable: placement agency owes INSPT the FULL Commission ('Direct' excluded — no broker).
+   - Payable: Commission_Shared is ALWAYS what INSPT gives the source agent. Never a receivable.
+   v12 SETTLE (2026-06-15) — per-policy, per-side:
+   - Scope = Invoice_Date >= 01-May-2026 (replaces the old single Agent_Commission_Status gate,
+     which could not keep the two sides independent).
+   - Receivable cleared by Commission_Claimed = Yes (or Not Applicable); Payable cleared by
+     Agent_Commission_Status = Settled. The two sides settle INDEPENDENTLY.
+   - Per-row "Settled" button + checkbox multi-select. Writes via ZOHO.CREATOR.DATA.updateRecordById.
+   - v11 Excel export preserved.
+   ===================================================================== */
+
+/*CORE-START*/
+// ---------- Pure helpers (testable) ----------
+
+function lookupVal(field) {
+  // Lookup fields: v2 API returns {display_value, ID}; v2.1 API (used by SDK getRecords)
+  // returns {<DisplayFieldName>, ID, zc_display_value}. Empty lookup: {} or ''.
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
+  }
+  return String(field).trim();
+}
+
+function num(v) {
+  var n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+
+function parseDMY(s) {
+  // "dd-MMM-yyyy" -> timestamp; unparseable dates sort first
+  if (!s) return 0;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(String(s).trim());
+  if (!m) {
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  if (mon === undefined) return 0;
+  return new Date(parseInt(m[3], 10), mon, parseInt(m[1], 10)).getTime();
+}
+
+function fmtOMR(v) {
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  var parts = abs.toFixed(3).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + parts[0] + '.' + parts[1] + ' OMR';
+}
+
+// Go-live cutoff: only policy entries on/after 01-May-2026 are in scope (month is 0-based).
+var CUTOFF_TS = new Date(2026, 4, 1).getTime();
+
+// Build transaction rows per agent from raw records.
+// Returns { agents: { name: [rows...] }, totals: {receivable, payable, settlements, net} }
+function buildLedger(policies, settlements) {
+  var agents = {};
+  var totals = { receivable: 0, payable: 0, settlements: 0, net: 0 };
+
+  function rowsFor(name) {
+    if (!agents[name]) agents[name] = [];
+    return agents[name];
+  }
+
+  // v13 — FULL AGENT MASTER LIST: seed a bucket for EVERY placement agency
+  // (Insurer_Agents, receivable side) and EVERY source agent (Agent_Source_Details,
+  // payable side) seen on ANY policy, regardless of date or settled status. This
+  // guarantees every agent is selectable in the dropdown so dad can settle them one
+  // by one. Agents with no OUTSTANDING entries simply render the empty state below.
+  // Seeding empty buckets does NOT affect KPIs or net (empty buckets contribute 0).
+  (policies || []).forEach(function (p) {
+    var pl = lookupVal(p.Insurer_Agents);
+    if (pl && pl !== 'Direct') rowsFor(pl);
+    var sa = String(p.Agent_Source_Details || '').trim();
+    if (sa) rowsFor(sa);
+  });
+
+  (policies || []).forEach(function (p) {
+    var ts = parseDMY(p.Invoice_Date);
+    // SCOPE / CUTOFF: only entries on/after the go-live date are in scope.
+    // Replaces the old single Agent_Commission_Status=='Unsettled' gate, which
+    // could not keep the two sides independent.
+    if (ts < CUTOFF_TS) return;
+
+    var id = String(p.ID || '').trim();
+    var ref = String(p.Reference_Number || '').trim();
+    var desc = [String(p.Insured_Name || '').trim(), String(p.Policy_Number || '').trim()]
+      .filter(Boolean).join(' | ');
+
+    // SIDE 1 — RECEIVABLE: placement agency owes INSPT the FULL Commission.
+    // 'Direct' = no broker, no receivable. Cleared when Commission_Claimed = Yes
+    // (or Not Applicable). Its OWN flag, independent of the payable side.
+    var placement = lookupVal(p.Insurer_Agents);
+    var commission = num(p.Commission);
+    var claimed = String(p.Commission_Claimed || '').trim();
+    var recvOpen = claimed !== 'Yes' && claimed !== 'Not Applicable';
+    var premium = num(p.Premium);
+    if (placement && placement !== 'Direct' && commission !== 0 && recvOpen) {
+      rowsFor(placement).push({
+        ts: ts, date: p.Invoice_Date || '', ref: ref,
+        desc: desc || 'Policy entry', type: 'Receivable', debit: commission, credit: 0,
+        settleable: true, id: id, settleField: 'Commission_Claimed', settleValue: 'Yes',
+        amount: commission, premium: premium
+      });
+      totals.receivable += commission;
+    }
+
+    // SIDE 2 — PAYABLE: INSPT owes referral agent Commission_Shared.
+    // Cleared when Agent_Commission_Status = Settled. Its OWN flag, independent
+    // of the receivable side. Never counted as a receivable.
+    var source = lookupVal(p.Sources_of_Business);
+    var refAgent = String(p.Agent_Source_Details || '').trim();
+    var shared = num(p.Commission_Shared);
+    var payOpen = String(p.Agent_Commission_Status || '').trim() !== 'Settled';
+    if (source === 'Agent' && refAgent && shared !== 0 && payOpen) {
+      rowsFor(refAgent).push({
+        ts: ts, date: p.Invoice_Date || '', ref: ref,
+        desc: desc || 'Policy entry', type: 'Payable', debit: 0, credit: shared,
+        settleable: true, id: id, settleField: 'Agent_Commission_Status', settleValue: 'Settled',
+        amount: shared, premium: premium
+      });
+      totals.payable += shared;
+    }
+  });
+
+  (settlements || []).forEach(function (s) {
+    var agent = lookupVal(s.Agent);
+    if (!agent) return;
+    var amount = num(s.Amount);
+    if (amount === 0) return;
+    var dir = String(s.Direction || '').trim();
+    var notes = String(s.Notes || '').trim();
+    var row = {
+      ts: parseDMY(s.Settlement_Date), date: s.Settlement_Date || '', ref: '',
+      desc: notes || 'Settlement', type: 'Settlement', debit: 0, credit: 0
+    };
+    if (dir === 'Agent pays INSPT') {
+      row.credit = amount;          // reduces what the agent owes
+    } else if (dir === 'INSPT pays Agent') {
+      row.debit = amount;           // increases net towards agent-owes-INSPT
+    } else {
+      return;                       // unknown direction — skip
+    }
+    rowsFor(agent).push(row);
+    totals.settlements += amount;
+  });
+
+  // Sort chronologically ascending and compute running balance per agent
+  Object.keys(agents).forEach(function (name) {
+    agents[name].sort(function (a, b) { return a.ts - b.ts; });
+    var bal = 0;
+    agents[name].forEach(function (r) {
+      bal += r.debit - r.credit;    // positive = agent owes INSPT
+      r.balance = bal;
+    });
+  });
+
+  // Net position = sum of every agent's final balance
+  totals.net = Object.keys(agents).reduce(function (acc, name) {
+    var rows = agents[name];
+    return acc + (rows.length ? rows[rows.length - 1].balance : 0);
+  }, 0);
+
+  return { agents: agents, totals: totals };
+}
+
+// v15 — PREMIUM POSITION (2026-08-01).
+// Premium is NOT part of the commission ledger and deliberately does NOT touch
+// debit/credit/balance: premium is client->insurer money, it is not owed between
+// INSPT and the agent. Mixing it into the running balance would make the SOA wrong.
+// It is reported as a separate per-agent summary instead.
+//
+// An agent's premium = every in-scope policy where that agent appears on EITHER
+// side (Insurer_Agents = they placed it with us, or Agent_Source_Details = they
+// referred it to us). Unlike the commission rows, this is NOT filtered by whether
+// commission is settled — premium status is independent of commission status.
+//
+// Three buckets, from Dropdown1 (Premium Status) and Premium_Paid_to_Insurer:
+//   pending      - Premium Status "Pending": nobody has collected the money yet.
+//   heldByINSPT  - "Paid to INSPT" AND Premium_Paid_to_Insurer != "Paid":
+//                  INSPT is holding it and still owes it onward to the insurer.
+//   paidDirect   - "Paid Directly to Insurer": client paid the insurer, nothing owed.
+// NOTE Premium_Paid_to_Insurer was absent from the All_Policy_Entries report layout
+// until 2026-08-01 (OI-91) — on any older layout it reads undefined and heldByINSPT
+// would silently equal the whole "Paid to INSPT" bucket. Guarded below.
+function buildPremium(policies) {
+  var byAgent = {};
+  var layoutHasRemitField = false;
+
+  function bucketFor(name) {
+    if (!byAgent[name]) {
+      byAgent[name] = { recs: 0, total: 0, pending: 0, heldByINSPT: 0, paidDirect: 0, other: 0 };
+    }
+    return byAgent[name];
+  }
+
+  (policies || []).forEach(function (p) {
+    if (Object.prototype.hasOwnProperty.call(p, 'Premium_Paid_to_Insurer')) layoutHasRemitField = true;
+
+    var ts = parseDMY(p.Invoice_Date);
+    if (ts < CUTOFF_TS) return;
+
+    var names = [];
+    var pl = lookupVal(p.Insurer_Agents);
+    if (pl && pl !== 'Direct') names.push(pl);
+    var sa = String(p.Agent_Source_Details || '').trim();
+    if (sa && names.indexOf(sa) < 0) names.push(sa);
+    if (!names.length) return;
+
+    var premium = num(p.Premium);
+    var status = String(p.Dropdown1 || '').trim();
+    var remitted = String(p.Premium_Paid_to_Insurer || '').trim();
+
+    names.forEach(function (nm) {
+      var b = bucketFor(nm);
+      b.recs += 1;
+      b.total += premium;
+      if (status === 'Pending') b.pending += premium;
+      else if (status === 'Paid Directly to Insurer') b.paidDirect += premium;
+      else if (status === 'Paid to INSPT') {
+        if (remitted !== 'Paid') b.heldByINSPT += premium;
+      } else b.other += premium;
+    });
+  });
+
+  return { byAgent: byAgent, layoutHasRemitField: layoutHasRemitField };
+}
+/*CORE-END*/
+
+// ---------- DOM / SDK layer ----------
+
+var APP_NAME = 'inspt-policy-accounting-system';
+var booted = false;
+var ledger = null;
+var premium = { byAgent: {}, layoutHasRemitField: false };
+
+function showError(msg) {
+  var el = document.getElementById('errorBox');
+  document.getElementById('loading').style.display = 'none';
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+async function fetchAllPages(reportName) {
+  var allRecords = [];
+  var cursor = null;
+  while (true) {
+    var params = {
+      app_name: APP_NAME,
+      report_name: reportName,
+      max_records: 200
+    };
+    if (cursor) params.record_cursor = cursor;
+    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) break;
+    allRecords = allRecords.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return allRecords;
+}
+
+function animateCounter(el, target, formatter) {
+  var start = null;
+  var dur = 300;
+  function step(t) {
+    if (start === null) start = t;
+    var p = Math.min((t - start) / dur, 1);
+    var eased = 1 - Math.pow(1 - p, 3); // ease-out
+    el.textContent = formatter(target * eased);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderKPIs(t) {
+  animateCounter(document.getElementById('kpiReceivable'), t.receivable, fmtOMR);
+  animateCounter(document.getElementById('kpiPayable'), t.payable, fmtOMR);
+  animateCounter(document.getElementById('kpiSettlements'), t.settlements, fmtOMR);
+  var netEl = document.getElementById('kpiNet');
+  netEl.classList.remove('pos', 'neg');
+  netEl.classList.add(t.net >= 0 ? 'pos' : 'neg');
+  document.getElementById('kpiNetHint').textContent =
+    t.net >= 0 ? 'Agents owe INSPT (net)' : 'INSPT owes agents (net)';
+  animateCounter(netEl, t.net, fmtOMR);
+}
+
+// v13 — count of OUTSTANDING (settleable) entries for an agent, used to annotate
+// the dropdown and to pick a sensible default agent.
+function openCountFor(name) {
+  var rows = (ledger && ledger.agents[name]) || [];
+  var c = 0;
+  for (var i = 0; i < rows.length; i++) { if (rows[i].settleable) c++; }
+  return c;
+}
+
+function renderAgentOptions(names) {
+  var sel = document.getElementById('agentSelect');
+  sel.innerHTML = '';
+  var withOpen = 0;
+  names.forEach(function (n) {
+    var open = openCountFor(n);
+    if (open > 0) withOpen++;
+    var o = document.createElement('option');
+    o.value = n; // value stays the bare agent name (used for lookups)
+    o.textContent = n + (open > 0 ? '  —  ' + open + ' open' : '  —  settled');
+    sel.appendChild(o);
+  });
+  document.getElementById('agentCount').textContent =
+    names.length + ' agent' + (names.length === 1 ? '' : 's') +
+    ' · ' + withOpen + ' with open entries';
+}
+
+
+// v15 — premium summary block for one agent. Reference only: these numbers are
+// deliberately NOT in the debit/credit balance (see buildPremium).
+function premiumStripHTML(agentName) {
+  var b = (premium.byAgent || {})[agentName];
+  if (!b || !b.recs) return '';
+  var boxes =
+    '<div class="box"><div class="l">Premium not yet collected</div>' +
+      '<div class="v">' + fmtOMR(b.pending) + '</div>' +
+      '<div class="h">Client has not paid anyone yet</div></div>' +
+    '<div class="box' + (b.heldByINSPT > 0 ? ' warn' : '') + '"><div class="l">Held by INSPT, owed to insurer</div>' +
+      '<div class="v">' + fmtOMR(b.heldByINSPT) + '</div>' +
+      '<div class="h">Collected by INSPT, not yet remitted</div></div>' +
+    '<div class="box"><div class="l">Paid straight to insurer</div>' +
+      '<div class="v">' + fmtOMR(b.paidDirect) + '</div>' +
+      '<div class="h">Nothing owed by anyone</div></div>' +
+    '<div class="box"><div class="l">Total premium</div>' +
+      '<div class="v">' + fmtOMR(b.total) + '</div>' +
+      '<div class="h">' + b.recs + ' polic' + (b.recs === 1 ? 'y' : 'ies') + ' from 01-May-2026</div></div>';
+  var note = '<div class="prem-note">Reference only &mdash; premium is money between the client and the insurer, ' +
+    'so it is not part of the commission balance below. A policy that has both a placement agency and a ' +
+    'source agent is counted under both, so these figures do not add up across agents.' +
+    (premium.layoutHasRemitField ? '' :
+      ' <strong>Warning:</strong> the report layout is not returning Premium Paid to Insurer, ' +
+      'so &ldquo;Held by INSPT&rdquo; may be overstated.') + '</div>';
+  return '<div class="prem-wrap"><div class="prem-head">Premium position</div>' +
+    '<div class="prem">' + boxes + '</div>' + note + '</div>';
+}
+
+function renderSOA(agentName) {
+  var card = document.getElementById('soaCard');
+  var rows = (ledger.agents[agentName] || []);
+
+  if (!rows.length) {
+    card.innerHTML =
+      premiumStripHTML(agentName) +
+      '<div class="empty-state">' +
+        '<div class="icon">&#128203;</div>' +
+        '<div class="big">No outstanding activity</div>' +
+        '<div>' + esc(agentName || 'This agent') + ' has no outstanding entries or settlements in this period.</div>' +
+      '</div>';
+    return;
+  }
+
+  var settleableCount = rows.filter(function (r) { return r.settleable; }).length;
+
+  var actionBar = settleableCount
+    ? '<div class="action-bar">' +
+        '<label class="selall"><input type="checkbox" id="selAll"> Select all</label>' +
+        '<button id="settleSelectedBtn" class="settle-selected" type="button" disabled>Settle selected (0)</button>' +
+      '</div>'
+    : '';
+
+  var html = premiumStripHTML(agentName) + actionBar + '<div class="table-wrap"><table><thead><tr>' +
+    '<th class="chk"></th>' +
+    '<th>Date</th><th>Reference / Description</th><th class="num">Premium</th><th>Type</th>' +
+    '<th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>' +
+    '<th class="act">Action</th>' +
+    '</tr></thead><tbody>';
+
+  rows.forEach(function (r, idx) {
+    var badgeCls = r.type.toLowerCase();
+    var chkCell = r.settleable
+      ? '<td class="chk"><input type="checkbox" class="rowchk" data-idx="' + idx + '"></td>'
+      : '<td class="chk"></td>';
+    var actCell = r.settleable
+      ? '<td class="act"><button class="settle-btn" type="button" data-idx="' + idx + '">Settle</button></td>'
+      : '<td class="act"></td>';
+    var premCell = typeof r.premium === 'number' ? fmtOMR(r.premium) : '&ndash;';
+    html += '<tr data-idx="' + idx + '">' +
+      chkCell +
+      '<td>' + esc(r.date || '—') + '</td>' +
+      '<td><div class="desc">' + esc(r.desc) + '</div>' +
+        (r.ref ? '<div class="ref">' + esc(r.ref) + '</div>' : '') + '</td>' +
+      '<td class="num">' + premCell + '</td>' +
+      '<td><span class="badge ' + badgeCls + '">' + r.type + '</span></td>' +
+      '<td class="num">' + (r.debit ? '<span class="debit">' + fmtOMR(r.debit) + '</span>' : '–') + '</td>' +
+      '<td class="num">' + (r.credit ? '<span class="credit">' + fmtOMR(r.credit) + '</span>' : '–') + '</td>' +
+      '<td class="num bal ' + (r.balance >= 0 ? 'pos' : 'neg') + '">' + fmtOMR(r.balance) + '</td>' +
+      actCell +
+      '</tr>';
+  });
+
+  var net = rows[rows.length - 1].balance;
+  var cls = net >= 0 ? 'pos' : 'neg';
+  var who = net >= 0 ? 'Agent owes INSPT' : 'INSPT owes Agent';
+  if (Math.abs(net) < 0.0005) who = 'Fully settled';
+
+  html += '</tbody></table></div>' +
+    '<div class="balance-footer">' +
+      '<span class="lbl">Current Net Balance — ' + esc(agentName) + '</span>' +
+      '<span><span class="amt ' + cls + '">' + fmtOMR(net) + '</span> ' +
+      '<span class="who ' + cls + '">&nbsp;' + who + '</span></span>' +
+    '</div>';
+
+  card.innerHTML = html;
+  wireSoaControls();
+}
+
+// ---------- Settle UI wiring + actions (v12) ----------
+
+function currentRows() {
+  return (ledger && selectedAgent) ? (ledger.agents[selectedAgent] || []) : [];
+}
+
+function updateSelCount() {
+  var checks = document.querySelectorAll('.rowchk:checked');
+  var btn = document.getElementById('settleSelectedBtn');
+  if (btn) {
+    btn.textContent = 'Settle selected (' + checks.length + ')';
+    btn.disabled = checks.length === 0;
+  }
+}
+
+function wireSoaControls() {
+  var selAll = document.getElementById('selAll');
+  if (selAll) {
+    selAll.addEventListener('change', function () {
+      var on = this.checked;
+      Array.prototype.forEach.call(document.querySelectorAll('.rowchk'), function (c) { c.checked = on; });
+      updateSelCount();
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.rowchk'), function (c) {
+    c.addEventListener('change', updateSelCount);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.settle-btn'), function (b) {
+    b.addEventListener('click', function () {
+      var idx = parseInt(this.getAttribute('data-idx'), 10);
+      var r = currentRows()[idx];
+      if (r && r.settleable) openSettleConfirm([r]);
+    });
+  });
+  var ss = document.getElementById('settleSelectedBtn');
+  if (ss) {
+    ss.addEventListener('click', function () {
+      var rows = currentRows();
+      var sel = [];
+      Array.prototype.forEach.call(document.querySelectorAll('.rowchk:checked'), function (c) {
+        var r = rows[parseInt(c.getAttribute('data-idx'), 10)];
+        if (r && r.settleable) sel.push(r);
+      });
+      if (sel.length) openSettleConfirm(sel);
+    });
+  }
+}
+
+function openSettleConfirm(rowsToSettle) {
+  var total = rowsToSettle.reduce(function (a, r) { return a + (r.amount || 0); }, 0);
+  var listHtml = rowsToSettle.map(function (r) {
+    var effect = r.settleField === 'Commission_Claimed'
+      ? 'Commission Claimed &rarr; Yes'
+      : 'Agent Commission Status &rarr; Settled';
+    return '<li><div class="m-desc">' + esc(r.desc) +
+      (r.ref ? ' <span class="m-ref">' + esc(r.ref) + '</span>' : '') + '</div>' +
+      '<div class="m-meta"><span class="badge ' + r.type.toLowerCase() + '">' + r.type + '</span> ' +
+      fmtOMR(r.amount) + ' &middot; <span class="m-eff">' + effect + '</span></div></li>';
+  }).join('');
+
+  document.getElementById('modalBody').innerHTML =
+    '<p>Mark <strong>' + rowsToSettle.length + '</strong> ' +
+    (rowsToSettle.length === 1 ? 'entry' : 'entries') + ' as settled (total ' + fmtOMR(total) + ')? ' +
+    'This updates the policy record' + (rowsToSettle.length === 1 ? '' : 's') + ' and removes ' +
+    (rowsToSettle.length === 1 ? 'it' : 'them') + ' from this statement.</p>' +
+    '<ul class="m-list">' + listHtml + '</ul>';
+
+  document.getElementById('confirmModal').classList.add('show');
+  var confirmBtn = document.getElementById('modalConfirm');
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = 'Confirm settle';
+  confirmBtn.onclick = function () { performSettle(rowsToSettle); };
+  document.getElementById('modalCancel').onclick = closeModal;
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('show');
+}
+
+async function updateRecordField(id, field, value) {
+  var payloadData = {};
+  payloadData[field] = value;
+  return await ZOHO.CREATOR.DATA.updateRecordById({
+    app_name: APP_NAME,
+    report_name: 'All_Policy_Entries',
+    id: String(id),
+    payload: { data: payloadData }
+  });
+}
+
+async function performSettle(rowsToSettle) {
+  var confirmBtn = document.getElementById('modalConfirm');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Settling…';
+  var ok = 0, fail = 0, firstErr = '';
+  for (var i = 0; i < rowsToSettle.length; i++) {
+    var r = rowsToSettle[i];
+    try {
+      var resp = await updateRecordField(r.id, r.settleField, r.settleValue);
+      if (resp && (resp.code === 3000 || resp.code === 0)) ok++;
+      else { fail++; if (!firstErr) firstErr = 'code ' + (resp && resp.code); }
+    } catch (e) {
+      fail++; if (!firstErr) firstErr = (e && e.message) ? e.message : JSON.stringify(e);
+    }
+  }
+  closeModal();
+  if (fail === 0) {
+    toast(ok + (ok === 1 ? ' entry' : ' entries') + ' settled.', false);
+  } else {
+    toast(ok + ' settled, ' + fail + ' failed (' + firstErr + ').', true);
+  }
+  await refresh();
+}
+
+var toastTimer = null;
+function toast(msg, isErr) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.className = 'toast'; }, 4500);
+}
+
+/* ---------- Excel export (v11) ----------
+   Exports EXACTLY the rows rendered for the selected agent, plus the
+   KPI context and net-balance footer. Real .xlsx via SheetJS. */
+function exportExcel() {
+  if (!ledger) return;
+  if (typeof XLSX === 'undefined') {
+    showWarn('Excel library failed to load — check internet connection and refresh.');
+    return;
+  }
+  var agentName = document.getElementById('agentSelect').value || '';
+  var rows = (ledger.agents[agentName] || []);
+
+  var aoa = [];
+  aoa.push(['Agent Statement of Account — INSPT']);
+  aoa.push(['Agent:', agentName]);
+  aoa.push(['Outstanding entries from 01-May-2026']);
+  aoa.push(['Generated:', new Date().toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  })]);
+  aoa.push([]);
+  aoa.push(['Date', 'Description', 'Reference', 'Premium (OMR)', 'Type', 'Debit (OMR)', 'Credit (OMR)', 'Balance (OMR)']);
+
+  rows.forEach(function (r) {
+    aoa.push([
+      r.date || '',
+      r.desc || '',
+      r.ref || '',
+      typeof r.premium === 'number' ? r.premium : null,
+      r.type,
+      r.debit ? r.debit : null,
+      r.credit ? r.credit : null,
+      r.balance
+    ]);
+  });
+
+  var net = rows.length ? rows[rows.length - 1].balance : 0;
+  var who = net >= 0 ? 'Agent owes INSPT' : 'INSPT owes Agent';
+  if (Math.abs(net) < 0.0005) who = 'Fully settled';
+  aoa.push([]);
+  aoa.push(['', '', '', '', 'CURRENT NET BALANCE', '', '', net]);
+  aoa.push(['', '', '', '', who]);
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // 3-decimal OMR number format on Premium/Debit/Credit/Balance columns (D,F,G,H)
+  var headerRowIdx = 5;                       // 0-based row of the column headers
+  var firstDataRow = headerRowIdx + 1;
+  var lastRow = aoa.length - 1;
+  for (var R = firstDataRow; R <= lastRow; R++) {
+    ['D', 'F', 'G', 'H'].forEach(function (col) {
+      var cell = ws[col + (R + 1)];
+      if (cell && typeof cell.v === 'number') { cell.t = 'n'; cell.z = '#,##0.000'; }
+    });
+  }
+  ws['!cols'] = [
+    { wch: 12 },  // Date
+    { wch: 52 },  // Description
+    { wch: 26 },  // Reference
+    { wch: 14 },  // Premium
+    { wch: 22 },  // Type / footer label
+    { wch: 14 },  // Debit
+    { wch: 14 },  // Credit
+    { wch: 14 }   // Balance
+  ];
+
+  var wb = XLSX.utils.book_new();
+  var sheetName = agentName.replace(/[\\\/\?\*\[\]:]/g, ' ').slice(0, 31) || 'SOA';
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  var safe = agentName.replace(/[^A-Za-z0-9 _-]/g, '').trim().replace(/\s+/g, '_') || 'Agent';
+  var d = new Date();
+  var fname = 'INSPT_Agent_SOA_' + safe + '_' +
+    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0') + '.xlsx';
+  XLSX.writeFile(wb, fname);
+}
+
+function onAgentChange() {
+  var card = document.getElementById('soaCard');
+  card.classList.add('switching');
+  selectedAgent = document.getElementById('agentSelect').value;
+  setTimeout(function () {
+    renderSOA(selectedAgent);
+    card.classList.remove('switching');
+  }, 180);
+}
+
+function showWarn(msg) {
+  var el = document.getElementById('warnBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+// The Agent_Settlements FORM exists but may have no REPORT yet (v2 API reads
+// reports only). Try known link names; if none resolve, degrade gracefully.
+var SETTLEMENT_REPORT_CANDIDATES = ['All_Agent_Settlements', 'Agent_Settlements', 'Agent_Settlements_Report'];
+
+async function fetchSettlementsSafe() {
+  for (var i = 0; i < SETTLEMENT_REPORT_CANDIDATES.length; i++) {
+    try {
+      return await fetchAllPages(SETTLEMENT_REPORT_CANDIDATES[i]);
+    } catch (e) {
+      // Report exists but has zero records: v2.1 API responds HTTP 400 with code
+      // 9220 (v2 uses 3100 "No Data Available"). Treat as success with no settlements.
+      var es = String(e && e.message || '') + ' ' + ((e && e.code) || '') + ' ' + JSON.stringify(e);
+      if (/9220|3100|no data/i.test(es)) return [];
+      /* otherwise try next candidate */
+    }
+  }
+  return null; // no settlements report available
+}
+
+var selectedAgent = null;
+var controlsWired = false;
+
+function setRefreshedAt() {
+  document.getElementById('refreshedAt').textContent =
+    'Refreshed: ' + new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+}
+
+async function loadData() {
+  var results = await Promise.all([
+    fetchAllPages('All_Policy_Entries').catch(function (e) {
+      throw new Error('All_Policy_Entries: ' + (e && e.message ? e.message : JSON.stringify(e)));
+    }),
+    fetchSettlementsSafe()
+  ]);
+  var settlementRecords = results[1];
+  var warn = false;
+  if (settlementRecords === null) { settlementRecords = []; warn = true; }
+  ledger = buildLedger(results[0], settlementRecords);
+  premium = buildPremium(results[0]);
+  return warn;
+}
+
+function renderAll() {
+  var names = Object.keys(ledger.agents).sort(function (a, b) { return a.localeCompare(b); });
+  renderKPIs(ledger.totals);
+
+  if (!names.length) {
+    document.getElementById('soaCard').innerHTML =
+      '<div class="empty-state">' +
+        '<div class="icon">&#128202;</div>' +
+        '<div class="big">No outstanding activity</div>' +
+        '<div>No outstanding policy entries or settlements found.</div>' +
+      '</div>';
+    document.getElementById('agentCount').textContent = '0 agents';
+    document.getElementById('agentSelect').innerHTML = '';
+    selectedAgent = null;
+    return;
+  }
+
+  // v13 — default to the first agent that actually has open entries (so dad lands
+  // on something actionable), falling back to the first agent alphabetically.
+  if (!selectedAgent || names.indexOf(selectedAgent) < 0) {
+    var firstOpen = null;
+    for (var i = 0; i < names.length; i++) {
+      if (openCountFor(names[i]) > 0) { firstOpen = names[i]; break; }
+    }
+    selectedAgent = firstOpen || names[0];
+  }
+  renderAgentOptions(names);
+  document.getElementById('agentSelect').value = selectedAgent;
+  renderSOA(selectedAgent);
+}
+
+async function boot() {
+  booted = true;
+  try {
+    var warn = await loadData();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    setRefreshedAt();
+    if (warn) {
+      showWarn('Settlements report not found in Creator — figures below exclude settlements. ' +
+        'Create a report for the Agent_Settlements form (link name: All_Agent_Settlements), then refresh.');
+    }
+    if (!controlsWired) {
+      document.getElementById('excelBtn').addEventListener('click', exportExcel);
+      document.getElementById('agentSelect').addEventListener('change', onAgentChange);
+      controlsWired = true;
+    }
+    renderAll();
+  } catch (e) {
+    showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+// Re-fetch and re-render after a settle, preserving the selected agent.
+async function refresh() {
+  try {
+    await loadData();
+    renderAll();
+    setRefreshedAt();
+  } catch (e) {
+    toast('Refresh failed: ' + ((e && e.message) ? e.message : JSON.stringify(e)), true);
+  }
+}
+
+// ---------- Boot pattern (SDK v2 — do not change) ----------
+// Safety timeout registered BEFORE init. It ONLY shows an error — it NEVER calls boot().
+setTimeout(function () {
+  if (!booted) {
+    showError('Widget timed out. Not embedded in Creator?');
+  }
+}, 15000);
+
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
+    SigmaSDK.CREATOR.init(function () {
+      if (!booted) boot();
+    });
+  } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
+    boot();
+  } else {
+    showError('Zoho Creator SDK not found.');
+  }
+} catch (e) {
+  showError('SDK error: ' + e.message);
+}
+</script>
+</body>
+</html>
