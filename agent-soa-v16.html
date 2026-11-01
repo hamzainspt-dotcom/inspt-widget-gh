@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent SOA – INSPT</title>
+<!-- agent-soa-v16.html v16.0 (2026-11-01) | INSPT Policy Accounting System | AGENT SOA = NET SETTLEMENTS FOR SOURCE AGENTS ONLY
+     Supersedes party-ledger.html v1.0 (which also included placement agencies; Hamza 01-Nov-2026: agencies do not belong in the agent SOA). Rollback files kept: party-ledger.html, agent-ledger-v15.html.
+     Who is an agent: Sources_of_Business = "Agent" and Agent_Source_Details not blank (Bhatti = Attaullah, D10). Scope: Invoice_Date >= 01-May-2026.
+     Legs per policy:
+       PREM_IN  : agent owes INSPT  Premium            open while Premium Status (Dropdown1) = "Pending" (INSPT has not received the customer's premium)
+                  Premium Status "Partially Paid" = CHECK (listed, unticked, not in net: the unpaid part is not recorded anywhere)
+                  -> settle sets Dropdown1 = "Paid to INSPT"  (fires the existing premium-collection journal in Books: Dr Bank / Cr Premium Payable-Insurers)
+       COMM_OUT : INSPT owes agent  Commission_Shared  open while Agent_Commission_Status != "Settled" and Commission_Shared != 0
+                  -> settle sets Agent_Commission_Status = "Settled" (fires "Settle Agent Commission Payable": Dr Agent Commission Payable / Cr Bank)
+     NET = PREM_IN - COMM_OUT. Positive = agent pays INSPT. Negative = INSPT pays agent. Books: the two gross journals together equal the net cash. -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --card: #FFFFFF; --primary: #6B3A2A; --accent: #B5622A; --pos: #2A7D4F; --neg: #C0392B;
+    --text: #2C1810; --text2: #8B6B5A; --border: #E8DDD5; --soft: #FBF7F2; --warn: #9A6B00;
+  }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #FFFFFF; color: var(--text); font-size: 13px; padding: 14px; }
+  .header { background: linear-gradient(120deg, #6B3A2A 0%, #8A4A30 70%, #B5622A 100%); border-radius: 12px; padding: 18px 22px; color: #fff; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .header h1 { font-size: 18px; font-weight: 700; }
+  .header .sub { font-size: 12px; opacity: .85; margin-top: 3px; }
+  .header .refreshed { font-size: 11px; opacity: .8; text-align: right; }
+  .header button { margin-top: 6px; background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 7px; padding: 5px 10px; font-size: 11.5px; cursor: pointer; }
+  .header button:hover { background: rgba(255,255,255,.25); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .kpi .label { font-size: 10.5px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  .kpi .value { font-size: 19px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; color: var(--primary); }
+  .kpi .hint { font-size: 10.5px; color: var(--text2); margin-top: 2px; }
+  .pos { color: var(--pos) !important; } .neg { color: var(--neg) !important; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--soft); }
+  .card-head h2 { font-size: 14px; color: var(--primary); }
+  .card-head .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chkline { font-size: 12px; color: var(--text2); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .btn { border: 1px solid var(--primary); background: var(--primary); color: #fff; border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: var(--accent); border-color: var(--accent); }
+  .btn.ghost { background: #fff; color: var(--primary); }
+  .btn.ghost:hover { background: var(--soft); }
+  .btn.go { background: var(--pos); border-color: var(--pos); }
+  .btn.go:hover { background: #21663F; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--text2); padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; background: #fff; }
+  td { padding: 9px 12px; border-bottom: 1px solid #F1EAE4; vertical-align: top; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr:hover { background: var(--soft); }
+  tr.click { cursor: pointer; }
+  tr.sel { background: #F6EDE4 !important; }
+  .muted { color: var(--text2); font-size: 11px; }
+  .roles span { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; margin-right: 4px; background: rgba(107,58,42,.09); color: var(--primary); }
+  .net-cell { font-weight: 700; }
+  .who { font-size: 11px; font-weight: 600; }
+  .leg { padding: 0 0 6px 0; }
+  .leg-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 6px; gap: 10px; flex-wrap: wrap; }
+  .leg-head .t { font-weight: 700; color: var(--primary); font-size: 13px; }
+  .leg-head .s { font-size: 11px; color: var(--text2); }
+  .leg-head .amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+  input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
+  td.chk, th.chk { width: 34px; text-align: center; }
+  .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: rgba(154,107,0,.12); color: var(--warn); margin-left: 6px; }
+  .netbar { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; background: #FFF8F1; border-top: 2px solid var(--accent); }
+  .netbar .lines { font-size: 12px; color: var(--text2); line-height: 1.6; }
+  .netbar .lines b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .netbar .big { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .empty { padding: 26px; text-align: center; color: var(--text2); }
+  .note { font-size: 11px; color: var(--text2); padding: 8px 16px 12px; line-height: 1.5; }
+  #loading { padding: 50px; text-align: center; color: var(--text2); }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto 10px; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #errorBox, #warnBox { display: none; padding: 12px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 12.5px; }
+  #errorBox { background: #FDECEA; color: var(--neg); border: 1px solid #F5C6C0; }
+  #warnBox { background: #FFF6E0; color: #7A5600; border: 1px solid #F1DDA6; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(44,24,16,.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 14px; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 12px; max-width: 520px; width: 100%; max-height: 90vh; overflow: auto; padding: 18px 20px; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+  .modal h3 { color: var(--primary); font-size: 16px; margin-bottom: 10px; }
+  .modal .row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 12.5px; border-bottom: 1px dashed #EEE3DA; }
+  .modal .row b { font-variant-numeric: tabular-nums; }
+  .modal .result { margin: 12px 0; padding: 12px; border-radius: 10px; background: #FFF8F1; border: 1px solid #F0DCC8; font-size: 14px; font-weight: 700; text-align: center; }
+  .modal label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text2); margin: 10px 0 4px; }
+  .modal input[type=date], .modal textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px; font: inherit; }
+  .modal textarea { min-height: 60px; }
+  .modal .warnline { font-size: 11.5px; color: var(--text2); margin-top: 10px; line-height: 1.5; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .toast { position: fixed; right: 16px; bottom: 16px; background: var(--pos); color: #fff; padding: 10px 14px; border-radius: 9px; font-size: 12.5px; opacity: 0; transform: translateY(10px); transition: all .25s; z-index: 60; max-width: 420px; }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.err { background: var(--neg); }
+  @media (max-width: 640px) { body { padding: 8px; } .header { padding: 14px; } .kpi .value { font-size: 16px; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Agent Statement of Account — Net</h1>
+    <div class="sub">Source agents only: pending premium netted against commission owed · entries from 01-May-2026</div>
+  </div>
+  <div class="refreshed"><div id="refreshedAt">Loading…</div><button id="refreshBtn" type="button">Refresh</button></div>
+</div>
+<div id="errorBox"></div>
+<div id="warnBox"></div>
+<div id="loading"><div class="spinner"></div>Loading policies…</div>
+
+<div id="app" style="display:none">
+  <div class="kpis">
+    <div class="kpi"><div class="label">Agents owe INSPT</div><div class="value pos" id="kOweUs">0.000</div><div class="hint">Sum of positive nets</div></div>
+    <div class="kpi"><div class="label">INSPT owes agents</div><div class="value neg" id="kWeOwe">0.000</div><div class="hint">Sum of negative nets</div></div>
+    <div class="kpi"><div class="label">Overall net</div><div class="value" id="kNet">0.000</div><div class="hint" id="kNetHint"></div></div>
+    <div class="kpi"><div class="label">Open items</div><div class="value" id="kItems">0</div><div class="hint" id="kParties"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Agents — who owes whom</h2>
+      <div class="tools">
+        <label class="chkline"><input type="checkbox" id="showAll"> Show parties with nothing open</label>
+        <button class="btn ghost" id="excelAllBtn" type="button">Download Excel</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Party</th>
+          <th class="num">Premium pending (agent owes INSPT)</th>
+          <th class="num">Commission INSPT owes agent</th>
+          <th class="num">Net</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="overviewBody"></tbody>
+      </table>
+    </div>
+    <div class="note">Click an agent to see every open item and record a net settlement. Recording a settlement does not move money — it closes the items you tick, so pay or collect the net amount yourself.</div>
+  </div>
+
+  <div class="card" id="partyCard" style="display:none"></div>
+</div>
+
+<div class="modal-overlay" id="modal"><div class="modal" id="modalBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/*CORE-START*/
+var APP_NAME = 'inspt-policy-accounting-system';
+var CUTOFF_TS = new Date(2026, 4, 1).getTime();          // 01-May-2026
+var ALIASES = { 'bhatti': 'Attaullah' };                  // D10: same real agent
+var LEG = {
+  PREM_IN:  { label: 'Premium pending (agent owes INSPT)', short: 'Premium pending', sign: +1, field: 'Dropdown1',               value: 'Paid to INSPT' },
+  COMM_OUT: { label: 'Commission INSPT owes agent',        short: 'Comm. payable',   sign: -1, field: 'Agent_Commission_Status', value: 'Settled' }
+};
+var LEG_ORDER = ['PREM_IN', 'COMM_OUT'];
+
+function lookupVal(f) {
+  if (f === null || f === undefined) return '';
+  if (typeof f === 'object') {
+    var dv = f.display_value !== undefined ? f.display_value : f.zc_display_value;
+    if (dv === undefined) { for (var k in f) { if (k !== 'ID' && typeof f[k] === 'string') { dv = f[k]; break; } } }
+    return String(dv || '').trim();
+  }
+  return String(f).trim();
+}
+function num(v) { var n = parseFloat(String(v === undefined || v === null ? '' : v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
+function r3(v) { return Math.round(v * 1000) / 1000; }
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+var MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function parseDMY(s) {
+  if (!s) return 0;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})/.exec(String(s).trim());
+  if (!m) { var d = new Date(s); return isNaN(d.getTime()) ? 0 : d.getTime(); }
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  return mon === undefined ? 0 : new Date(+m[3], mon, +m[1]).getTime();
+}
+function fmtDMY(d) { return ('0' + d.getDate()).slice(-2) + '-' + MON_NAMES[d.getMonth()] + '-' + d.getFullYear(); }
+function fmt(v) {
+  var s = v < 0 ? '-' : ''; var p = Math.abs(v).toFixed(3).split('.');
+  return s + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + p[1];
+}
+function canonName(n) { n = String(n || '').trim().replace(/\s+/g, ' '); if (!n) return ''; return ALIASES[n.toLowerCase()] || n; }
+function partyKey(n) { return canonName(n).toLowerCase(); }
+
+// policies: raw All_Policy_Entries records. Returns { parties: {key: party}, list: [party...] }
+function buildParties(policies) {
+  var parties = {};
+  function getP(name, role) {
+    var k = partyKey(name);
+    if (!parties[k]) parties[k] = { key: k, name: canonName(name), roles: {}, items: [] };
+    parties[k].roles[role] = true;
+    return parties[k];
+  }
+  (policies || []).forEach(function (p) {
+    var ts = parseDMY(p.Invoice_Date);
+    var src = lookupVal(p.Sources_of_Business);
+    var agent = lookupVal(p.Agent_Source_Details);
+    if (src !== 'Agent' || !agent) return;              // source agents only
+    var pa = getP(agent, 'agent');                       // seed every agent ever seen
+    if (ts < CUTOFF_TS) return;
+    var base = {
+      id: String(p.ID || ''), ts: ts, date: String(p.Invoice_Date || ''),
+      ref: String(p.Reference_Number || '').trim(), insured: String(p.Insured_Name || '').trim(),
+      policyNo: String(p.Policy_Number || '').trim(), insurer: lookupVal(p.Insurers),
+      premium: num(p.Premium)
+    };
+    function push(leg, amount, needsCheck) {
+      var it = {}; for (var k in base) it[k] = base[k];
+      it.leg = leg; it.amount = r3(amount); it.uid = base.id + ':' + leg; it.needsCheck = !!needsCheck;
+      pa.items.push(it);
+    }
+    var premStatus = String(p.Dropdown1 || '').trim();
+    var prem = num(p.Premium);
+    if (prem !== 0 && premStatus === 'Pending') push('PREM_IN', prem, false);
+    else if (prem !== 0 && premStatus === 'Partially Paid') push('PREM_IN', prem, true);
+    var sh = num(p.Commission_Shared);
+    var acs = String(p.Agent_Commission_Status || '').trim();
+    if (sh !== 0 && acs !== 'Settled') push('COMM_OUT', sh, false);
+  });
+  var list = Object.keys(parties).map(function (k) {
+    var pt = parties[k];
+    pt.items.sort(function (a, b) { return a.ts - b.ts; });
+    pt.totals = sumItems(pt.items.filter(function (i) { return !i.needsCheck; }));
+    pt.checkCount = pt.items.filter(function (i) { return i.needsCheck; }).length;
+    pt.checkAmount = r3(pt.items.filter(function (i) { return i.needsCheck; }).reduce(function (a, i) { return a + i.amount; }, 0));
+    return pt;
+  });
+  list.sort(function (a, b) { return Math.abs(b.totals.net) - Math.abs(a.totals.net) || a.name.localeCompare(b.name); });
+  return { parties: parties, list: list };
+}
+
+function sumItems(items) {
+  var t = { PREM_IN: 0, COMM_OUT: 0, net: 0, count: 0 };
+  items.forEach(function (i) { t[i.leg] += i.amount; t.net += LEG[i.leg].sign * i.amount; t.count++; });
+  t.PREM_IN = r3(t.PREM_IN); t.COMM_OUT = r3(t.COMM_OUT); t.net = r3(t.net);
+  return t;
+}
+
+// Groups selected items into one update payload per policy record.
+function buildUpdates(items) {
+  var byId = {}; var order = [];
+  items.forEach(function (i) {
+    if (!byId[i.id]) { byId[i.id] = {}; order.push(i.id); }
+    byId[i.id][LEG[i.leg].field] = LEG[i.leg].value;
+  });
+  return order.map(function (id) { return { id: id, data: byId[id] }; });
+}
+
+function directionFor(net) { return net > 0 ? 'Agent pays INSPT' : 'INSPT pays Agent'; }
+function whoText(name, net) {
+  if (net > 0) return name + ' pays INSPT';
+  if (net < 0) return 'INSPT pays ' + name;
+  return 'Nothing to pay — fully netted';
+}
+
+function buildNotes(party, t, items, userNote) {
+  var head = 'Party: ' + party.name + ' | Net settlement (Net Settlements screen) | ' + t.count + ' item(s)' +
+    ' | Premium pending ' + fmt(t.PREM_IN) + ' | Commission INSPT owes agent ' + fmt(t.COMM_OUT) + ' | NET ' + fmt(t.net) + ' = ' + whoText(party.name, t.net);
+  var lines = items.map(function (i) { return (i.ref || i.id) + ' ' + i.leg + ' ' + fmt(i.amount); });
+  return head + (userNote ? '\nNote: ' + userNote : '') + '\nItems: ' + lines.join('; ');
+}
+
+function settlementParty(s) {
+  var n = String(s.Party_Name || '').trim();
+  if (!n) n = lookupVal(s.Agent);
+  if (!n) { var m = /^Party: ([^|\n]+)/.exec(String(s.Notes || '')); if (m) n = m[1].trim(); }
+  return canonName(n);
+}
+/*CORE-END*/
+
+// ---------------- UI ----------------
+var state = { data: null, settlements: [], selectedKey: null, sel: {}, showAll: false };
+var booted = false;
+
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function $(id) { return document.getElementById(id); }
+function showError(msg) { $('loading').style.display = 'none'; $('errorBox').style.display = 'block'; $('errorBox').textContent = msg; }
+function showWarn(msg) { $('warnBox').style.display = msg ? 'block' : 'none'; $('warnBox').textContent = msg || ''; }
+var toastTimer;
+function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 6000); }
+
+async function fetchAll(report) {
+  var out = [], cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: report, max_records: 200 };
+    if (cursor) params.record_cursor = cursor;
+    var resp;
+    try { resp = await ZOHO.CREATOR.DATA.getRecords(params); }
+    catch (e) {
+      var es = JSON.stringify(e || {}) + String(e && e.message || '');
+      if (/9220|3100|no data/i.test(es)) break;          // empty report
+      throw e;
+    }
+    if (!resp || resp.code !== 3000 || !resp.data || !resp.data.length) break;
+    out = out.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return out;
+}
+
+async function loadData() {
+  var res = await Promise.all([
+    fetchAll('All_Policy_Entries'),
+    fetchAll('All_Agent_Settlements').catch(function () { return null; })
+  ]);
+  var pol = res[0];
+  if (pol.length && !('Premium_Paid_to_Insurer' in pol[0])) {
+    showWarn('');
+  } else showWarn('');
+  state.data = buildParties(pol);
+  state.settlements = res[1] || [];
+  $('refreshedAt').textContent = 'Refreshed ' + new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderKPIs() {
+  var oweUs = 0, weOwe = 0, items = 0, parties = 0;
+  state.data.list.forEach(function (p) {
+    if (p.totals.net > 0) oweUs += p.totals.net; else weOwe += -p.totals.net;
+    items += p.totals.count; if (p.totals.count) parties++;
+  });
+  var net = r3(oweUs - weOwe);
+  $('kOweUs').textContent = fmt(oweUs); $('kWeOwe').textContent = fmt(weOwe);
+  $('kNet').textContent = fmt(net); $('kNet').className = 'value ' + (net >= 0 ? 'pos' : 'neg');
+  $('kNetHint').textContent = net >= 0 ? 'Overall, agents owe INSPT' : 'Overall, INSPT owes agents';
+  $('kItems').textContent = items; $('kParties').textContent = parties + ' agents with open items';
+}
+
+function rolesHtml(p) {
+  return '';
+}
+
+function renderOverview() {
+  var rows = state.data.list.filter(function (p) { return state.showAll || p.totals.count || p.checkCount; });
+  if (!rows.length) { $('overviewBody').innerHTML = '<tr><td colspan="5" class="empty">Nothing open. Everyone is settled.</td></tr>'; return; }
+  $('overviewBody').innerHTML = rows.map(function (p) {
+    var t = p.totals; var cls = t.net > 0 ? 'pos' : (t.net < 0 ? 'neg' : '');
+    return '<tr class="click' + (p.key === state.selectedKey ? ' sel' : '') + '" data-key="' + esc(p.key) + '">' +
+      '<td><b>' + esc(p.name) + '</b>' + rolesHtml(p) +
+        (p.checkCount ? '<div class="muted">' + p.checkCount + ' partially paid premium(s) to check, ' + fmt(p.checkAmount) + ' not counted</div>' : '') + '</td>' +
+      '<td class="num">' + (t.PREM_IN ? fmt(t.PREM_IN) : '–') + '</td>' +
+      '<td class="num">' + (t.COMM_OUT ? fmt(t.COMM_OUT) : '–') + '</td>' +
+      '<td class="num net-cell ' + cls + '">' + fmt(Math.abs(t.net)) + '<div class="who ' + cls + '">' + esc(t.count ? whoText(p.name, t.net) : 'Nothing open') + '</div></td>' +
+      '<td><button class="btn ghost" type="button">Open</button></td></tr>';
+  }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('#overviewBody tr.click'), function (tr) {
+    tr.addEventListener('click', function () { openParty(tr.getAttribute('data-key')); });
+  });
+}
+
+function openParty(key) {
+  state.selectedKey = key; state.sel = {};
+  var p = state.data.parties[key];
+  if (p) p.items.forEach(function (i) { if (!i.needsCheck) state.sel[i.uid] = true; });
+  renderOverview(); renderParty();
+  setTimeout(function () { $('partyCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
+}
+
+function selectedItems(p) { return p.items.filter(function (i) { return state.sel[i.uid]; }); }
+
+function legTable(p, leg) {
+  var items = p.items.filter(function (i) { return i.leg === leg; });
+  if (!items.length) return '';
+  var counted = items.filter(function (i) { return !i.needsCheck; });
+  var sub = r3(counted.reduce(function (a, i) { return a + i.amount; }, 0));
+  var allOn = items.every(function (i) { return state.sel[i.uid]; });
+  var hint = leg === 'PREM_IN' ? 'Premium Status = Pending: INSPT has not received the premium for customers ' + p.name + ' brought'
+           : 'Commission share INSPT owes ' + p.name + ' for the business they brought';
+  var rows = items.map(function (i) {
+    return '<tr><td class="chk"><input type="checkbox" class="ichk" data-uid="' + esc(i.uid) + '"' + (state.sel[i.uid] ? ' checked' : '') + '></td>' +
+      '<td>' + esc(i.date) + '</td>' +
+      '<td><b>' + esc(i.insured || '—') + '</b>' + (i.needsCheck ? '<span class="tag">CHECK</span>' : '') +
+        '<div class="muted">' + esc([i.policyNo, i.insurer, i.ref].filter(Boolean).join(' · ')) + '</div></td>' +
+      '<td class="num">' + fmt(i.premium) + '</td>' +
+      '<td class="num"><b>' + fmt(i.amount) + '</b></td></tr>';
+  }).join('');
+  return '<div class="leg"><div class="leg-head"><div><div class="t">' + LEG[leg].label + '</div><div class="s">' + esc(hint) + '</div></div>' +
+    '<div class="amt ' + (LEG[leg].sign > 0 ? 'pos' : 'neg') + '">' + fmt(sub) + ' · ' + counted.length + ' item(s)</div></div>' +
+    (leg === 'PREM_IN' && items.some(function (i) { return i.needsCheck; }) ?
+      '<div class="note" style="padding-top:0">Items marked CHECK are "Partially Paid": the system does not record how much is still unpaid, so they are not counted. Tick one only if the full premium is now being settled.</div>' : '') +
+    '<div class="table-wrap"><table><thead><tr><th class="chk"><input type="checkbox" class="lchk" data-leg="' + leg + '"' + (allOn ? ' checked' : '') + '></th>' +
+    '<th>Date</th><th>Customer / policy</th><th class="num">Premium</th><th class="num">Amount</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+}
+
+function historyHtml(p) {
+  var hs = state.settlements.filter(function (s) { return partyKey(settlementParty(s)) === p.key; })
+    .sort(function (a, b) { return parseDMY(b.Settlement_Date) - parseDMY(a.Settlement_Date); });
+  if (!hs.length) return '<div class="note">No settlements recorded yet for ' + esc(p.name) + '.</div>';
+  return '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Direction</th><th class="num">Net amount</th><th>Details</th></tr></thead><tbody>' +
+    hs.map(function (s) {
+      var notes = String(s.Notes || ''); var first = notes.split('\n')[0];
+      var userNote = (/\nNote: ([^\n]*)/.exec(notes) || [])[1] || '';
+      var short = first.replace(/^Party: [^|]*\|\s*/, '');
+      return '<tr><td>' + esc(s.Settlement_Date || '') + '</td><td>' + esc(String(s.Direction || '').replace('Agent', p.name)) + '</td>' +
+        '<td class="num"><b>' + fmt(num(s.Amount)) + '</b></td><td class="muted">' + esc(userNote ? userNote + ' — ' : '') + esc(short) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+function renderParty() {
+  var p = state.data.parties[state.selectedKey];
+  var card = $('partyCard');
+  if (!p) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  var body = LEG_ORDER.map(function (l) { return legTable(p, l); }).join('');
+  card.innerHTML =
+    '<div class="card-head"><div><h2>' + esc(p.name) + '</h2>' + rolesHtml(p) + '</div>' +
+    '<div class="tools"><button class="btn ghost" id="excelPartyBtn" type="button">Download statement</button><button class="btn ghost" id="closeParty" type="button">Close</button></div></div>' +
+    (body || '<div class="empty">Nothing open for ' + esc(p.name) + '.</div>') +
+    (body ? '<div class="netbar" id="netbar"></div>' : '') +
+    '<div class="card-head" style="border-top:1px solid var(--border)"><h2>Past settlements</h2></div>' + historyHtml(p);
+  Array.prototype.forEach.call(card.querySelectorAll('.ichk'), function (c) {
+    c.addEventListener('change', function () { state.sel[c.getAttribute('data-uid')] = c.checked; renderNetbar(); syncLegChecks(); });
+  });
+  Array.prototype.forEach.call(card.querySelectorAll('.lchk'), function (c) {
+    c.addEventListener('change', function () {
+      var leg = c.getAttribute('data-leg');
+      p.items.forEach(function (i) { if (i.leg === leg) state.sel[i.uid] = c.checked; });
+      renderParty();
+    });
+  });
+  $('closeParty').addEventListener('click', function () { state.selectedKey = null; renderOverview(); renderParty(); });
+  $('excelPartyBtn').addEventListener('click', function () { exportParty(p); });
+  if (body) renderNetbar();
+}
+
+function syncLegChecks() {
+  var p = state.data.parties[state.selectedKey];
+  Array.prototype.forEach.call(document.querySelectorAll('.lchk'), function (c) {
+    var leg = c.getAttribute('data-leg');
+    c.checked = p.items.filter(function (i) { return i.leg === leg; }).every(function (i) { return state.sel[i.uid]; });
+  });
+}
+
+function renderNetbar() {
+  var p = state.data.parties[state.selectedKey];
+  var t = sumItems(selectedItems(p));
+  var cls = t.net > 0 ? 'pos' : (t.net < 0 ? 'neg' : '');
+  $('netbar').innerHTML =
+    '<div class="lines">Ticked: <b>' + t.count + '</b> item(s)<br>' +
+    'Premium pending <b>' + fmt(t.PREM_IN) + '</b> − Commission INSPT owes agent <b>' + fmt(t.COMM_OUT) + '</b></div>' +
+    '<div style="text-align:right"><div class="big ' + cls + '">' + fmt(Math.abs(t.net)) + ' OMR</div><div class="who ' + cls + '">' + esc(whoText(p.name, t.net)) + '</div>' +
+    '<button class="btn go" id="settleBtn" type="button" style="margin-top:8px"' + (t.count ? '' : ' disabled') + '>Record net settlement</button></div>';
+  $('settleBtn').addEventListener('click', function () { openConfirm(p); });
+}
+
+function todayISO() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+function openConfirm(p) {
+  var items = selectedItems(p); var t = sumItems(items);
+  var cls = t.net > 0 ? 'pos' : (t.net < 0 ? 'neg' : '');
+  $('modalBody').innerHTML =
+    '<h3>Record net settlement — ' + esc(p.name) + '</h3>' +
+    '<div class="row"><span>Items ticked</span><b>' + t.count + '</b></div>' +
+    '<div class="row"><span>Premium pending (agent owes INSPT)</span><b class="pos">' + fmt(t.PREM_IN) + '</b></div>' +
+    '<div class="row"><span>Commission INSPT owes agent</span><b class="neg">− ' + fmt(t.COMM_OUT) + '</b></div>' +
+    '<div class="result ' + cls + '">' + esc(whoText(p.name, t.net)) + (t.net ? ': ' + fmt(Math.abs(t.net)) + ' OMR' : '') + '</div>' +
+    '<label for="sDate">Settlement date</label><input type="date" id="sDate" value="' + todayISO() + '">' +
+    '<label for="sNote">Note (optional — e.g. cheque no., bank ref, who was told)</label><textarea id="sNote" maxlength="400"></textarea>' +
+    '<div class="warnline">This closes the ' + t.count + ' ticked item(s) and saves one settlement record. It does not send or collect money. ' +
+    (t.PREM_IN ? 'Ticked premiums will be marked "Paid to INSPT" and recorded in Zoho Books as premium collected. ' : '') + (t.COMM_OUT ? 'Ticked commission is marked Settled and cleared in Zoho Books.' : '') + '</div>' +
+    '<div class="actions"><button class="btn ghost" id="mCancel" type="button">Cancel</button><button class="btn go" id="mGo" type="button">Confirm settlement</button></div>';
+  $('modal').classList.add('show');
+  $('mCancel').onclick = closeModal;
+  $('mGo').onclick = function () { performSettle(p, items, t); };
+}
+function closeModal() { $('modal').classList.remove('show'); }
+
+async function performSettle(p, items, t) {
+  var go = $('mGo'); go.disabled = true; $('mCancel').disabled = true; go.textContent = 'Saving…';
+  var dv = $('sDate').value; var d = dv ? new Date(dv + 'T00:00:00') : new Date();
+  var userNote = String($('sNote').value || '').trim();
+  // 1) Settlement record first. If it fails, nothing else is touched.
+  var addResp;
+  try {
+    addResp = await ZOHO.CREATOR.DATA.addRecords({
+      app_name: APP_NAME, form_name: 'Agent_Settlements',
+      payload: { data: {
+        Party_Name: p.name, Settlement_Date: fmtDMY(d), Amount: Math.abs(t.net).toFixed(3),
+        Direction: directionFor(t.net), Notes: buildNotes(p, t, items, userNote)
+      } }
+    });
+  } catch (e) { addResp = { code: 'ERR', message: (e && e.message) || JSON.stringify(e) }; }
+  if (!addResp || addResp.code !== 3000) {
+    go.disabled = false; $('mCancel').disabled = false; go.textContent = 'Confirm settlement';
+    toast('Could not save the settlement record (' + ((addResp && (addResp.message || addResp.code)) || 'unknown error') + '). Nothing was changed.', true);
+    return;
+  }
+  // 2) Close the ticked items, one update per policy.
+  var failed = await runUpdates(buildUpdates(items), go);
+  closeModal();
+  if (!failed.length) toast('Settlement saved. ' + items.length + ' item(s) closed for ' + p.name + '.', false);
+  else showRetry(p, failed);
+  await refresh();
+}
+
+async function runUpdates(updates, btn) {
+  var failed = [];
+  for (var i = 0; i < updates.length; i++) {
+    if (btn) btn.textContent = 'Closing items ' + (i + 1) + ' / ' + updates.length + '…';
+    var u = updates[i], resp;
+    try {
+      resp = await ZOHO.CREATOR.DATA.updateRecordById({ app_name: APP_NAME, report_name: 'All_Policy_Entries', id: String(u.id), payload: { data: u.data } });
+    } catch (e) { resp = { code: 'ERR', message: (e && e.message) || JSON.stringify(e) }; }
+    if (!resp || (resp.code !== 3000 && resp.code !== 0)) failed.push({ u: u, err: (resp && (resp.message || resp.code)) || 'unknown' });
+  }
+  return failed;
+}
+
+function showRetry(p, failed) {
+  $('modalBody').innerHTML = '<h3>Settlement saved, but ' + failed.length + ' item(s) did not close</h3>' +
+    '<div class="warnline">The settlement record is saved. These policies could not be updated (first error: ' + esc(String(failed[0].err)) + '). ' +
+    'Press Retry to close only these — it will not create a second settlement record.</div>' +
+    '<div class="actions"><button class="btn ghost" id="mCancel" type="button">Close</button><button class="btn go" id="mGo" type="button">Retry</button></div>';
+  $('modal').classList.add('show');
+  $('mCancel').onclick = closeModal;
+  $('mGo').onclick = async function () {
+    $('mGo').disabled = true;
+    var again = await runUpdates(failed.map(function (f) { return f.u; }), $('mGo'));
+    closeModal();
+    if (again.length) showRetry(p, again); else toast('All remaining items closed.', false);
+    await refresh();
+  };
+}
+
+// ---------- Excel ----------
+function exportAll() {
+  var wb = XLSX.utils.book_new();
+  var ov = [['Agent', 'Premium pending (agent owes INSPT)', 'Commission INSPT owes agent', 'Net', 'Who pays', 'Open items', 'Partially paid premium to check (not counted)']];
+  state.data.list.filter(function (p) { return p.totals.count || p.checkCount; }).forEach(function (p) {
+    ov.push([p.name, p.totals.PREM_IN, p.totals.COMM_OUT, Math.abs(p.totals.net), whoText(p.name, p.totals.net), p.totals.count, p.checkAmount]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ov), 'Who owes whom');
+  var it = [['Party', 'Type', 'Date', 'Customer', 'Policy No', 'Insurer', 'Reference', 'Premium', 'Amount', 'Counted in net']];
+  state.data.list.forEach(function (p) { p.items.forEach(function (i) {
+    it.push([p.name, LEG[i.leg].label, i.date, i.insured, i.policyNo, i.insurer, i.ref, i.premium, i.amount, i.needsCheck ? 'No - partially paid, check' : 'Yes']);
+  }); });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(it), 'All open items');
+  XLSX.writeFile(wb, 'INSPT_Agent_SOA_' + fmtDMY(new Date()) + '.xlsx');
+}
+function exportParty(p) {
+  var wb = XLSX.utils.book_new(); var t = p.totals;
+  var rows = [[p.name + ' — statement of open items'], ['Generated', fmtDMY(new Date())], [],
+    ['Type', 'Date', 'Customer', 'Policy No', 'Insurer', 'Reference', 'Premium', 'Amount', 'Counted in net']];
+  p.items.forEach(function (i) { rows.push([LEG[i.leg].label, i.date, i.insured, i.policyNo, i.insurer, i.ref, i.premium, i.amount, i.needsCheck ? 'No - partially paid, check' : 'Yes']); });
+  rows.push([], ['Premium pending (agent owes INSPT)', t.PREM_IN], ['Commission INSPT owes agent', t.COMM_OUT], ['NET', Math.abs(t.net), whoText(p.name, t.net)]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Statement');
+  XLSX.writeFile(wb, 'INSPT_' + p.name.replace(/[^A-Za-z0-9]+/g, '_') + '_' + fmtDMY(new Date()) + '.xlsx');
+}
+
+// ---------- Boot ----------
+function renderAll() { renderKPIs(); renderOverview(); renderParty(); }
+async function refresh() {
+  try { var keepSel = state.selectedKey; await loadData(); state.selectedKey = keepSel; if (keepSel) openParty(keepSel); else renderAll(); renderKPIs(); }
+  catch (e) { toast('Refresh failed: ' + ((e && e.message) || JSON.stringify(e)), true); }
+}
+async function boot() {
+  booted = true;
+  try {
+    await loadData();
+    $('loading').style.display = 'none'; $('app').style.display = 'block';
+    $('showAll').addEventListener('change', function () { state.showAll = this.checked; renderOverview(); });
+    $('excelAllBtn').addEventListener('click', exportAll);
+    $('refreshBtn').addEventListener('click', refresh);
+    renderAll();
+  } catch (e) { showError('Failed to load data: ' + ((e && e.message) || JSON.stringify(e))); }
+}
+setTimeout(function () { if (!booted) showError('Widget timed out. Not embedded in Creator?'); }, 15000);
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) SigmaSDK.CREATOR.init(function () { if (!booted) boot(); });
+  else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) boot();
+  else showError('Zoho Creator SDK not found.');
+} catch (e) { showError('SDK error: ' + e.message); }
+</script>
+</body>
+</html>
