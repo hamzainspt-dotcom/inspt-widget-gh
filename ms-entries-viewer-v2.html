@@ -1088,9 +1088,11 @@ function openDetail(row) {
  const edit=$('editEntry');
  if (id) { edit.href='https://creatorapp.zoho.com/mohammadhamza383/'+APP_NAME+'/#Form:Policy_Entry?recLinkID='+id+'&viewLinkName='+REPORT_NAME; edit.hidden=false; } else edit.hidden=true;
  // Saving an edit on a policy that has commission but no Books commission entry makes the system post one to Books (edit rule, OI-44 late booking).
- const noBooks=!rawText(row.Books_Journal_ID).trim() && Number(decimal(row.Commission)?.n||0)!==0;
- $('editWarn').hidden=!noBooks;
- $('editWarn').textContent=noBooks?'Note: this policy has no commission entry in Zoho Books yet. Saving any edit to it will make the system post its commission to Books, dated on its invoice date.':'';
+ // The bulk SDK fetch may not include Books_Journal_ID, so look the single record up; warn only when we KNOW it is blank.
+ $('editWarn').hidden=true;$('editWarn').textContent='';
+ const showWarn=r=>{ if(!r || !Object.hasOwn(r,'Books_Journal_ID')) return; const noBooks=!rawText(r.Books_Journal_ID).trim() && Number(decimal(r.Commission)?.n||0)!==0; $('editWarn').hidden=!noBooks; $('editWarn').textContent=noBooks?'Note: this policy has no commission entry in Zoho Books yet. Saving any edit to it will make the system post its commission to Books, dated on its invoice date.':''; };
+ if (Object.hasOwn(row,'Books_Journal_ID')) showWarn(row);
+ else if (id && window.ZOHO?.CREATOR?.DATA?.getRecordById) { const want=id; ZOHO.CREATOR.DATA.getRecordById({app_name:APP_NAME,report_name:REPORT_NAME,id:want}).then(res=>{ if($('detail').open && $('editEntry').href.includes(want)) showWarn(res?.data); }).catch(()=>{}); }
  $('detail').showModal();
 }
 function writeReport(kind) {
