@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent statement of account · INSPT</title>
+<!-- INSPT-AGENT-SOA-v18-2026-11-21 | Look only. Script block byte-identical to v17. -->
+<link rel="stylesheet" href="inspt-widget-v1.css">
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  main{padding-top:var(--s5)}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+          flex-wrap:wrap;margin-bottom:24px}
+  .header h1{font-size:var(--title);font-weight:570;line-height:1.09;letter-spacing:-.055em}
+  .header .sub{font-size:var(--label);color:var(--muted);margin-top:8px;max-width:80ch;line-height:1.45}
+  .header .refreshed{font-size:var(--meta);color:var(--muted);text-align:right;
+                     display:flex;flex-direction:column;align-items:flex-end;gap:7px;white-space:nowrap}
+  .header button{min-height:var(--control);border:1px solid #bdb3a6;border-radius:var(--radius);
+                 background:var(--paper);color:var(--ink);padding:7px 12px;
+                 font-size:var(--label);font-weight:540}
+  .header button:hover{background:var(--mist);border-color:var(--sea)}
+
+  .kpis{grid-template-columns:repeat(4,1fr);margin-bottom:34px}
+  .kpi .label{font-size:var(--label);font-weight:510;line-height:1.3}
+  .kpi .value{font-size:var(--figure);font-weight:570;letter-spacing:-.035em;line-height:1.12;
+              font-variant-numeric:var(--numerals);white-space:nowrap}
+  .kpi .hint{font-size:var(--meta);color:var(--muted);line-height:1.35}
+  .pos{color:var(--credit)!important}
+  .neg{color:var(--debit)!important}
+
+  .card{margin-bottom:38px}
+  .card-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;
+             flex-wrap:wrap;margin-bottom:16px}
+  .card-head h2{font-size:var(--section);font-weight:570;letter-spacing:-.035em}
+  .card-head .tools{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .chkline{font-size:var(--label);color:var(--muted);display:inline-flex;gap:8px;
+           align-items:center;cursor:pointer;white-space:nowrap}
+  .chkline input{width:auto}
+
+  .btn{min-height:var(--control);border:1px solid var(--petrol);background:var(--petrol);color:#fff;
+       border-radius:var(--radius);padding:7px 12px;font-size:var(--label);font-weight:540}
+  .btn:hover{background:var(--petrol-hover);border-color:var(--petrol-hover)}
+  .btn.ghost{background:var(--paper);color:var(--petrol);border-color:#bdb3a6}
+  .btn.ghost:hover{background:var(--mist);border-color:var(--sea)}
+  .btn.go{background:var(--credit);border-color:var(--credit);color:#fff}
+  .btn.go:hover{background:#1b4e3d;border-color:#1b4e3d}
+
+  .table-wrap{overflow-x:auto}
+  table{font-size:var(--label)}
+  th{text-align:left;font-size:var(--meta);color:var(--muted);font-weight:500;
+     padding:9px 12px;background:var(--mist);white-space:nowrap}
+  td{padding:10px 12px;border-bottom:1px solid var(--rule-light);vertical-align:top}
+  th.num,td.num{text-align:right;font-variant-numeric:var(--numerals);white-space:nowrap}
+  tr.click{cursor:pointer}
+  tr.sel{background:var(--mist)!important}
+  .muted{color:var(--muted);font-size:var(--meta)}
+  .roles span{display:inline-block;font-size:var(--meta);font-weight:550;margin-right:9px;
+              color:var(--muted)}
+  .net-cell{font-weight:650}
+  .who{font-size:var(--meta);font-weight:600}
+  .note{font-size:var(--meta);color:var(--muted);padding:12px 0 0;line-height:1.55;max-width:96ch}
+
+  .leg{padding:0 0 8px}
+  .leg-head{display:flex;justify-content:space-between;align-items:baseline;
+            padding:22px 0 10px;gap:12px;flex-wrap:wrap;border-bottom:var(--hairline);margin-bottom:4px}
+  .leg-head .t{font-weight:600;font-size:1rem;letter-spacing:-.02em}
+  .leg-head .s{font-size:var(--meta);color:var(--muted)}
+  .leg-head .amt{font-weight:650;font-variant-numeric:var(--numerals)}
+  td.chk,th.chk{width:34px;text-align:center}
+  .tag{display:inline-block;font-size:var(--meta);font-weight:620;color:var(--warning);margin-left:8px}
+
+  .netbar{position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;
+          gap:16px;flex-wrap:wrap;padding:16px 0;background:var(--paper);
+          border-top:2px solid var(--sea)}
+  .netbar .lines{font-size:var(--label);color:var(--muted);line-height:1.6}
+  .netbar .lines b{color:var(--ink);font-variant-numeric:var(--numerals)}
+  .netbar .big{font-size:1.5rem;font-weight:650;font-variant-numeric:var(--numerals);
+               letter-spacing:-.035em}
+  .empty{padding:36px 0;text-align:center;color:var(--muted)}
+
+  #loading{padding:70px 20px;text-align:center;color:var(--muted);font-size:var(--label)}
+  .spinner{width:24px;height:24px;border:2px solid var(--rule);border-top-color:var(--sea);
+           border-radius:50%;margin:0 auto 14px;animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #errorBox,#warnBox{display:none;padding:12px 14px;margin-bottom:16px;font-size:var(--label);
+                     background:var(--mist);border-left:3px solid var(--rule)}
+  #errorBox{border-left-color:var(--debit)}
+  #warnBox{border-left-color:var(--warning)}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(36,28,22,.44);display:none;
+                 align-items:center;justify-content:center;z-index:50;padding:16px}
+  .modal-overlay.show{display:flex}
+  .modal{background:#fff;border:1px solid var(--rule);border-radius:6px;max-width:560px;width:100%;
+         max-height:90vh;overflow:auto;padding:26px 28px}
+  .modal h3{font-size:1.25rem;font-weight:570;letter-spacing:-.035em;margin-bottom:14px}
+  .modal .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;
+              font-size:var(--label);border-bottom:1px solid var(--rule-light)}
+  .modal .row b{font-variant-numeric:var(--numerals)}
+  .modal .result{margin:18px 0;padding:16px;background:var(--mist);border-left:3px solid var(--sea);
+                 font-size:1.0625rem;font-weight:650;text-align:center;
+                 font-variant-numeric:var(--numerals)}
+  .modal label{display:block;font-size:var(--meta);font-weight:550;color:var(--muted);margin:14px 0 6px}
+  .modal textarea{width:100%;border:1px solid #c8bfb2;border-radius:var(--radius);padding:8px 10px;
+                  font:inherit;min-height:66px;color:var(--ink)}
+  .modal .warnline{font-size:var(--meta);color:var(--muted);margin-top:14px;line-height:1.55}
+  .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+
+  .toast{position:fixed;right:18px;bottom:18px;background:var(--credit);color:#fff;
+         padding:11px 16px;border-radius:var(--radius);font-size:var(--label);opacity:0;
+         transform:translateY(10px);transition:all .25s;z-index:60;max-width:420px}
+  .toast.show{opacity:1;transform:none}
+  .toast.err{background:var(--debit)}
+  @media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}
+    .kpis .kpi:nth-child(n+3){border-top:1px solid var(--rule-light)}}
+  @media(max-width:640px){.kpis{grid-template-columns:1fr}.kpi+.kpi:before{display:none}}
+</style>
+</head>
+<body>
+<main>
+<div class="header">
+  <div>
+    <h1>Agent statement of account</h1>
+    <div class="sub">Source agents only: pending premium netted against commission owed · entries from 01-May-2026</div>
+  </div>
+  <div class="refreshed"><div id="refreshedAt">Loading…</div><button id="refreshBtn" type="button">Refresh</button></div>
+</div>
+<div id="errorBox"></div>
+<div id="warnBox"></div>
+<div id="loading"><div class="spinner"></div>Loading policies…</div>
+
+<div id="app" style="display:none">
+  <div class="kpis">
+    <div class="kpi"><div class="label">Agents owe INSPT</div><div class="value pos" id="kOweUs">0.000</div><div class="hint">Sum of positive nets</div></div>
+    <div class="kpi"><div class="label">INSPT owes agents</div><div class="value neg" id="kWeOwe">0.000</div><div class="hint">Sum of negative nets</div></div>
+    <div class="kpi"><div class="label">Overall net</div><div class="value" id="kNet">0.000</div><div class="hint" id="kNetHint"></div></div>
+    <div class="kpi"><div class="label">Open items</div><div class="value" id="kItems">0</div><div class="hint" id="kParties"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Agents — who owes whom</h2>
+      <div class="tools">
+        <label class="chkline"><input type="checkbox" id="showAll"> Show parties with nothing open</label>
+        <button class="btn ghost" id="excelAllBtn" type="button">Download Excel</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Party</th>
+          <th class="num">Premium pending (agent owes INSPT)</th>
+          <th class="num">Commission INSPT owes agent</th>
+          <th class="num">Net</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="overviewBody"></tbody>
+      </table>
+    </div>
+    <div class="note">Click an agent to see every open item and record a net settlement. Recording a settlement does not move money — it closes the items you tick, so pay or collect the net amount yourself.</div>
+  </div>
+
+  <div class="card" id="partyCard" style="display:none"></div>
+</div>
+
+<div class="modal-overlay" id="modal"><div class="modal" id="modalBody"></div></div>
+<div class="toast" id="toast"></div>
+</main>
+
+<script>
+/*CORE-START*/
+var APP_NAME = 'inspt-policy-accounting-system';
+var CUTOFF_TS = new Date(2026, 4, 1).getTime();          // 01-May-2026
+var ALIASES = { 'bhatti': 'Attaullah' };                  // D10: same real agent
+var LEG = {
+  PREM_IN:  { label: 'Premium pending (agent owes INSPT)', short: 'Premium pending', sign: +1, field: 'Dropdown1',               value: 'Paid to INSPT' },
+  COMM_OUT: { label: 'Commission INSPT owes agent',        short: 'Comm. payable',   sign: -1, field: 'Agent_Commission_Status', value: 'Settled' }
+};
+var LEG_ORDER = ['PREM_IN', 'COMM_OUT'];
+
+function lookupVal(f) {
+  if (f === null || f === undefined) return '';
+  if (typeof f === 'object') {
+    var dv = f.display_value !== undefined ? f.display_value : f.zc_display_value;
+    if (dv === undefined) { for (var k in f) { if (k !== 'ID' && typeof f[k] === 'string') { dv = f[k]; break; } } }
+    return String(dv || '').trim();
+  }
+  return String(f).trim();
+}
+function num(v) { var n = parseFloat(String(v === undefined || v === null ? '' : v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
+function r3(v) { return Math.round(v * 1000) / 1000; }
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+var MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function parseDMY(s) {
+  if (!s) return 0;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})/.exec(String(s).trim());
+  if (!m) { var d = new Date(s); return isNaN(d.getTime()) ? 0 : d.getTime(); }
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  return mon === undefined ? 0 : new Date(+m[3], mon, +m[1]).getTime();
+}
+function fmtDMY(d) { return ('0' + d.getDate()).slice(-2) + '-' + MON_NAMES[d.getMonth()] + '-' + d.getFullYear(); }
+function fmt(v) {
+  var s = v < 0 ? '-' : ''; var p = Math.abs(v).toFixed(3).split('.');
+  return s + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + p[1];
+}
+function canonName(n) { n = String(n || '').trim().replace(/\s+/g, ' '); if (!n) return ''; return ALIASES[n.toLowerCase()] || n; }
+function partyKey(n) { return canonName(n).toLowerCase(); }
+
+// policies: raw All_Policy_Entries records. Returns { parties: {key: party}, list: [party...] }
+function buildParties(policies) {
+  var parties = {};
+  function getP(name, role) {
+    var k = partyKey(name);
+    if (!parties[k]) parties[k] = { key: k, name: canonName(name), roles: {}, items: [] };
+    parties[k].roles[role] = true;
+    return parties[k];
+  }
+  (policies || []).forEach(function (p) {
+    var ts = parseDMY(p.Invoice_Date);
+    var src = lookupVal(p.Sources_of_Business);
+    var agent = lookupVal(p.Agent_Source_Details);
+    if (src !== 'Agent' || !agent) return;              // source agents only
+    var pa = getP(agent, 'agent');                       // seed every agent ever seen
+    if (ts < CUTOFF_TS) return;
+    var base = {
+      id: String(p.ID || ''), ts: ts, date: String(p.Invoice_Date || ''),
+      ref: String(p.Reference_Number || '').trim(), insured: String(p.Insured_Name || '').trim(),
+      policyNo: String(p.Policy_Number || '').trim(), insurer: lookupVal(p.Insurers),
+      premium: num(p.Premium)
+    };
+    function push(leg, amount, needsCheck) {
+      var it = {}; for (var k in base) it[k] = base[k];
+      it.leg = leg; it.amount = r3(amount); it.uid = base.id + ':' + leg; it.needsCheck = !!needsCheck;
+      pa.items.push(it);
+    }
+    var premStatus = String(p.Dropdown1 || '').trim();
+    var prem = num(p.Premium);
+    if (prem !== 0 && premStatus === 'Pending') push('PREM_IN', prem, false);
+    else if (prem !== 0 && premStatus === 'Partially Paid') push('PREM_IN', prem, true);
+    var sh = num(p.Commission_Shared);
+    var acs = String(p.Agent_Commission_Status || '').trim();
+    if (sh !== 0 && acs !== 'Settled') push('COMM_OUT', sh, false);
+  });
+  var list = Object.keys(parties).map(function (k) {
+    var pt = parties[k];
+    pt.items.sort(function (a, b) { return a.ts - b.ts; });
+    pt.totals = sumItems(pt.items.filter(function (i) { return !i.needsCheck; }));
+    pt.checkCount = pt.items.filter(function (i) { return i.needsCheck; }).length;
+    pt.checkAmount = r3(pt.items.filter(function (i) { return i.needsCheck; }).reduce(function (a, i) { return a + i.amount; }, 0));
+    return pt;
+  });
+  list.sort(function (a, b) { return Math.abs(b.totals.net) - Math.abs(a.totals.net) || a.name.localeCompare(b.name); });
+  return { parties: parties, list: list };
+}
+
+function sumItems(items) {
+  var t = { PREM_IN: 0, COMM_OUT: 0, net: 0, count: 0 };
+  items.forEach(function (i) { t[i.leg] += i.amount; t.net += LEG[i.leg].sign * i.amount; t.count++; });
+  t.PREM_IN = r3(t.PREM_IN); t.COMM_OUT = r3(t.COMM_OUT); t.net = r3(t.net);
+  return t;
+}
+
+// Groups selected items into one update payload per policy record.
+function buildUpdates(items) {
+  var byId = {}; var order = [];
+  items.forEach(function (i) {
+    if (!byId[i.id]) { byId[i.id] = {}; order.push(i.id); }
+    byId[i.id][LEG[i.leg].field] = LEG[i.leg].value;
+  });
+  return order.map(function (id) { return { id: id, data: byId[id] }; });
+}
+
+function directionFor(net) { return net > 0 ? 'Agent pays INSPT' : 'INSPT pays Agent'; }
+function whoText(name, net) {
+  if (net > 0) return name + ' pays INSPT';
+  if (net < 0) return 'INSPT pays ' + name;
+  return 'Nothing to pay — fully netted';
+}
+
+function buildNotes(party, t, items, userNote) {
+  var head = 'Party: ' + party.name + ' | Net settlement (Net Settlements screen) | ' + t.count + ' item(s)' +
+    ' | Premium pending ' + fmt(t.PREM_IN) + ' | Commission INSPT owes agent ' + fmt(t.COMM_OUT) + ' | NET ' + fmt(t.net) + ' = ' + whoText(party.name, t.net);
+  var lines = items.map(function (i) { return (i.ref || i.id) + ' ' + i.leg + ' ' + fmt(i.amount); });
+  return head + (userNote ? '\nNote: ' + userNote : '') + '\nItems: ' + lines.join('; ');
+}
+
+function settlementParty(s) {
+  var n = String(s.Party_Name || '').trim();
+  if (!n) n = lookupVal(s.Agent);
+  if (!n) { var m = /^Party: ([^|\n]+)/.exec(String(s.Notes || '')); if (m) n = m[1].trim(); }
+  return canonName(n);
+}
+
+// v17 (10-Nov-2026): items a past settlement listed that are STILL open (closing was interrupted).
+// Notes format written by buildNotes: "Items: <ref or id> <LEG> <amount>; ..."
+function parseSettledItems(s) {
+  var m = /\nItems: ([^\n]*)/.exec(String(s.Notes || '')); if (!m) return [];
+  return m[1].split('; ').map(function (x) {
+    var r = /^(.+) (PREM_IN|COMM_OUT) (-?[\d,]+\.\d{3})$/.exec(x.trim()); return r ? { key: r[1].trim(), leg: r[2] } : null;
+  }).filter(Boolean);
+}
+function unfinishedFor(p, settlements) {
+  var out = [];
+  (settlements || []).forEach(function (s) {
+    if (partyKey(settlementParty(s)) !== p.key) return;
+    parseSettledItems(s).forEach(function (x) {
+      p.items.forEach(function (i) {
+        if (i.leg === x.leg && (i.ref === x.key || i.id === x.key) && out.indexOf(i) < 0) { i.inSettlement = String(s.Settlement_Date || ''); out.push(i); }
+      });
+    });
+  });
+  return out;
+}
+/*CORE-END*/
+
+// ---------------- UI ----------------
+var state = { data: null, settlements: [], selectedKey: null, sel: {}, showAll: false };
+var booted = false;
+
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function $(id) { return document.getElementById(id); }
+function showError(msg) { $('loading').style.display = 'none'; $('errorBox').style.display = 'block'; $('errorBox').textContent = msg; }
+function showWarn(msg) { $('warnBox').style.display = msg ? 'block' : 'none'; $('warnBox').textContent = msg || ''; }
+var toastTimer;
+function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 6000); }
+
+async function fetchAll(report) {
+  var out = [], cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: report, max_records: 200 };
+    if (cursor) params.record_cursor = cursor;
+    var resp;
+    try { resp = await ZOHO.CREATOR.DATA.getRecords(params); }
+    catch (e) {
+      var es = JSON.stringify(e || {}) + String(e && e.message || '');
+      if (/9220|3100|no data/i.test(es)) break;          // empty report
+      throw e;
+    }
+    if (!resp || resp.code !== 3000 || !resp.data || !resp.data.length) break;
+    out = out.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return out;
+}
+
+async function loadData() {
+  var res = await Promise.all([
+    fetchAll('All_Policy_Entries'),
+    fetchAll('All_Agent_Settlements').catch(function () { return null; })
+  ]);
+  var pol = res[0];
+  if (pol.length && !('Premium_Paid_to_Insurer' in pol[0])) {
+    showWarn('');
+  } else showWarn('');
+  state.data = buildParties(pol);
+  state.settlements = res[1] || [];
+  $('refreshedAt').textContent = 'Refreshed ' + new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderKPIs() {
+  var oweUs = 0, weOwe = 0, items = 0, parties = 0;
+  state.data.list.forEach(function (p) {
+    if (p.totals.net > 0) oweUs += p.totals.net; else weOwe += -p.totals.net;
+    items += p.totals.count; if (p.totals.count) parties++;
+  });
+  var net = r3(oweUs - weOwe);
+  $('kOweUs').textContent = fmt(oweUs); $('kWeOwe').textContent = fmt(weOwe);
+  $('kNet').textContent = fmt(net); $('kNet').className = 'value ' + (net >= 0 ? 'pos' : 'neg');
+  $('kNetHint').textContent = net >= 0 ? 'Overall, agents owe INSPT' : 'Overall, INSPT owes agents';
+  $('kItems').textContent = items; $('kParties').textContent = parties + ' agents with open items';
+}
+
+function rolesHtml(p) {
+  return '';
+}
+
+function renderOverview() {
+  var rows = state.data.list.filter(function (p) { return state.showAll || p.totals.count || p.checkCount; });
+  if (!rows.length) { $('overviewBody').innerHTML = '<tr><td colspan="5" class="empty">Nothing open. Everyone is settled.</td></tr>'; return; }
+  $('overviewBody').innerHTML = rows.map(function (p) {
+    var t = p.totals; var cls = t.net > 0 ? 'pos' : (t.net < 0 ? 'neg' : '');
+    return '<tr class="click' + (p.key === state.selectedKey ? ' sel' : '') + '" data-key="' + esc(p.key) + '">' +
+      '<td><b>' + esc(p.name) + '</b>' + rolesHtml(p) +
+        (p.checkCount ? '<div class="muted">' + p.checkCount + ' partially paid premium(s) to check, ' + fmt(p.checkAmount) + ' not counted</div>' : '') + '</td>' +
+      '<td class="num">' + (t.PREM_IN ? fmt(t.PREM_IN) : '–') + '</td>' +
+      '<td class="num">' + (t.COMM_OUT ? fmt(t.COMM_OUT) : '–') + '</td>' +
+      '<td class="num net-cell ' + cls + '">' + fmt(Math.abs(t.net)) + '<div class="who ' + cls + '">' + esc(t.count ? whoText(p.name, t.net) : 'Nothing open') + '</div></td>' +
+      '<td><button class="btn ghost" type="button">Open</button></td></tr>';
+  }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('#overviewBody tr.click'), function (tr) {
+    tr.addEventListener('click', function () { openParty(tr.getAttribute('data-key')); });
+  });
+}
+
+function openParty(key) {
+  state.selectedKey = key; state.sel = {};
+  var p = state.data.parties[key];
+  if (p) { var stuck = unfinishedFor(p, state.settlements); p.items.forEach(function (i) { if (!i.needsCheck && stuck.indexOf(i) < 0) state.sel[i.uid] = true; }); }
+  renderOverview(); renderParty();
+  setTimeout(function () { $('partyCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
+}
+
+function selectedItems(p) { return p.items.filter(function (i) { return state.sel[i.uid]; }); }
+
+function legTable(p, leg) {
+  var items = p.items.filter(function (i) { return i.leg === leg; });
+  if (!items.length) return '';
+  var counted = items.filter(function (i) { return !i.needsCheck; });
+  var sub = r3(counted.reduce(function (a, i) { return a + i.amount; }, 0));
+  var allOn = items.every(function (i) { return state.sel[i.uid]; });
+  var hint = leg === 'PREM_IN' ? 'Premium Status = Pending: INSPT has not received the premium for customers ' + p.name + ' brought'
+           : 'Commission share INSPT owes ' + p.name + ' for the business they brought';
+  var rows = items.map(function (i) {
+    return '<tr><td class="chk"><input type="checkbox" class="ichk" data-uid="' + esc(i.uid) + '"' + (state.sel[i.uid] ? ' checked' : '') + '></td>' +
+      '<td>' + esc(i.date) + '</td>' +
+      '<td><b>' + esc(i.insured || '—') + '</b>' + (i.needsCheck ? '<span class="tag">CHECK</span>' : '') + (i.inSettlement ? '<span class="tag">IN SETTLEMENT ' + esc(i.inSettlement) + ' - NOT CLOSED</span>' : '') +
+        '<div class="muted">' + esc([i.policyNo, i.insurer, i.ref].filter(Boolean).join(' · ')) + '</div></td>' +
+      '<td class="num">' + fmt(i.premium) + '</td>' +
+      '<td class="num"><b>' + fmt(i.amount) + '</b></td></tr>';
+  }).join('');
+  return '<div class="leg"><div class="leg-head"><div><div class="t">' + LEG[leg].label + '</div><div class="s">' + esc(hint) + '</div></div>' +
+    '<div class="amt ' + (LEG[leg].sign > 0 ? 'pos' : 'neg') + '">' + fmt(sub) + ' · ' + counted.length + ' item(s)</div></div>' +
+    (leg === 'PREM_IN' && items.some(function (i) { return i.needsCheck; }) ?
+      '<div class="note" style="padding-top:0">Items marked CHECK are "Partially Paid": the system does not record how much is still unpaid, so they are not counted. Tick one only if the full premium is now being settled.</div>' : '') +
+    '<div class="table-wrap"><table><thead><tr><th class="chk"><input type="checkbox" class="lchk" data-leg="' + leg + '"' + (allOn ? ' checked' : '') + '></th>' +
+    '<th>Date</th><th>Customer / policy</th><th class="num">Premium</th><th class="num">Amount</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+}
+
+function historyHtml(p) {
+  var hs = state.settlements.filter(function (s) { return partyKey(settlementParty(s)) === p.key; })
+    .sort(function (a, b) { return parseDMY(b.Settlement_Date) - parseDMY(a.Settlement_Date); });
+  if (!hs.length) return '<div class="note">No settlements recorded yet for ' + esc(p.name) + '.</div>';
+  return '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Direction</th><th class="num">Net amount</th><th>Details</th></tr></thead><tbody>' +
+    hs.map(function (s) {
+      var notes = String(s.Notes || ''); var first = notes.split('\n')[0];
+      var userNote = (/\nNote: ([^\n]*)/.exec(notes) || [])[1] || '';
+      var short = first.replace(/^Party: [^|]*\|\s*/, '');
+      return '<tr><td>' + esc(s.Settlement_Date || '') + '</td><td>' + esc(String(s.Direction || '').replace('Agent', p.name)) + '</td>' +
+        '<td class="num"><b>' + fmt(num(s.Amount)) + '</b></td><td class="muted">' + esc(userNote ? userNote + ' — ' : '') + esc(short) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+function renderParty() {
+  var p = state.data.parties[state.selectedKey];
+  var card = $('partyCard');
+  if (!p) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  var body = LEG_ORDER.map(function (l) { return legTable(p, l); }).join('');
+  card.innerHTML =
+    '<div class="card-head"><div><h2>' + esc(p.name) + '</h2>' + rolesHtml(p) + '</div>' +
+    '<div class="tools"><button class="btn ghost" id="excelPartyBtn" type="button">Download statement</button><button class="btn ghost" id="closeParty" type="button">Close</button></div></div>' +
+    (function () { var st = unfinishedFor(p, state.settlements); return st.length ? '<div class="warnline" style="margin:12px 16px">' + st.length +
+      ' item(s) were already included in an earlier settlement but are still open (closing was interrupted). They are not ticked, so they cannot be settled twice. ' +
+      '<button class="btn go" id="finishBtn" type="button" style="margin-left:8px">Finish closing these ' + st.length + '</button></div>' : ''; })() +
+    (body || '<div class="empty">Nothing open for ' + esc(p.name) + '.</div>') +
+    (body ? '<div class="netbar" id="netbar"></div>' : '') +
+    '<div class="card-head" style="border-top:1px solid var(--border)"><h2>Past settlements</h2></div>' + historyHtml(p);
+  Array.prototype.forEach.call(card.querySelectorAll('.ichk'), function (c) {
+    c.addEventListener('change', function () { state.sel[c.getAttribute('data-uid')] = c.checked; renderNetbar(); syncLegChecks(); });
+  });
+  Array.prototype.forEach.call(card.querySelectorAll('.lchk'), function (c) {
+    c.addEventListener('change', function () {
+      var leg = c.getAttribute('data-leg');
+      p.items.forEach(function (i) { if (i.leg === leg) state.sel[i.uid] = c.checked; });
+      renderParty();
+    });
+  });
+  $('closeParty').addEventListener('click', function () { state.selectedKey = null; renderOverview(); renderParty(); });
+  $('excelPartyBtn').addEventListener('click', function () { exportParty(p); });
+  if ($('finishBtn')) $('finishBtn').addEventListener('click', async function () {
+    var st = unfinishedFor(p, state.settlements); var b = $('finishBtn'); b.disabled = true;
+    var failed = await runUpdates(buildUpdates(st), b);
+    if (failed.length) toast(failed.length + ' item(s) still could not be closed (' + String(failed[0].err) + '). Try again later.', true);
+    else toast(st.length + ' item(s) closed. No new settlement record was created.', false);
+    await refresh();
+  });
+  if (body) renderNetbar();
+}
+
+function syncLegChecks() {
+  var p = state.data.parties[state.selectedKey];
+  Array.prototype.forEach.call(document.querySelectorAll('.lchk'), function (c) {
+    var leg = c.getAttribute('data-leg');
+    c.checked = p.items.filter(function (i) { return i.leg === leg; }).every(function (i) { return state.sel[i.uid]; });
+  });
+}
+
+function renderNetbar() {
+  var p = state.data.parties[state.selectedKey];
+  var t = sumItems(selectedItems(p));
+  var cls = t.net > 0 ? 'pos' : (t.net < 0 ? 'neg' : '');
+  $('netbar').innerHTML =
+    '<div class="lines">Ticked: <b>' + t.count + '</b> item(s)<br>' +
+    'Premium pending <b>' + fmt(t.PREM_IN) + '</b> − Commission INSPT owes agent <b>' + fmt(t.COMM_OUT) + '</b></div>' +
+    '<div style="text-align:right"><div class="big ' + cls + '">' + fmt(Math.abs(t.net)) + ' OMR</div><div class="who ' + cls + '">' + esc(whoText(p.name, t.net)) + '</div>' +
+    '<button class="btn go" id="settleBtn" type="button" style="margin-top:8px"' + (t.count ? '' : ' disabled') + '>Record net settlement</button></div>';
+  $('settleBtn').addEventListener('click', function () { openConfirm(p); });
+}
+
+function todayISO() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+function openConfirm(p) {
+  var items = selectedItems(p); var t = sumItems(items);
+  var cls = t.net > 0 ? 'pos' : (t.net < 0 ? 'neg' : '');
+  $('modalBody').innerHTML =
+    '<h3>Record net settlement — ' + esc(p.name) + '</h3>' +
+    '<div class="row"><span>Items ticked</span><b>' + t.count + '</b></div>' +
+    '<div class="row"><span>Premium pending (agent owes INSPT)</span><b class="pos">' + fmt(t.PREM_IN) + '</b></div>' +
+    '<div class="row"><span>Commission INSPT owes agent</span><b class="neg">− ' + fmt(t.COMM_OUT) + '</b></div>' +
+    '<div class="result ' + cls + '">' + esc(whoText(p.name, t.net)) + (t.net ? ': ' + fmt(Math.abs(t.net)) + ' OMR' : '') + '</div>' +
+    '<label for="sDate">Settlement date</label><input type="date" id="sDate" value="' + todayISO() + '">' +
+    '<label for="sNote">Note (optional — e.g. cheque no., bank ref, who was told)</label><textarea id="sNote" maxlength="400"></textarea>' +
+    '<div class="warnline">This closes the ' + t.count + ' ticked item(s) and saves one settlement record. It does not send or collect money. ' +
+    (t.PREM_IN ? 'Ticked premiums will be marked "Paid to INSPT" and recorded in Zoho Books as premium collected. ' : '') + (t.COMM_OUT ? 'Ticked commission is marked Settled and cleared in Zoho Books.' : '') + '</div>' +
+    '<div class="actions"><button class="btn ghost" id="mCancel" type="button">Cancel</button><button class="btn go" id="mGo" type="button">Confirm settlement</button></div>';
+  $('modal').classList.add('show');
+  $('mCancel').onclick = closeModal;
+  $('mGo').onclick = function () { performSettle(p, items, t); };
+}
+function closeModal() { $('modal').classList.remove('show'); }
+
+async function performSettle(p, items, t) {
+  var go = $('mGo'); go.disabled = true; $('mCancel').disabled = true; go.textContent = 'Saving…';
+  var dv = $('sDate').value; var d = dv ? new Date(dv + 'T00:00:00') : new Date();
+  var userNote = String($('sNote').value || '').trim();
+  // 0) v17: re-read live data. If any ticked item was closed meanwhile (other tab / other user / old page), stop.
+  go.textContent = 'Checking latest data…';
+  try {
+    var fresh = buildParties(await fetchAll('All_Policy_Entries')).parties[p.key];
+    var openNow = {}; (fresh ? fresh.items : []).forEach(function (i) { openNow[i.uid] = i.amount; });
+    var gone = items.filter(function (i) { return !(i.uid in openNow) || openNow[i.uid] !== i.amount; });
+    if (gone.length) {
+      closeModal();
+      toast(gone.length + ' ticked item(s) changed or were already closed since this page loaded (e.g. ' + (gone[0].ref || gone[0].id) + '). Nothing was saved. The page has been refreshed: please check and tick again.', true);
+      await refresh(); return;
+    }
+  } catch (e) {
+    go.disabled = false; $('mCancel').disabled = false; go.textContent = 'Confirm settlement';
+    toast('Could not check the latest data (' + ((e && e.message) || 'error') + '). Nothing was saved.', true); return;
+  }
+  go.textContent = 'Saving…';
+  // 1) Settlement record first. If it fails, nothing else is touched.
+  var addResp;
+  try {
+    addResp = await ZOHO.CREATOR.DATA.addRecords({
+      app_name: APP_NAME, form_name: 'Agent_Settlements',
+      payload: { data: {
+        Party_Name: p.name, Settlement_Date: fmtDMY(d), Amount: Math.abs(t.net).toFixed(3),
+        Direction: directionFor(t.net), Notes: buildNotes(p, t, items, userNote)
+      } }
+    });
+  } catch (e) { addResp = { code: 'ERR', message: (e && e.message) || JSON.stringify(e) }; }
+  if (!addResp || addResp.code !== 3000) {
+    go.disabled = false; $('mCancel').disabled = false; go.textContent = 'Confirm settlement';
+    toast('Could not save the settlement record (' + ((addResp && (addResp.message || addResp.code)) || 'unknown error') + '). Nothing was changed.', true);
+    return;
+  }
+  // 2) Close the ticked items, one update per policy.
+  var failed = await runUpdates(buildUpdates(items), go);
+  closeModal();
+  if (!failed.length) toast('Settlement saved. ' + items.length + ' item(s) closed for ' + p.name + '.', false);
+  else showRetry(p, failed);
+  await refresh();
+}
+
+async function runUpdates(updates, btn) {
+  var failed = [];
+  for (var i = 0; i < updates.length; i++) {
+    if (btn) btn.textContent = 'Closing items ' + (i + 1) + ' / ' + updates.length + '…';
+    var u = updates[i], resp;
+    try {
+      resp = await ZOHO.CREATOR.DATA.updateRecordById({ app_name: APP_NAME, report_name: 'All_Policy_Entries', id: String(u.id), payload: { data: u.data } });
+    } catch (e) { resp = { code: 'ERR', message: (e && e.message) || JSON.stringify(e) }; }
+    if (!resp || (resp.code !== 3000 && resp.code !== 0)) failed.push({ u: u, err: (resp && (resp.message || resp.code)) || 'unknown' });
+  }
+  return failed;
+}
+
+function showRetry(p, failed) {
+  $('modalBody').innerHTML = '<h3>Settlement saved, but ' + failed.length + ' item(s) did not close</h3>' +
+    '<div class="warnline">The settlement record is saved. These policies could not be updated (first error: ' + esc(String(failed[0].err)) + '). ' +
+    'Press Retry to close only these — it will not create a second settlement record.</div>' +
+    '<div class="actions"><button class="btn ghost" id="mCancel" type="button">Close</button><button class="btn go" id="mGo" type="button">Retry</button></div>';
+  $('modal').classList.add('show');
+  $('mCancel').onclick = closeModal;
+  $('mGo').onclick = async function () {
+    $('mGo').disabled = true;
+    var again = await runUpdates(failed.map(function (f) { return f.u; }), $('mGo'));
+    closeModal();
+    if (again.length) showRetry(p, again); else toast('All remaining items closed.', false);
+    await refresh();
+  };
+}
+
+// ---------- Excel ----------
+function exportAll() {
+  var wb = XLSX.utils.book_new();
+  var ov = [['Agent', 'Premium pending (agent owes INSPT)', 'Commission INSPT owes agent', 'Net', 'Who pays', 'Open items', 'Partially paid premium to check (not counted)']];
+  state.data.list.filter(function (p) { return p.totals.count || p.checkCount; }).forEach(function (p) {
+    ov.push([p.name, p.totals.PREM_IN, p.totals.COMM_OUT, Math.abs(p.totals.net), whoText(p.name, p.totals.net), p.totals.count, p.checkAmount]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ov), 'Who owes whom');
+  var it = [['Party', 'Type', 'Date', 'Customer', 'Policy No', 'Insurer', 'Reference', 'Premium', 'Amount', 'Counted in net']];
+  state.data.list.forEach(function (p) { p.items.forEach(function (i) {
+    it.push([p.name, LEG[i.leg].label, i.date, i.insured, i.policyNo, i.insurer, i.ref, i.premium, i.amount, i.needsCheck ? 'No - partially paid, check' : 'Yes']);
+  }); });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(it), 'All open items');
+  XLSX.writeFile(wb, 'INSPT_Agent_SOA_' + fmtDMY(new Date()) + '.xlsx');
+}
+function exportParty(p) {
+  var wb = XLSX.utils.book_new(); var t = p.totals;
+  var rows = [[p.name + ' — statement of open items'], ['Generated', fmtDMY(new Date())], [],
+    ['Type', 'Date', 'Customer', 'Policy No', 'Insurer', 'Reference', 'Premium', 'Amount', 'Counted in net']];
+  p.items.forEach(function (i) { rows.push([LEG[i.leg].label, i.date, i.insured, i.policyNo, i.insurer, i.ref, i.premium, i.amount, i.needsCheck ? 'No - partially paid, check' : 'Yes']); });
+  rows.push([], ['Premium pending (agent owes INSPT)', t.PREM_IN], ['Commission INSPT owes agent', t.COMM_OUT], ['NET', Math.abs(t.net), whoText(p.name, t.net)]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Statement');
+  XLSX.writeFile(wb, 'INSPT_' + p.name.replace(/[^A-Za-z0-9]+/g, '_') + '_' + fmtDMY(new Date()) + '.xlsx');
+}
+
+// ---------- Boot ----------
+function renderAll() { renderKPIs(); renderOverview(); renderParty(); }
+async function refresh() {
+  try { var keepSel = state.selectedKey; await loadData(); state.selectedKey = keepSel; if (keepSel) openParty(keepSel); else renderAll(); renderKPIs(); }
+  catch (e) { toast('Refresh failed: ' + ((e && e.message) || JSON.stringify(e)), true); }
+}
+async function boot() {
+  booted = true;
+  try {
+    await loadData();
+    $('loading').style.display = 'none'; $('app').style.display = 'block';
+    $('showAll').addEventListener('change', function () { state.showAll = this.checked; renderOverview(); });
+    $('excelAllBtn').addEventListener('click', exportAll);
+    $('refreshBtn').addEventListener('click', refresh);
+    renderAll();
+  } catch (e) { showError('Failed to load data: ' + ((e && e.message) || JSON.stringify(e))); }
+}
+setTimeout(function () { if (!booted) showError('Widget timed out. Not embedded in Creator?'); }, 15000);
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) SigmaSDK.CREATOR.init(function () { if (!booted) boot(); });
+  else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) boot();
+  else showError('Zoho Creator SDK not found.');
+} catch (e) { showError('SDK error: ' + e.message); }
+</script>
+</body>
+</html>

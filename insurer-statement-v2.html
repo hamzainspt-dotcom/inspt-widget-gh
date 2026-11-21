@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Insurer statement · INSPT</title>
+<!-- INSPT-INSURER-STATEMENT-v2-2026-11-21 | Look only. Script block byte-identical to v1. -->
+<link rel="stylesheet" href="inspt-widget-v1.css">
+<style>
+  main{padding-top:var(--s5)}
+  .when{text-align:right;font-size:var(--meta);color:var(--muted);line-height:1.5;white-space:nowrap}
+  .kpis{grid-template-columns:repeat(3,1fr);margin-bottom:30px}
+  .box{display:none}
+  .loading{text-align:center;color:var(--muted);padding:70px 20px;font-size:var(--label)}
+  .spin{width:24px;height:24px;border:2px solid var(--rule);border-top-color:var(--sea);
+        border-radius:50%;margin:0 auto 14px;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  table{font-size:var(--label)}
+  thead th{text-align:right;background:transparent;font-weight:500;color:var(--muted);
+           font-size:var(--meta);padding:9px 14px;border-bottom:var(--hairline);white-space:nowrap}
+  thead th.l{text-align:left}
+  thead tr.grouphead th{padding:0 14px 5px;border-bottom:0}
+  thead th.grp{text-align:center;font-weight:600;letter-spacing:-.01em}
+  thead th.grp-comm{color:var(--petrol);border-bottom:2px solid var(--petrol)}
+  thead th.grp-prem{color:var(--sea);border-bottom:2px solid var(--sea)}
+  tbody td{text-align:right;padding:10px 14px;font-variant-numeric:var(--numerals);white-space:nowrap}
+  tbody td.l{text-align:left;font-weight:560;white-space:normal}
+  tbody td.out{font-weight:650}
+  tbody td.muted0{color:#b9ac9e;font-weight:400}
+  tfoot td{text-align:right;padding:12px 14px;font-weight:650;border-top:2px solid var(--sea);
+           border-bottom:0;font-variant-numeric:var(--numerals);background:var(--mist);white-space:nowrap}
+  tfoot td.l{text-align:left}
+  tfoot td.out{font-weight:760}
+  @media(max-width:900px){.kpis{grid-template-columns:1fr}
+    .kpi+.kpi:before{display:none}.kpi+.kpi{border-top:1px solid var(--rule-light)}}
+</style>
+</head>
+<body>
+  <main>
+  <div id="loading" class="loading"><div class="spin"></div>Loading insurer statement…</div>
+  <div id="errorBox" class="box notice bad"></div>
+
+  <div id="app" style="display:none">
+    <header class="title-row">
+      <div>
+        <h1>Insurer statement</h1>
+        <p class="subtitle">Per insurer · commission owed to INSPT and premium owed to insurers</p>
+      </div>
+      <div class="when"><div id="todayLbl"></div><div id="refreshedAt"></div></div>
+    </header>
+
+    <div id="warnBox" class="box notice"></div>
+
+    <div class="kpis">
+      <div class="kpi lead">
+        <div class="k-label">Commission outstanding</div>
+        <div class="k-value" id="sumCommOut">—</div>
+        <div class="k-note" id="sumCommOutHint">insurers still owe INSPT</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Net commission retained</div>
+        <div class="k-value" id="sumNet">—</div>
+        <div class="k-note">after agent share, on accrued commission</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Premium outstanding</div>
+        <div class="k-value" id="sumPremOut">—</div>
+        <div class="k-note" id="sumPremOutHint">INSPT still owes insurers</div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2>By insurer</h2>
+      <p class="section-sub" id="tableSub">All policy records · sorted by commission receivable</p>
+    </div>
+
+    <div class="tscroll">
+      <table>
+        <thead>
+          <tr class="grouphead">
+            <th class="l"></th>
+            <th></th>
+            <th colspan="3" class="grp grp-comm">Commission (insurer → INSPT)</th>
+            <th colspan="3" class="grp grp-prem">Premium (INSPT → insurer)</th>
+          </tr>
+          <tr>
+            <th class="l">Insurer</th>
+            <th>Policies</th>
+            <th>Accrued</th>
+            <th>Received</th>
+            <th>Outstanding</th>
+            <th>Held</th>
+            <th>Remitted</th>
+            <th>Outstanding</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+
+    <div class="footnote" id="footNote"></div>
+  </div>
+  </main>
+
+<script>
+/* =====================================================================
+   Insurer Statement Widget v1 — INSPT
+   Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   ===================================================================== */
+
+/*CORE-START*/
+function lookupVal(field) {
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
+  }
+  return String(field).trim();
+}
+
+function num(v) {
+  var n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtOMR(v) {
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  var parts = abs.toFixed(3).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + parts[0] + '.' + parts[1] + ' OMR';
+}
+
+// Build per-insurer statement from policy records.
+// Tracks, per insurer, the GROSS accrued balances AND the portions already
+// settled in cash, so it can show TRUE OUTSTANDING = accrued − settled.
+//   commRecv   gross commission accrued (Commission>0, not Cancelled) — matches the
+//              commission-recognition journals (Dr Comm Receivable / Cr Comm Income).
+//   commRecd   gross commission already RECEIVED from the insurer — the same recognizable
+//              set where Commission_Received_from_Insurer == 'Received' (matches the
+//              commission-receipt journals Dr Bank / Cr Comm Receivable).
+//   commOut    = commRecv − commRecd  (what the insurer still owes INSPT).
+//   premPay    premium INSPT holds on 'Paid to INSPT' policies (Dr Bank / Cr Premium Payable).
+//   premRemit  premium already REMITTED to the insurer — 'Paid to INSPT' policies where
+//              Premium_Paid_to_Insurer == 'Paid' (matches the remit journals
+//              Dr Premium Payable / Cr Bank).
+//   premOut    = premPay − premRemit  (what INSPT still owes the insurer).
+//   netComm    INSPT-retained commission (after agent share) on the recognizable set.
+function buildInsurerStatement(policies) {
+  var map = {};
+  function row(name) {
+    if (!map[name]) map[name] = { name: name, policies: 0,
+      commRecv: 0, commRecd: 0, commOut: 0, netComm: 0,
+      premPay: 0, premRemit: 0, premOut: 0 };
+    return map[name];
+  }
+
+  (policies || []).forEach(function (p) {
+    var insurer = lookupVal(p.Insurers);
+    if (!insurer) return;
+    var premStatus = String(p.Dropdown1 || '').trim();
+    var cancelled = premStatus === 'Cancelled';
+    var commission = num(p.Commission);
+    var netComm = num(p.Net_Commission);
+    var premium = num(p.Premium);
+    var commReceived = String(p.Commission_Received_from_Insurer || '').trim() === 'Received';
+    var premRemitted = String(p.Premium_Paid_to_Insurer || '').trim() === 'Paid';
+
+    var r = row(insurer);
+    // Commission side — recognizable set (Commission>0 AND not Cancelled).
+    if (!cancelled && commission > 0) {
+      r.commRecv += commission;
+      r.netComm += netComm;
+      r.policies += 1;
+      if (commReceived) r.commRecd += commission;   // insurer has paid this commission
+    }
+    // Premium side — premium INSPT holds for 'Paid to INSPT' policies.
+    if (premStatus === 'Paid to INSPT') {
+      r.premPay += premium;
+      if (premRemitted) r.premRemit += premium;      // INSPT has remitted this premium
+    }
+  });
+
+  var rows = Object.keys(map).map(function (n) {
+    var r = map[n];
+    r.commOut = r.commRecv - r.commRecd;
+    r.premOut = r.premPay - r.premRemit;
+    return r;
+  }).sort(function (a, b) { return b.commOut - a.commOut; });
+
+  var totals = { policies: 0, commRecv: 0, commRecd: 0, commOut: 0,
+    netComm: 0, premPay: 0, premRemit: 0, premOut: 0 };
+  rows.forEach(function (r) {
+    totals.policies += r.policies;
+    totals.commRecv += r.commRecv; totals.commRecd += r.commRecd; totals.commOut += r.commOut;
+    totals.netComm += r.netComm;
+    totals.premPay += r.premPay; totals.premRemit += r.premRemit; totals.premOut += r.premOut;
+  });
+
+  return { rows: rows, totals: totals };
+}
+/*CORE-END*/
+
+// ---------------- DOM / SDK layer ----------------
+
+var APP_NAME = 'inspt-policy-accounting-system';
+var booted = false;
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  var el = document.getElementById('errorBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function showWarn(msg) {
+  var el = document.getElementById('warnBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function cell(v, extra) {
+  var cls = (v === 0 ? 'muted0' : '') + (extra ? (v === 0 ? ' ' : '') + extra : '');
+  var attr = cls ? ' class="' + cls + '"' : '';
+  return '<td' + attr + '>' + (v === 0 ? '—' : fmtOMR(v)) + '</td>';
+}
+
+async function fetchAllPages(reportName) {
+  var all = [];
+  var cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: reportName, max_records: 200 };
+    if (cursor) params.record_cursor = cursor;
+    var resp = await ZOHO.CREATOR.DATA.getRecords(params);
+    if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) break;
+    all = all.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return all;
+}
+
+function render(stmt) {
+  var t = stmt.totals;
+  document.getElementById('sumCommOut').textContent = fmtOMR(t.commOut);
+  document.getElementById('sumCommOutHint').textContent =
+    'insurers still owe INSPT · ' + fmtOMR(t.commRecd) + ' received of ' + fmtOMR(t.commRecv);
+  document.getElementById('sumNet').textContent = fmtOMR(t.netComm);
+  document.getElementById('sumPremOut').textContent = fmtOMR(t.premOut);
+  document.getElementById('sumPremOutHint').textContent =
+    'INSPT still owes insurers · ' + fmtOMR(t.premRemit) + ' remitted of ' + fmtOMR(t.premPay);
+
+  var tb = document.getElementById('rows');
+  if (!stmt.rows.length) {
+    tb.innerHTML = '<tr><td class="l" colspan="8" style="text-align:center;color:#c4b8ae;padding:30px">No insurer data found.</td></tr>';
+  } else {
+    tb.innerHTML = stmt.rows.map(function (r) {
+      return '<tr>' +
+        '<td class="l" title="' + esc(r.name) + '">' + esc(r.name) + '</td>' +
+        '<td>' + r.policies + '</td>' +
+        cell(r.commRecv) + cell(r.commRecd) + cell(r.commOut, 'out') +
+        cell(r.premPay) + cell(r.premRemit) + cell(r.premOut, 'out') +
+        '</tr>';
+    }).join('');
+  }
+
+  document.getElementById('foot').innerHTML =
+    '<tr><td class="l">Total · ' + stmt.rows.length + ' insurers</td>' +
+    '<td>' + t.policies + '</td>' +
+    '<td>' + fmtOMR(t.commRecv) + '</td>' +
+    '<td>' + fmtOMR(t.commRecd) + '</td>' +
+    '<td class="out">' + fmtOMR(t.commOut) + '</td>' +
+    '<td>' + fmtOMR(t.premPay) + '</td>' +
+    '<td>' + fmtOMR(t.premRemit) + '</td>' +
+    '<td class="out">' + fmtOMR(t.premOut) + '</td></tr>';
+}
+
+async function boot() {
+  booted = true;
+  try {
+    var policies = await fetchAllPages('All_Policy_Entries');
+    var stmt = buildInsurerStatement(policies);
+
+    var nowD = new Date();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+    document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('tableSub').textContent =
+      stmt.totals.policies + ' of ' + policies.length + ' records shown · commission-recognizable (named insurer, not cancelled, commission > 0) · sorted by commission outstanding';
+    document.getElementById('footNote').innerHTML =
+      '<b>Commission</b> — Accrued = gross commission on recognizable policies (Commission &gt; 0, not Cancelled). ' +
+      'Received = those policies marked “Commission Received from Insurer = Received”. Outstanding = Accrued − Received (what insurers still owe INSPT). ' +
+      '<b>Premium</b> — Held = premium on “Paid to INSPT” policies. Remitted = those marked “Premium Paid to Insurer = Paid”. ' +
+      'Outstanding = Held − Remitted (what INSPT still owes insurers). ' +
+      'Each column mirrors a Books journal: commission recognition &amp; receipt, premium pass-through &amp; remittance. ' +
+      'Figures are per-policy accruals; bulk insurer settlements not yet modelled.';
+
+    render(stmt);
+  } catch (e) {
+    showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+// ---------- Boot pattern (SDK v2 — do not change) ----------
+setTimeout(function () {
+  if (!booted) showError('Widget timed out. Not embedded in Creator?');
+}, 15000);
+
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
+    SigmaSDK.CREATOR.init(function () { if (!booted) boot(); });
+  } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
+    boot();
+  } else {
+    showError('Zoho Creator SDK not found.');
+  }
+} catch (e) {
+  showError('SDK error: ' + e.message);
+}
+</script>
+</body>
+</html>
