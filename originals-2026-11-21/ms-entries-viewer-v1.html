@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MS Entries Viewer · INSPT</title>
+<!-- INSPT-MS-VIEWER-v1-2026-11-10 | S1.10 | Read-only replacement of OI-78. -->
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" async></script>
+<style>
+:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172b3a;background:#fff;font-size:14px;--line:#dce3e9;--muted:#526777;--blue:#164f79}
+*{box-sizing:border-box}body{margin:0;padding:24px;background:#fff}button,input,select{font:inherit}button,summary{cursor:pointer}button,input,select{border:1px solid #b9c8d3;border-radius:6px;background:#fff;color:inherit;padding:8px 10px;min-height:36px}button:hover{background:#edf4f9}button:disabled{opacity:.48;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #4b9bd3;outline-offset:2px}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.primary:hover{background:#21658f}
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:20px;border-bottom:1px solid var(--line)}h1{margin:3px 0 6px;font-size:26px;letter-spacing:-.6px}p{margin:6px 0;line-height:1.5}.eyebrow{color:var(--blue);font-size:11px;font-weight:750;letter-spacing:1.6px}.muted{color:var(--muted);font-size:12px}.pill{border:1px solid #c1ded0;background:#f1faf5;border-radius:20px;padding:6px 10px;color:#246347;font-size:12px;white-space:nowrap}.load-panel{padding:16px 0 12px;display:flex;gap:16px;align-items:center}.load-panel>div{flex:1}.load-panel p{margin:0 0 5px}progress{height:6px;width:100%;accent-color:var(--blue);display:block}.banner{padding:12px 14px;border-radius:6px;margin:10px 0;line-height:1.5;overflow-wrap:anywhere}.error{border:1px solid #d59191;background:#fff3f3;color:#8a2020}.warning{border:1px solid #d9c27f;background:#fffbed;color:#665217}[hidden]{display:none!important}
+.totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0 20px}.metric{border:1px solid var(--line);border-radius:8px;padding:15px 16px;background:#f8fafc}.metric small{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}.metric strong{font-size:22px;font-variant-numeric:tabular-nums}.metric em{font-size:11px;font-style:normal;color:var(--muted);margin-left:6px}.controls{border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}.searchbar{display:flex;align-items:end;gap:10px;margin-bottom:12px}.searchbar label{flex:1}.searchbar input{width:100%}label.control{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}.filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.control input,.control select{width:100%;min-width:0;color:#172b3a}.viewbar{display:flex;flex-wrap:wrap;align-items:end;gap:10px;border-top:1px solid var(--line);margin-top:16px;padding-top:14px}.viewbar .control{min-width:130px;max-width:260px}.viewbar input{max-width:180px}.exports{margin-left:auto;display:flex;gap:8px}details{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}summary{color:var(--blue);font-size:13px;font-weight:600}.columns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;padding-top:14px;max-height:240px;overflow:auto}.columns label{display:flex;align-items:center;gap:7px;font-size:12px;overflow-wrap:anywhere}.columns input{min-height:0}.column-actions{display:flex;gap:8px;margin-top:10px}.column-actions button{font-size:12px}.table-top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin:18px 0 10px}.table-top strong{font-size:14px}.table-wrap{border:1px solid var(--line);border-radius:7px;overflow:auto;max-height:65vh}table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px}th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}thead th{position:sticky;top:0;background:#f0f4f7;z-index:2;color:#354f61;font-weight:600}th button{border:0;padding:0;background:transparent;min-height:26px;font-size:12px}th button:hover{background:transparent;text-decoration:underline}td.number{text-align:right;font-variant-numeric:tabular-nums}tbody tr.record{cursor:pointer}tbody tr.record:hover,tbody tr.record:focus{background:#edf5fb}td.name{max-width:250px;white-space:normal;min-width:180px}.group td{background:#edf3f7;color:#164f79;font-weight:700;white-space:normal}.subtotal td{background:#f7f9fb;font-size:12px;white-space:normal}.group-metrics{display:flex;flex-wrap:wrap;gap:8px 24px}.group-metrics span{font-weight:400}tfoot td{background:#eaf2f8;font-weight:700;position:sticky;bottom:0;z-index:1;white-space:normal}.pager{display:flex;justify-content:center;align-items:center;gap:12px;margin:14px 0}.footnote{border-top:1px solid var(--line);padding:12px 0;font-size:12px;color:var(--muted)}dialog{border:1px solid #c6d4df;border-radius:12px;max-width:860px;width:90vw;max-height:88vh;padding:0;color:#172b3a;box-shadow:0 20px 80px #172b3a40}dialog::backdrop{background:#122b3f66}.dialog-head{position:sticky;top:0;background:white;display:flex;gap:14px;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line)}h2{font-size:18px;margin:0}.detail-content{padding:16px 22px}dl{margin:0;display:grid;grid-template-columns:230px minmax(0,1fr)}dt,dd{margin:0;border-bottom:1px solid var(--line);padding:10px 0;overflow-wrap:anywhere}dt{padding-right:20px;font-size:12px;color:var(--muted)}dd pre{font:12px/1.6 ui-monospace,monospace;white-space:pre-wrap;margin:0}#message{min-height:18px;margin-top:8px}.empty{padding:34px;text-align:center;color:var(--muted)}
+@media(max-width:1050px){body{padding:16px}.filters{grid-template-columns:repeat(4,minmax(0,1fr))}.viewbar .control{min-width:120px}.metric strong{font-size:19px}.columns{grid-template-columns:repeat(3,minmax(0,1fr))}.exports{margin-left:0}}@media(max-width:750px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.totals{grid-template-columns:repeat(2,minmax(0,1fr))}header{align-items:start}.columns{grid-template-columns:repeat(2,minmax(0,1fr))}dl{grid-template-columns:1fr}dt{border:0;padding-bottom:0}dd{padding-top:4px}}
+</style>
+</head>
+<body>
+<span hidden id="build-marker">INSPT-MS-VIEWER-v1-2026-11-10</span>
+<header><div><div class="eyebrow">INSURANCE SPOT · MS WORKSPACE</div><h1>Policy entries</h1><p class="muted">Search, compare and export your policy book. Open any row for the full record.</p></div><span class="pill">Read-only · view &amp; export</span></header>
+<div class="load-panel"><div><p id="loadStatus" role="status" aria-live="polite">Connecting to Creator…</p><progress id="loadProgress" aria-label="Loading policy entries"></progress><p id="loadNote" class="muted">The first page will appear as soon as it arrives.</p></div><button id="reload" disabled>Reload data</button></div>
+<div id="error" class="banner error" role="alert" hidden></div><div id="dataWarning" class="banner warning" role="status" hidden></div>
+<div class="totals" id="metrics" aria-label="Totals for current filtered view"></div>
+<section class="controls" aria-label="Search, filters and saved views">
+<div class="searchbar"><label class="control" for="search">Search every field<input id="search" type="search" placeholder="Name, policy, agent, reference, notes…" autocomplete="off"></label><button id="reset">Reset filters</button></div>
+<div id="filters" class="filters"></div>
+<div class="viewbar"><label class="control">Group by<select id="group"><option value="none">No grouping</option><option value="insurer">Insurer</option><option value="agent">Agent</option><option value="month">Invoice month</option></select></label><label class="control">Sort column<select id="sortKey"></select></label><label class="control">Direction<select id="sortDir"><option value="asc">Ascending</option><option value="desc" selected>Descending</option></select></label><div class="exports"><button id="csv" disabled>Export CSV</button><button id="xlsx" class="primary" disabled>Export Excel</button></div></div>
+<div class="viewbar"><label class="control">Saved view<select id="saved"><option value="">Choose a view…</option></select></label><button id="applyView">Apply view</button><label class="control">View name<input id="viewName" maxlength="80" placeholder="e.g. Pending premium"></label><button id="saveView">Save view</button><button id="deleteView">Delete view</button></div>
+<div id="message" class="muted" role="status"></div>
+<details><summary id="columnSummary">Choose visible columns</summary><div class="column-actions"><button id="defaultColumns">Default columns</button><button id="allColumns">All returned columns</button></div><div id="columns" class="columns"></div></details>
+</section>
+<div class="table-top"><strong id="resultStatus" role="status">Waiting for policy entries…</strong><span class="muted">Click a column to sort · click a row for details</span></div>
+<div class="table-wrap" id="tableWrap"><table aria-label="Policy entries"><thead id="head"></thead><tbody id="rows"></tbody><tfoot id="totalsFoot"></tfoot></table></div>
+<div class="pager"><button id="previous" disabled>← Previous</button><span id="pageStatus" class="muted">Page 1 of 1</span><button id="next" disabled>Next →</button></div>
+<p class="footnote">Amounts are OMR, shown to 3 decimals. Totals cover the whole filtered view. Group subtotals include all matching rows in that group, across table pages. Exports include all matching rows in the displayed order and visible columns. Payment labels are recorded statuses; they do not prove a cash movement.</p>
+<dialog id="detail" aria-labelledby="detailTitle"><div class="dialog-head"><h2 id="detailTitle">Policy entry details</h2><button id="closeDetail">Close details</button></div><div class="detail-content"><p class="muted">Every field returned by Creator, including original nested values. No record can be edited here.</p><dl id="detailFields"></dl></div></dialog>
+<script id="viewer-code">
+'use strict';
+/* PURE-START — functions extracted directly by offline Node tests. */
+const SOURCE_COLUMNS = [
+  {
+    "key": "Reference_Number",
+    "label": "Reference Number",
+    "type": "text",
+    "reportLine": 96,
+    "formLine": 15,
+    "formType": "text"
+  },
+  {
+    "key": "Invoice_Date",
+    "label": "Invoice Date",
+    "type": "date",
+    "reportLine": 97,
+    "formLine": 61,
+    "formType": "date"
+  },
+  {
+    "key": "Policy_Status",
+    "label": "Policy Status",
+    "type": "text",
+    "reportLine": 98,
+    "formLine": 23,
+    "formType": "picklist"
+  },
+  {
+    "key": "Created_By_Email",
+    "label": "Created By Email",
+    "type": "text",
+    "reportLine": 99,
+    "formLine": 34,
+    "formType": "email"
+  },
+  {
+    "key": "Created_By_Name",
+    "label": "Created By Name",
+    "type": "text",
+    "reportLine": 100,
+    "formLine": 44,
+    "formType": "text"
+  },
+  {
+    "key": "Insured_Name",
+    "label": "Insured Name",
+    "type": "text",
+    "reportLine": 101,
+    "formLine": 88,
+    "formType": "text"
+  },
+  {
+    "key": "Contact_Number",
+    "label": "Contact Number",
+    "type": "text",
+    "reportLine": 102,
+    "formLine": 70,
+    "formType": "text"
+  },
+  {
+    "key": "License_CR_Number",
+    "label": "License / CR Number",
+    "type": "text",
+    "reportLine": 103,
+    "formLine": 96,
+    "formType": "text"
+  },
+  {
+    "key": "Email",
+    "label": "Email",
+    "type": "text",
+    "reportLine": 104,
+    "formLine": 79,
+    "formType": "email"
+  },
+  {
+    "key": "Insurance_Types",
+    "label": "Insurance Type",
+    "type": "text",
+    "reportLine": 105,
+    "formLine": 113,
+    "formType": "picklist"
+  },
+  {
+    "key": "Interest_Insured1",
+    "label": "Interest Insured",
+    "type": "text",
+    "reportLine": 106,
+    "formLine": 226,
+    "formType": "text"
+  },
+  {
+    "key": "Vehicle_Brands",
+    "label": "Vehicle Make",
+    "type": "text",
+    "reportLine": 107,
+    "formLine": 243,
+    "formType": "picklist"
+  },
+  {
+    "key": "Vehicle_Models",
+    "label": "Vehicle Model",
+    "type": "text",
+    "reportLine": 108,
+    "formLine": 272,
+    "formType": "picklist"
+  },
+  {
+    "key": "Registration_Number",
+    "label": "Registration Number",
+    "type": "text",
+    "reportLine": 109,
+    "formLine": 254,
+    "formType": "text"
+  },
+  {
+    "key": "Chassis_Number",
+    "label": "Chassis Number",
+    "type": "text",
+    "reportLine": 110,
+    "formLine": 283,
+    "formType": "text"
+  },
+  {
+    "key": "Sum_Insured",
+    "label": "Sum Insured",
+    "type": "number",
+    "reportLine": 111,
+    "formLine": 262,
+    "formType": "OMR"
+  },
+  {
+    "key": "Insurers",
+    "label": "Insurer",
+    "type": "text",
+    "reportLine": 112,
+    "formLine": 187,
+    "formType": "picklist"
+  },
+  {
+    "key": "Insurer_Agents",
+    "label": "Placement Agency",
+    "type": "text",
+    "reportLine": 113,
+    "formLine": 198,
+    "formType": "picklist"
+  },
+  {
+    "key": "Policy_Number",
+    "label": "Policy Number",
+    "type": "text",
+    "reportLine": 114,
+    "formLine": 123,
+    "formType": "text"
+  },
+  {
+    "key": "Endorsement_Number",
+    "label": "Endorsement Number",
+    "type": "text",
+    "reportLine": 115,
+    "formLine": 209,
+    "formType": "text"
+  },
+  {
+    "key": "Period_From",
+    "label": "Period From",
+    "type": "date",
+    "reportLine": 116,
+    "formLine": 147,
+    "formType": "date"
+  },
+  {
+    "key": "Period_To",
+    "label": "Period To",
+    "type": "date",
+    "reportLine": 117,
+    "formLine": 217,
+    "formType": "date"
+  },
+  {
+    "key": "Insurer_Invoice_Number",
+    "label": "Insurer Invoice Number",
+    "type": "text",
+    "reportLine": 118,
+    "formLine": 340,
+    "formType": "text"
+  },
+  {
+    "key": "Premium",
+    "label": "Premium",
+    "type": "number",
+    "reportLine": 119,
+    "formLine": 300,
+    "formType": "OMR"
+  },
+  {
+    "key": "Net_Commission_Legacy",
+    "label": "Net Commission (Legacy)",
+    "type": "number",
+    "reportLine": 120,
+    "formLine": 624,
+    "formType": "OMR"
+  },
+  {
+    "key": "Currency",
+    "label": "Discount",
+    "type": "number",
+    "reportLine": 121,
+    "formLine": 393,
+    "formType": "OMR"
+  },
+  {
+    "key": "Commission_Shared",
+    "label": "Commission Shared",
+    "type": "number",
+    "reportLine": 122,
+    "formLine": 308,
+    "formType": "OMR"
+  },
+  {
+    "key": "Commission",
+    "label": "Commission",
+    "type": "number",
+    "reportLine": 123,
+    "formLine": 385,
+    "formType": "OMR"
+  },
+  {
+    "key": "Sources_of_Business",
+    "label": "Sources of Business",
+    "type": "text",
+    "reportLine": 124,
+    "formLine": 156,
+    "formType": "picklist"
+  },
+  {
+    "key": "Payment_Modes",
+    "label": "Payment Modes",
+    "type": "text",
+    "reportLine": 125,
+    "formLine": 428,
+    "formType": "picklist"
+  },
+  {
+    "key": "Dropdown1",
+    "label": "Premium Status",
+    "type": "text",
+    "reportLine": 126,
+    "formLine": 417,
+    "formType": "picklist"
+  },
+  {
+    "key": "Payment_Reference_Number",
+    "label": "Payment Reference Number",
+    "type": "text",
+    "reportLine": 127,
+    "formLine": 332,
+    "formType": "text"
+  },
+  {
+    "key": "Commission_Claimed",
+    "label": "Commission Claimed",
+    "type": "text",
+    "reportLine": 128,
+    "formLine": 348,
+    "formType": "picklist"
+  },
+  {
+    "key": "Notes",
+    "label": "Notes",
+    "type": "text",
+    "reportLine": 129,
+    "formLine": 377,
+    "formType": "textarea"
+  },
+  {
+    "key": "Approved_By",
+    "label": "Receipt Approved By",
+    "type": "text",
+    "reportLine": 130,
+    "formLine": 595,
+    "formType": "email"
+  },
+  {
+    "key": "Approved_At",
+    "label": "Receipt Approved At",
+    "type": "date",
+    "reportLine": 131,
+    "formLine": 633,
+    "formType": "datetime"
+  },
+  {
+    "key": "Rejected_By",
+    "label": "Receipt Rejected By",
+    "type": "text",
+    "reportLine": 132,
+    "formLine": 643,
+    "formType": "email"
+  },
+  {
+    "key": "Rejected_At",
+    "label": "Receipt Rejected At",
+    "type": "date",
+    "reportLine": 133,
+    "formLine": 653,
+    "formType": "datetime"
+  },
+  {
+    "key": "Rejection_Reason",
+    "label": "Receipt Rejection Reason",
+    "type": "text",
+    "reportLine": 134,
+    "formLine": 663,
+    "formType": "textarea"
+  },
+  {
+    "key": "Zoho_Books_Sync_Status",
+    "label": "Invoice Sync (Legacy)",
+    "type": "text",
+    "reportLine": 135,
+    "formLine": 710,
+    "formType": "picklist"
+  },
+  {
+    "key": "Zoho_Books_Invoice_ID",
+    "label": "Invoice ID (Legacy)",
+    "type": "text",
+    "reportLine": 136,
+    "formLine": 721,
+    "formType": "text"
+  },
+  {
+    "key": "Zoho_Books_Customer_ID",
+    "label": "Customer ID (Legacy)",
+    "type": "text",
+    "reportLine": 137,
+    "formLine": 730,
+    "formType": "text"
+  },
+  {
+    "key": "Zoho_Books_Payment_ID",
+    "label": "Payment ID (Legacy)",
+    "type": "text",
+    "reportLine": 138,
+    "formLine": 739,
+    "formType": "text"
+  },
+  {
+    "key": "Last_Synced_At",
+    "label": "Last Synced At",
+    "type": "date",
+    "reportLine": 139,
+    "formLine": 748,
+    "formType": "datetime"
+  },
+  {
+    "key": "Last_Sync_Error",
+    "label": "Last Sync Error",
+    "type": "text",
+    "reportLine": 140,
+    "formLine": 758,
+    "formType": "textarea"
+  },
+  {
+    "key": "Receipt_Approval_Status",
+    "label": "Receipt Approval Status",
+    "type": "text",
+    "reportLine": 141,
+    "formLine": 672,
+    "formType": "picklist"
+  },
+  {
+    "key": "Payment_Received_Date",
+    "label": "Payment Received Date",
+    "type": "date",
+    "reportLine": 142,
+    "formLine": 683,
+    "formType": "date"
+  },
+  {
+    "key": "Payment_Amount_Received",
+    "label": "Payment Amount Received",
+    "type": "number",
+    "reportLine": 143,
+    "formLine": 692,
+    "formType": "OMR"
+  },
+  {
+    "key": "Payment_Notes",
+    "label": "Payment Notes",
+    "type": "text",
+    "reportLine": 144,
+    "formLine": 701,
+    "formType": "textarea"
+  },
+  {
+    "key": "Other_Insurer_Agent",
+    "label": "Other Insurer Agent",
+    "type": "text",
+    "reportLine": 145,
+    "formLine": 131,
+    "formType": "text"
+  },
+  {
+    "key": "Other_Source_of_Business",
+    "label": "Other Source of Business",
+    "type": "text",
+    "reportLine": 146,
+    "formLine": 139,
+    "formType": "text"
+  },
+  {
+    "key": "Direct_Source_Details",
+    "label": "Direct Source Details",
+    "type": "text",
+    "reportLine": 147,
+    "formLine": 167,
+    "formType": "picklist"
+  },
+  {
+    "key": "Agent_Source_Details",
+    "label": "Agent Source Details",
+    "type": "text",
+    "reportLine": 148,
+    "formLine": 177,
+    "formType": "picklist"
+  },
+  {
+    "key": "VAT_Legacy",
+    "label": "VAT (Legacy)",
+    "type": "number",
+    "reportLine": 149,
+    "formLine": 614,
+    "formType": "OMR"
+  },
+  {
+    "key": "Total_Commission_Legacy",
+    "label": "Total Commission (Legacy)",
+    "type": "number",
+    "reportLine": 150,
+    "formLine": 605,
+    "formType": "OMR"
+  },
+  {
+    "key": "Zoho_Books_Bill_ID",
+    "label": "Zoho Books Bill ID",
+    "type": "text",
+    "reportLine": 151,
+    "formLine": 767,
+    "formType": "text"
+  },
+  {
+    "key": "Agent_Commission_Status",
+    "label": "Agent Commission Status",
+    "type": "text",
+    "reportLine": 152,
+    "formLine": 439,
+    "formType": "picklist"
+  },
+  {
+    "key": "Books_Journal_ID",
+    "label": "Commission Earned Journal ID",
+    "type": "text",
+    "reportLine": 153,
+    "formLine": 776,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Journal_Status",
+    "label": "Commission Earned Journal Status",
+    "type": "text",
+    "reportLine": 154,
+    "formLine": 785,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Premium_Journal_ID",
+    "label": "Premium Received Journal ID",
+    "type": "text",
+    "reportLine": 155,
+    "formLine": 794,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Premium_Journal_Status",
+    "label": "Premium Received Journal Status",
+    "type": "text",
+    "reportLine": 156,
+    "formLine": 803,
+    "formType": "text"
+  },
+  {
+    "key": "Premium_Paid_to_Insurer",
+    "label": "Premium Paid to Insurer",
+    "type": "text",
+    "reportLine": 157,
+    "formLine": 460,
+    "formType": "picklist"
+  },
+  {
+    "key": "Books_Premium_Remit_Journal_ID",
+    "label": "Premium Remitted Journal ID",
+    "type": "text",
+    "reportLine": 158,
+    "formLine": 503,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Premium_Remit_Journal_Status",
+    "label": "Premium Remitted Journal Status",
+    "type": "text",
+    "reportLine": 159,
+    "formLine": 512,
+    "formType": "text"
+  },
+  {
+    "key": "Commission_Received_from_Insurer",
+    "label": "Commission Received from Insurer",
+    "type": "text",
+    "reportLine": 160,
+    "formLine": 471,
+    "formType": "picklist"
+  },
+  {
+    "key": "Books_Commission_Receipt_Journal_ID",
+    "label": "Commission Received Journal ID",
+    "type": "text",
+    "reportLine": 161,
+    "formLine": 521,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Commission_Receipt_Journal_Status",
+    "label": "Commission Received Journal Status",
+    "type": "text",
+    "reportLine": 162,
+    "formLine": 530,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Reversal_Journal_ID",
+    "label": "Books Reversal Journal ID",
+    "type": "text",
+    "reportLine": 163,
+    "formLine": 548,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Reversal_Journal_Status",
+    "label": "Books Reversal Journal Status",
+    "type": "text",
+    "reportLine": 164,
+    "formLine": 539,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Premium_Reversal_Journal_ID",
+    "label": "Books Premium Reversal Journal ID",
+    "type": "text",
+    "reportLine": 165,
+    "formLine": 566,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Premium_Reversal_Journal_Status",
+    "label": "Books Premium Reversal Journal Status",
+    "type": "text",
+    "reportLine": 166,
+    "formLine": 557,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Reversal_Journal_ID2",
+    "label": "Books Reversal Journal ID",
+    "type": "text",
+    "reportLine": 167,
+    "formLine": 812,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Reversal_Journal_Status1",
+    "label": "Books Reversal Journal Status",
+    "type": "text",
+    "reportLine": 168,
+    "formLine": 821,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Premium_Reversal_Journal_ID1",
+    "label": "Books Premium Reversal Journal ID",
+    "type": "text",
+    "reportLine": 169,
+    "formLine": 830,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Premium_Reversal_Journal_Status1",
+    "label": "Books Premium Reversal Journal Status",
+    "type": "text",
+    "reportLine": 170,
+    "formLine": 839,
+    "formType": "text"
+  },
+  {
+    "key": "Books_Journal_Amount",
+    "label": "Books Journal Amount",
+    "type": "number",
+    "reportLine": 171,
+    "formLine": 575,
+    "formType": "decimal"
+  },
+  {
+    "key": "Books_Premium_Journal_Amount",
+    "label": "Books Premium Journal Amount",
+    "type": "number",
+    "reportLine": 172,
+    "formLine": 585,
+    "formType": "decimal"
+  },
+  {
+    "key": "VAT",
+    "label": "VAT",
+    "type": "number",
+    "reportLine": 173,
+    "formLine": 490,
+    "formType": "decimal"
+  },
+  {
+    "key": "Total_Commission",
+    "label": "Total Commission",
+    "type": "number",
+    "reportLine": 174,
+    "formLine": 403,
+    "formType": "decimal"
+  },
+  {
+    "key": "Net_Commission",
+    "label": "Net Commission",
+    "type": "number",
+    "reportLine": 175,
+    "formLine": 318,
+    "formType": "decimal"
+  },
+  {
+    "key": "Agent_Payable_Journal_ID",
+    "label": "Agent Payable Journal ID",
+    "type": "text",
+    "reportLine": 176,
+    "formLine": 848,
+    "formType": "text"
+  },
+  {
+    "key": "Agent_Payable_Journal_Status",
+    "label": "Agent Payable Journal Status",
+    "type": "text",
+    "reportLine": 177,
+    "formLine": 857,
+    "formType": "text"
+  },
+  {
+    "key": "Agent_Settlement_Journal_ID",
+    "label": "Agent Settlement Journal ID",
+    "type": "text",
+    "reportLine": 178,
+    "formLine": 866,
+    "formType": "text"
+  },
+  {
+    "key": "Agent_Settlement_Journal_Status",
+    "label": "Agent Settlement Journal Status",
+    "type": "text",
+    "reportLine": 179,
+    "formLine": 875,
+    "formType": "text"
+  },
+  {
+    "key": "Reversal_Reason",
+    "label": "Reversal Reason",
+    "type": "text",
+    "reportLine": 180,
+    "formLine": 884,
+    "formType": "textarea"
+  },
+  {
+    "key": "Agent_Payable_Journal_Amount",
+    "label": "Agent Payable Journal Amount",
+    "type": "number",
+    "reportLine": 181,
+    "formLine": 893,
+    "formType": "decimal"
+  },
+  {
+    "key": "Renewal_Source",
+    "label": "Renewal Source",
+    "type": "text",
+    "reportLine": 182,
+    "formLine": 902,
+    "formType": "picklist"
+  },
+  {
+    "key": "Transaction_Type",
+    "label": "Transaction Type",
+    "type": "text",
+    "reportLine": 183,
+    "formLine": 358,
+    "formType": "picklist"
+  },
+  {
+    "key": "Premium_Already_Remitted",
+    "label": "Premium Already Remitted",
+    "type": "text",
+    "reportLine": 184,
+    "formLine": 451,
+    "formType": "checkbox"
+  },
+  {
+    "key": "Documents",
+    "label": "Documents",
+    "type": "text",
+    "reportLine": 185,
+    "formLine": 368,
+    "formType": "upload file"
+  }
+];
+const FILTERS = [
+ ['Insurers','Insurer'],['Insurance_Types','Insurance type'],['Sources_of_Business','Source of business'],
+ ['Agent_Source_Details','Agent'],['Insurer_Agents','Placement agency'],['Premium_Paid_to_Insurer','Premium paid to insurer'],
+ ['Payment_Modes','Payment mode'],['Receipt_Approval_Status','Receipt approval status'],['Agent_Commission_Status','Agent settlement status']
+];
+const MONEY_KEYS = ['Premium','Commission','Commission_Shared','Net_Commission'];
+const MONEY_LABELS = ['Premium','Commission','Commission share','Net commission'];
+const DEFAULT_COLUMNS = ['Reference_Number','Invoice_Date','Insured_Name','Insurers','Insurance_Types','Policy_Number',...MONEY_KEYS,'Premium_Paid_to_Insurer','Agent_Source_Details'];
+const BLANK = '__INSPT_BLANK__';
+function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function rawText(value) {
+ if (value == null) return '';
+ if (Array.isArray(value)) return value.map(rawText).join(' · ');
+ if (typeof value === 'object') {
+  if (Object.hasOwn(value,'ID') && String(value.ID ?? '').trim() === '') return '';
+  if (value.display_value != null) return String(value.display_value).trim();
+  if (value.zc_display_value != null) return String(value.zc_display_value).trim();
+  return Object.entries(value).map(([k,v]) => k + ': ' + rawText(v)).join(' · ');
+ }
+ return String(value).trim();
+}
+function searchText(value) {
+ if (value == null) return '';
+ if (typeof value === 'object') return Object.values(value).map(searchText).join(' ');
+ return String(value);
+}
+// Arbitrary-scale decimal arithmetic: no binary addition or intermediate rounding.
+function decimal(value) {
+ const text = rawText(value);
+ if (!text) return null;
+ const normalized = /^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(text) ? text.replace(/,/g,'') : text;
+ const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i.exec(normalized);
+ if (!m) return null;
+ let scale = (m[3] || '').length - Number(m[4] || 0);
+ if (Math.abs(scale) > 1000) return null;
+ let coefficient = BigInt((m[1] === '-' ? '-' : '') + m[2] + (m[3] || ''));
+ if (scale < 0) { coefficient *= 10n ** BigInt(-scale); scale = 0; }
+ return {n:coefficient,s:scale};
+}
+function addDecimal(a,b) {
+ const s = Math.max(a.s,b.s);
+ return {n:a.n * 10n ** BigInt(s-a.s) + b.n * 10n ** BigInt(s-b.s),s};
+}
+function compareDecimal(a,b) {
+ const delta = addDecimal(a,{n:-b.n,s:b.s}).n;
+ return delta < 0n ? -1 : delta > 0n ? 1 : 0;
+}
+function money(value) {
+ const d = value && typeof value.n === 'bigint' ? value : decimal(value);
+ if (!d) return '—';
+ let n = d.n < 0n ? -d.n : d.n;
+ if (d.s > 3) { const factor = 10n ** BigInt(d.s-3); n = (n + factor/2n)/factor; }
+ else n *= 10n ** BigInt(3-d.s);
+ const text = n.toString().padStart(4,'0');
+ return (d.n < 0n && n !== 0n ? '-' : '') + text.slice(0,-3).replace(/\B(?=(\d{3})+(?!\d))/g,',') + '.' + text.slice(-3);
+}
+function totals(rows) {
+ const sums = Object.fromEntries(MONEY_KEYS.map(k => [k,{n:0n,s:0}]));
+ const missing = Object.fromEntries(MONEY_KEYS.map(k => [k,0]));
+ for (const row of rows) for (const key of MONEY_KEYS) {
+  const d = decimal(row[key]);
+  if (d) sums[key] = addDecimal(sums[key],d); else missing[key]++;
+ }
+ return {sums,missing};
+}
+function dateValue(value) {
+ const text = rawText(value);
+ let m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:Z)?)?$/.exec(text);
+ let year,month,day,hour=0,minute=0,second=0;
+ if (m) { [,year,month,day] = m; month=Number(month)-1; hour=Number(m[4]||0);minute=Number(m[5]||0);second=Number(m[6]||0); }
+ else {
+  m = /^(\d{1,2})-([a-z]{3})-(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/i.exec(text);
+  if (!m) return null;
+  year=m[3];day=m[1];month=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].toLowerCase());
+  hour=Number(m[4]||0);minute=Number(m[5]||0);second=Number(m[6]||0);
+ }
+ const t=Date.UTC(Number(year),month,Number(day),hour,minute,second), d=new Date(t);
+ return month>=0 && hour<24 && minute<60 && second<60 && d.getUTCFullYear()===Number(year) && d.getUTCMonth()===month && d.getUTCDate()===Number(day) ? t : null;
+}
+function filterRows(rows,state) {
+ const q = state.search.trim().toLocaleLowerCase();
+ const from=state.dateFrom ? dateValue(state.dateFrom) : null, to=state.dateTo ? dateValue(state.dateTo) : null;
+ return rows.filter(row => {
+  if (q && !searchText(row).toLocaleLowerCase().includes(q)) return false;
+  for (const [key] of FILTERS) {
+   const selected=state.filters[key];
+   if (!selected) continue;
+   const value=rawText(row[key]);
+   if (selected===BLANK ? value!=='' : value!==selected) return false;
+  }
+  if (from!==null || to!==null) {
+   const date=dateValue(row.Invoice_Date);
+   if (date===null || (from!==null && date<from) || (to!==null && date>to)) return false;
+  }
+  return true;
+ });
+}
+function sortRows(rows,sort,columns) {
+ const col=columns.find(c=>c.key===sort.key);
+ if (!col) return rows.slice();
+ const dir=sort.dir==='desc' ? -1 : 1;
+ return rows.slice().sort((a,b)=> {
+  const av=col.type==='number' ? decimal(a[col.key]) : col.type==='date' ? dateValue(a[col.key]) : rawText(a[col.key]);
+  const bv=col.type==='number' ? decimal(b[col.key]) : col.type==='date' ? dateValue(b[col.key]) : rawText(b[col.key]);
+  if (av==null || av==='') return bv==null || bv==='' ? 0 : 1;
+  if (bv==null || bv==='') return -1;
+  const compared=col.type==='number' ? compareDecimal(av,bv) : col.type==='date' ? Math.sign(av-bv) : av.localeCompare(bv,undefined,{sensitivity:'base'});
+  return compared*dir;
+ });
+}
+function groupRows(rows,by) {
+ if (by==='none') return [{name:'All entries',rows}];
+ const groups=new Map();
+ for (const row of rows) {
+  const date=dateValue(row.Invoice_Date);
+  const name=by==='month' ? (date===null ? '(No valid date)' : new Date(date).toISOString().slice(0,7)) : rawText(row[by==='insurer' ? 'Insurers' : 'Agent_Source_Details']) || '(Blank)';
+  if (!groups.has(name)) groups.set(name,[]);
+  groups.get(name).push(row);
+ }
+ return [...groups].sort(([a],[b])=>a.localeCompare(b)).map(([name,rows])=>({name,rows}));
+}
+function deriveView(rows,state,columns) {
+ const sorted=sortRows(filterRows(rows,state),state.sort,columns), groups=groupRows(sorted,state.group);
+ return {groups,rows:groups.flatMap(g=>g.rows)};
+}
+function defaultState() { return {search:'',filters:{},dateFrom:'',dateTo:'',sort:{key:'Invoice_Date',dir:'desc'},group:'none',columns:DEFAULT_COLUMNS.slice()}; }
+function sanitizeState(input,columns) {
+ const state=defaultState(), keys=new Set(columns.map(c=>c.key));
+ if (!input || typeof input!=='object') return state;
+ state.search=typeof input.search==='string' ? input.search.slice(0,500) : '';
+ for (const [key] of FILTERS) if (typeof input.filters?.[key]==='string') state.filters[key]=input.filters[key];
+ for (const key of ['dateFrom','dateTo']) if (/^\d{4}-\d{2}-\d{2}$/.test(input[key]) && dateValue(input[key])!==null) state[key]=input[key];
+ if (keys.has(input.sort?.key)) state.sort={key:input.sort.key,dir:input.sort.dir==='asc'?'asc':'desc'};
+ if (['none','insurer','agent','month'].includes(input.group)) state.group=input.group;
+ if (Array.isArray(input.columns)) { const allowed=[...new Set(input.columns.filter(k=>keys.has(k)))]; if (allowed.length) state.columns=allowed; }
+ return state;
+}
+function exportMatrix(rows,columns) {
+ return [columns.map(c=>c.label), ...rows.map(row=>columns.map(col=> {
+  if (col.type!=='number') return rawText(row[col.key]);
+  const d=decimal(row[col.key]);
+  if (!d) return '';
+  const number=Number(d.n)/10**d.s;
+  if (!Number.isFinite(number)) throw new Error('An amount is outside the spreadsheet numeric range.');
+  return number;
+ }))];
+}
+function csvCell(value) {
+ // Spreadsheet formula neutralization applies only to text; negative numbers stay numeric.
+ let text=String(value ?? '');
+ if (typeof value==='string' && /^[\s\u0000-\u001f]*[=+@-]/.test(text)) text="'"+text;
+ return /[",\r\n]/.test(text) ? '"'+text.replace(/"/g,'""')+'"' : text;
+}
+function toCSV(matrix) { return '\uFEFF'+matrix.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'; }
+function isEmptyReport(error) { return [9220,3100,9280].includes(Number(error?.code)); }
+async function fetchPages(getPage,onPage) {
+ let cursor=null, count=0, page=0;
+ const seenCursors=new Set(), seenIDs=new Set();
+ while (true) {
+  let response;
+  try { response=await getPage(cursor); }
+  catch (error) { if (page===0 && isEmptyReport(error)) return count; throw error; }
+  if (page===0 && isEmptyReport(response)) return count;
+  if (!response || Number(response.code)!==3000 || !Array.isArray(response.data)) throw new Error('Creator returned an unsuccessful or malformed page.');
+  const rows=response.data;
+  const next=response.record_cursor;
+  if (next!=null && next!=='' && typeof next!=='string') throw new Error('Creator returned an invalid page cursor.');
+  if (rows.length>1000 || (!rows.length && next)) throw new Error('Creator returned an invalid page size or an empty page with a cursor.');
+  const pageIDs=new Set();
+  for (const row of rows) {
+   if (!row || typeof row!=='object' || Array.isArray(row) || !String(row.ID ?? '').trim()) throw new Error('A page contains a record without a valid ID.');
+   const id=String(row.ID);
+   if (seenIDs.has(id) || pageIDs.has(id)) throw new Error('A page repeats record IDs; the report may have changed while loading. Reload to try again.');
+   pageIDs.add(id);
+  }
+  for (const id of pageIDs) seenIDs.add(id);
+  count+=rows.length;page++;
+  await onPage(rows,{count,page,hasMore:!!next});
+  if (!next) return count;
+  if (seenCursors.has(next) || cursor===next) throw new Error('Creator repeated a page cursor.');
+  seenCursors.add(next);cursor=next;
+ }
+}
+function timeoutPromise(promise,ms) {
+ let timer;
+ return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Creator did not respond before the page timeout.')),ms);})]).finally(()=>clearTimeout(timer));
+}
+/* PURE-END */
+const APP_NAME='inspt-policy-accounting-system', REPORT_NAME='All_Policy_Entries';
+const STORE_KEY='INSPT-MS-VIEWER-v1-views';
+const REQUIRED_FIELDS=['Invoice_Date',...FILTERS.map(([key])=>key),...MONEY_KEYS];
+let columns=SOURCE_COLUMNS.map(({key,label,type})=>({key,label,type})).concat({key:'ID',label:'Record ID',type:'text'});
+let state=defaultState(), allRows=[], currentView={groups:[],rows:[]}, page=1, complete=false, busy=false, searchTimer;
+const PAGE_SIZE=100;
+let savedViews=[];
+const $=id=>document.getElementById(id);
+// All HTML interpolation (including errors, field names and saved-view names) uses this one helper.
+function html(id,markup) { $(id).innerHTML=markup; }
+function message(text) { html('message',esc(text)); }
+function showError(text) { $('error').hidden=false;html('error',esc(text)); }
+function activeColumns() { return state.columns.map(key=>columns.find(c=>c.key===key)).filter(Boolean); }
+function readSavedViews() {
+ try {
+  const parsed=JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+  return Array.isArray(parsed) ? parsed.filter(v=>v && typeof v.name==='string' && v.state && typeof v.state==='object').slice(0,50) : [];
+ } catch (_) { message('Saved views are unavailable in this browser. You can still use all filters and exports.');return []; }
+}
+function writeSavedViews(next) {
+ try { localStorage.setItem(STORE_KEY,JSON.stringify(next));savedViews=next;renderSavedViews();return true; }
+ catch (_) { message('The browser could not save views. Your current view still works.');return false; }
+}
+function renderSavedViews() {
+ const selected=$('saved').value;
+ html('saved','<option value="">Choose a view…</option>'+savedViews.map((v,i)=>'<option value="'+i+'">'+esc(v.name)+'</option>').join(''));
+ if ([...$('saved').options].some(o=>o.value===selected)) $('saved').value=selected;
+}
+function buildFilters() {
+ html('filters','<label class="control">Invoice date from<input id="dateFrom" type="date"></label><label class="control">Invoice date to<input id="dateTo" type="date"></label>'+FILTERS.map(([key,label])=>'<label class="control">'+esc(label)+'<select id="filter-'+esc(key)+'"><option value="">All</option></select></label>').join(''));
+ for (const [key] of FILTERS) $('filter-'+key).onchange=e=>{state.filters[key]=e.target.value;refresh();};
+ for (const key of ['dateFrom','dateTo']) $(key).onchange=e=>{state[key]=e.target.value;refresh();};
+}
+function populateOptions() {
+ for (const [key] of FILTERS) {
+  const values=new Set(allRows.map(r=>rawText(r[key])).filter(Boolean));
+  const selected=state.filters[key] || '';
+  if (selected && selected!==BLANK) values.add(selected);
+  html('filter-'+key,'<option value="">All</option><option value="'+BLANK+'">(Blank)</option>'+[...values].sort((a,b)=>a.localeCompare(b)).map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join(''));
+  $('filter-'+key).value=selected;
+ }
+}
+function renderColumnControls() {
+ const selected=new Set(state.columns);
+ html('columns',columns.map((col,i)=>'<label><input type="checkbox" data-column="'+i+'" '+(selected.has(col.key)?'checked':'')+'>'+esc(col.label)+'</label>').join(''));
+ $('columns').querySelectorAll('input').forEach(input=>input.onchange=()=> {
+  const key=columns[Number(input.dataset.column)].key;
+  if (!input.checked && state.columns.length===1) {input.checked=true;message('Keep at least one column visible.');return;}
+  // Column order is always the documented report order, matching both exports.
+  const keys=new Set(state.columns); if (input.checked) keys.add(key);else keys.delete(key);
+  state.columns=columns.filter(c=>keys.has(c.key)).map(c=>c.key);refresh(false);
+ });
+ html('sortKey',columns.map(c=>'<option value="'+esc(c.key)+'">'+esc(c.label)+'</option>').join(''));
+ $('sortKey').value=state.sort.key;
+ $('columnSummary').textContent='Choose visible columns · '+state.columns.length+' selected';
+}
+function syncControls() {
+ for (const key of ['search','dateFrom','dateTo','group']) $(key).value=state[key];
+ $('sortDir').value=state.sort.dir;
+ populateOptions();renderColumnControls();
+}
+function metricsMarkup(totalsResult) {
+ return MONEY_KEYS.map((key,i)=>'<span>'+esc(MONEY_LABELS[i])+': <strong>'+esc(money(totalsResult.sums[key]))+'</strong> OMR'+(totalsResult.missing[key]?' ('+totalsResult.missing[key]+' unknown)':'')+'</span>').join('');
+}
+function refresh(resetPage=true) {
+ currentView=deriveView(allRows,state,columns);
+ if (resetPage) page=1;
+ const result=totals(currentView.rows);
+ html('metrics',MONEY_KEYS.map((key,i)=>'<div class="metric"><small>'+esc(MONEY_LABELS[i])+'</small><strong>'+esc(money(result.sums[key]))+'</strong><em>OMR</em></div>').join(''));
+ const missing=REQUIRED_FIELDS.filter(key=>allRows.length && !allRows.some(row=>Object.hasOwn(row,key)));
+ const unknown=MONEY_KEYS.filter(key=>result.missing[key]).map((key)=>MONEY_LABELS[MONEY_KEYS.indexOf(key)]+': '+result.missing[key]+' unknown');
+ const warnings=[];
+ if (missing.length) warnings.push('Creator did not return these required fields: '+missing.join(', ')+'. Related filters and totals may be incomplete.');
+ if (unknown.length) warnings.push('Totals include known amounts only ('+unknown.join('; ')+'). Blank or invalid amounts are not zero.');
+ if (state.dateFrom && state.dateTo && state.dateFrom>state.dateTo) warnings.push('The date range ends before it begins. Adjust the dates to see results.');
+ $('dataWarning').hidden=!warnings.length;html('dataWarning',esc(warnings.join(' ')));
+ const phase=complete ? '' : ' · '+(busy ? 'still loading; figures are provisional' : 'incomplete data');
+ $('resultStatus').textContent=currentView.rows.length.toLocaleString('en-US')+' matching entries of '+allRows.length.toLocaleString('en-US')+' loaded'+phase;
+ $('csv').disabled=!complete;$('xlsx').disabled=!complete;
+ $('columnSummary').textContent='Choose visible columns · '+state.columns.length+' selected';
+ renderTable();
+}
+function renderTable() {
+ const cols=activeColumns(), pageCount=Math.max(1,Math.ceil(currentView.rows.length/PAGE_SIZE));
+ page=Math.min(Math.max(1,page),pageCount);
+ html('head','<tr>'+cols.map((col,i)=>'<th scope="col" aria-sort="'+(state.sort.key===col.key?(state.sort.dir==='asc'?'ascending':'descending'):'none')+'"><button data-sort="'+i+'">'+esc(col.label)+(state.sort.key===col.key?(state.sort.dir==='asc'?' ↑':' ↓'):' ↕')+'</button></th>').join('')+'</tr>');
+ $('head').querySelectorAll('button').forEach(button=>button.onclick=()=>{
+  const key=cols[Number(button.dataset.sort)].key;state.sort={key,dir:state.sort.key===key && state.sort.dir==='asc'?'desc':'asc'};
+  $('sortKey').value=key;$('sortDir').value=state.sort.dir;refresh();
+ });
+ const start=(page-1)*PAGE_SIZE,end=start+PAGE_SIZE;
+ let offset=0,markup='';
+ for (const group of currentView.groups) {
+  const groupStart=offset,groupEnd=offset+group.rows.length;
+  offset=groupEnd;
+  if (groupStart>=end || groupEnd<=start) continue;
+  if (state.group!=='none') markup+='<tr class="group"><td colspan="'+cols.length+'">'+esc(group.name)+' · '+group.rows.length+' entries</td></tr>';
+  const first=Math.max(0,start-groupStart),last=Math.min(group.rows.length,end-groupStart);
+  for (let i=first;i<last;i++) {
+   const row=group.rows[i],index=groupStart+i;
+   markup+='<tr class="record" tabindex="0" data-index="'+index+'" aria-label="'+esc('Open details: '+rawText(row.Reference_Number || row.ID))+'">'+cols.map(col=>'<td class="'+(col.type==='number'?'number':col.key==='Insured_Name'?'name':'')+'">'+esc(col.type==='number'?money(row[col.key]):rawText(row[col.key]) || '—')+'</td>').join('')+'</tr>';
+  }
+  if (state.group!=='none') markup+='<tr class="subtotal"><td colspan="'+cols.length+'"><div>Subtotal · all '+group.rows.length+' matching entries in '+esc(group.name)+'</div><div class="group-metrics">'+metricsMarkup(totals(group.rows))+'</div></td></tr>';
+ }
+ html('rows',markup || '<tr><td colspan="'+cols.length+'" class="empty">'+(busy?'Waiting for matching entries…':'No entries match the current view.')+'</td></tr>');
+ $('rows').querySelectorAll('.record').forEach(tr=>{
+  tr.onclick=()=>openDetail(currentView.rows[Number(tr.dataset.index)]);
+  tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click();}};
+ });
+ html('totalsFoot','<tr><td colspan="'+cols.length+'">Filtered totals'+(!complete?' · provisional':'')+'<div class="group-metrics">'+metricsMarkup(totals(currentView.rows))+'</div></td></tr>');
+ $('pageStatus').textContent='Page '+page+' of '+pageCount+' · '+(currentView.rows.length?start+1:0)+'–'+Math.min(end,currentView.rows.length)+' of '+currentView.rows.length;
+ $('previous').disabled=page<=1;$('next').disabled=page>=pageCount;
+}
+function openDetail(row) {
+ html('detailTitle',esc(rawText(row.Reference_Number) || 'Policy entry details'));
+ html('detailFields',Object.entries(row).map(([key,value])=>{
+  const label=columns.find(c=>c.key===key)?.label || key;
+  const text=typeof value==='object' && value!==null ? JSON.stringify(value,null,2) : String(value ?? '');
+  return '<dt>'+esc(label)+'<br><small>'+esc(key)+'</small></dt><dd><pre>'+esc(text || '(Blank)')+'</pre></dd>';
+ }).join(''));
+ $('detail').showModal();
+}
+function downloadCSV() {
+ if (!complete) return;
+ flushSearch();
+ const blob=new Blob([toCSV(exportMatrix(currentView.rows,activeColumns()))],{type:'text/csv;charset=utf-8;'});
+ const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='INSPT_MS_Entries_'+stamp()+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ message('CSV exported: '+currentView.rows.length+' entries. Text that could run as a spreadsheet formula was protected.');
+}
+function stamp() { return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Muscat',year:'numeric',month:'2-digit',day:'2-digit'}).replace(/[^\d-]/g,''); }
+function downloadExcel() {
+ if (!complete) return;
+ flushSearch();
+ try {
+  if (!window.XLSX?.utils) throw new Error('Excel export library is unavailable. Use CSV or retry when the pinned library can load.');
+  const cols=activeColumns(),matrix=exportMatrix(currentView.rows,cols),ws=XLSX.utils.aoa_to_sheet(matrix);
+  for (let r=1;r<matrix.length;r++) for (let c=0;c<cols.length;c++) if (typeof matrix[r][c]==='number') ws[XLSX.utils.encode_cell({r,c})].z='#,##0.000';
+  ws['!cols']=cols.map(c=>({wch:Math.min(40,Math.max(15,c.label.length+3))}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Policy entries');XLSX.writeFile(wb,'INSPT_MS_Entries_'+stamp()+'.xlsx');
+  message('Excel exported: '+currentView.rows.length+' entries.');
+ } catch (error) { message(error.message); }
+}
+function flushSearch() { clearTimeout(searchTimer);state.search=$('search').value;refresh(false); }
+function wireUI() {
+ buildFilters();savedViews=readSavedViews();renderSavedViews();syncControls();
+ $('search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{state.search=$('search').value;refresh();},220);};
+ $('reset').onclick=()=>{clearTimeout(searchTimer);const base=defaultState();state={...state,search:base.search,filters:{},dateFrom:'',dateTo:''};syncControls();refresh();};
+ $('group').onchange=e=>{state.group=e.target.value;refresh();};
+ for (const key of ['sortKey','sortDir']) $(key).onchange=()=>{state.sort={key:$('sortKey').value,dir:$('sortDir').value};refresh();};
+ $('defaultColumns').onclick=()=>{state.columns=DEFAULT_COLUMNS.slice();renderColumnControls();refresh(false);};
+ $('allColumns').onclick=()=>{state.columns=columns.filter(c=>allRows.some(r=>Object.hasOwn(r,c.key))).map(c=>c.key);if(!state.columns.length)state.columns=DEFAULT_COLUMNS.slice();renderColumnControls();refresh(false);};
+ $('previous').onclick=()=>{page--;renderTable();$('tableWrap').scrollTop=0;};$('next').onclick=()=>{page++;renderTable();$('tableWrap').scrollTop=0;};
+ $('closeDetail').onclick=()=>$('detail').close();
+ $('csv').onclick=()=>{try{downloadCSV();}catch(error){message(error.message);}};$('xlsx').onclick=downloadExcel;
+ $('reload').onclick=load;
+ $('saveView').onclick=()=>{
+  flushSearch();const name=$('viewName').value.trim();
+  if (!name) {message('Enter a name for this view.');return;}
+  const next=savedViews.filter(v=>v.name!==name);
+  if (next.length>=50) {message('You have 50 saved views. Delete a view before saving another.');return;}
+  next.push({name,state:sanitizeState(state,columns)});
+  if(writeSavedViews(next)) message('Saved “'+name+'” in this browser.');
+ };
+ $('applyView').onclick=()=>{
+  const value=$('saved').value;if(value==='')return;
+  const saved=savedViews[Number(value)];if(!saved)return;
+  clearTimeout(searchTimer);state=sanitizeState(saved.state,columns);syncControls();refresh();message('Applied “'+saved.name+'”.');
+ };
+ $('deleteView').onclick=()=>{
+  const value=$('saved').value;if(value==='')return;
+  const saved=savedViews[Number(value)];if(!saved)return;
+  if(writeSavedViews(savedViews.filter((_,i)=>i!==Number(value))))message('Deleted “'+saved.name+'” from this browser.');
+ };
+}
+async function sdkPage(cursor) {
+ const params={app_name:APP_NAME,report_name:REPORT_NAME,max_records:1000};
+ if(cursor)params.record_cursor=cursor;
+ try { return await timeoutPromise(ZOHO.CREATOR.DATA.getRecords(params),20000); }
+ catch(error) { throw error; }
+}
+async function waitForSDK() {
+ const began=Date.now();
+ while(!window.ZOHO?.CREATOR?.DATA?.getRecords) {
+  if(Date.now()-began>=15000)throw new Error('Creator SDK is unavailable. Open this widget inside Creator, or use the local fake SDK harness.');
+  await new Promise(resolve=>setTimeout(resolve,100));
+ }
+}
+async function load() {
+ if(busy)return;
+ busy=true;complete=false;allRows=[];page=1;
+ $('reload').disabled=true;$('error').hidden=true;$('loadProgress').hidden=false;$('loadProgress').removeAttribute('value');
+ $('loadStatus').textContent='Loaded 0 of unknown · connecting…';$('loadNote').textContent='Loading every page. You can search the rows already received.';
+ refresh();
+ try {
+  await waitForSDK();
+  await fetchPages(sdkPage,async(rows,info)=>{
+   allRows.push(...rows);
+   const known=new Set(columns.map(c=>c.key));let newColumns=false;
+   for(const row of rows)for(const key of Object.keys(row))if(!known.has(key)){known.add(key);columns.push({key,label:key,type:'text'});newColumns=true;}
+   populateOptions();if(newColumns)renderColumnControls();refresh(false);
+   $('loadStatus').textContent='Loaded '+info.count.toLocaleString('en-US')+' of unknown · page '+info.page+(info.hasMore?' · loading next page…':' · finishing…');
+   // Paint the first page before the next SDK request, even when a mock resolves synchronously.
+   await new Promise(resolve=>{
+    let done=false;
+    const finish=()=>{if(!done){done=true;resolve();}};
+    requestAnimationFrame(()=>setTimeout(finish,0));setTimeout(finish,100);
+   });
+  });
+  complete=true;
+  $('loadStatus').textContent='Loaded '+allRows.length.toLocaleString('en-US')+' of '+allRows.length.toLocaleString('en-US');
+  $('loadNote').textContent='All report pages received · cursor exhausted · '+new Date().toLocaleString('en-GB',{timeZone:'Asia/Muscat'})+' (Muscat). Total is based on the completed cursor chain.';
+  $('loadProgress').max=1;$('loadProgress').value=1;
+ } catch(error) {
+  $('loadStatus').textContent='Loaded '+allRows.length.toLocaleString('en-US')+' of unknown · loading stopped';
+  $('loadNote').textContent='These rows are incomplete. Exports are paused until a full reload succeeds.';
+  $('loadProgress').hidden=true;
+  showError('Could not finish loading every report page. '+(error?.message || rawText(error))+'. '+allRows.length+' entries retained. Reload data to try again.');
+ } finally {busy=false;$('reload').disabled=false;refresh(false);}
+}
+function start() {wireUI();load();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+</script>
+</body>
+</html>

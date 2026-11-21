@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Employee policy entries · INSPT</title>
+<!-- INSPT-EMP-VIEWER-v1-2026-11-10 | Offline-built read-only widget. Field evidence: FIELD_MAP.md. -->
+<style>
+*{box-sizing:border-box}body{margin:0;background:#fff;color:#253348;font:14px system-ui,sans-serif}main{padding:24px;max-width:1800px;margin:auto}h1{margin:0 0 6px;font-size:25px}p{color:#536175}button,input,select{font:inherit;padding:9px;border:1px solid #bdc7d3;border-radius:6px;background:white;color:inherit}button{cursor:pointer}button:hover{background:#edf4fa}button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #276baf;outline-offset:2px}.filters{display:flex;flex-wrap:wrap;gap:12px;padding:18px 0;align-items:end}label{display:flex;flex-direction:column;gap:5px;font-size:12px}#search{width:280px}.table-wrap{overflow:auto;border:1px solid #d8dfe8;border-radius:8px}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #e3e8ee}th{background:#f3f6fa}th button{border:0;padding:2px;background:transparent;font-weight:600}td.name{white-space:normal;min-width:190px}td.money{text-align:right;font-variant-numeric:tabular-nums}.pager{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0}#error{border:1px solid #b72f32;color:#922124;padding:12px;margin:12px 0}#status{margin:12px 0;color:#375572}progress{width:100%;height:6px}#detail{border:1px solid #bdc7d3;border-radius:8px;padding:20px;margin-top:18px}dl{display:grid;grid-template-columns:minmax(160px,230px) 1fr;gap:10px}dt{font-weight:600}dd{margin:0;overflow-wrap:anywhere}small{color:#536175}[hidden]{display:none!important}@media(max-width:950px){main{padding:16px}.filters{gap:8px}input,select{max-width:100%}}
+</style></head><body>
+<main><h1>Policy entries</h1><p>Employee view · Read only. Open a reference to see policy details.</p>
+<span hidden>INSPT-EMP-VIEWER-v1-2026-11-10</span>
+<div id="error" role="alert" hidden></div>
+<div class="filters">
+<label>Search policies<input id="search" type="search" placeholder="Reference, insured name, policy, vehicle…"></label>
+<label>Invoice date from<input id="from" type="date"></label><label>Invoice date to<input id="to" type="date"></label>
+<label>Insurer<select id="Insurers"><option value="">All</option></select></label>
+<label>Insurance type<select id="Insurance_Types"><option value="">All</option></select></label>
+<label>Policy status<select id="Policy_Status"><option value="">All</option></select></label>
+<label>Source of business<select id="Sources_of_Business"><option value="">All</option></select></label>
+<button id="reset" type="button">Reset filters</button></div>
+<div id="status" role="status" aria-live="polite">Loaded 0 · Waiting for Creator…</div><progress id="progress" aria-label="Loading policies"></progress>
+<div class="table-wrap"><table aria-label="Employee policy entries"><thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="pager"><button id="prev" type="button">Previous</button><span id="pageInfo"></span><button id="next" type="button">Next</button><label>Rows per page<select id="size"><option>25</option><option selected>50</option><option>100</option></select></label></div>
+<section id="detail" aria-label="Policy details" hidden><button id="close" type="button">Close details</button><h2>Policy details</h2><dl id="detailFields"></dl></section>
+<small id="footnote"></small>
+</main>
+<script>
+'use strict';
+// Source names: original all-entries-explorer.html; projection and rendering hardened for Employee.
+const SHOW_PREMIUM = true;
+const APP_NAME = 'inspt-policy-accounting-system';
+const REPORT_NAME = 'Staff_Policy_List';
+// Explicit allow-list shared by projection, search, table and details. No raw-record renderer.
+const FIELDS = [
+ ['Reference_Number','Reference number','text'],['Invoice_Date','Invoice date','date'],
+ ['Insured_Name','Insured name','text'],['Policy_Number','Policy number','text'],
+ ['Endorsement_Number','Endorsement number','text'],['Insurers','Insurer','text'],
+ ['Insurance_Types','Insurance type','text'],['Period_From','Period from','date'],
+ ['Period_To','Period to','date'],['Vehicle_Brands','Vehicle make','text'],
+ ['Vehicle_Models','Vehicle model','text'],['Registration_Number','Registration number','text'],
+ ['Chassis_Number','Chassis number','text'],['Policy_Status','Policy status','text'],
+ ['Sources_of_Business','Source of business','text'],
+ ...(SHOW_PREMIUM ? [['Premium','Premium (OMR)','money']] : [])
+];
+const FILTER_KEYS = ['Insurers','Insurance_Types','Policy_Status','Sources_of_Business'];
+const COLUMNS = FIELDS.filter(f => !['Vehicle_Brands','Vehicle_Models','Sources_of_Business'].includes(f[0]));
+COLUMNS.splice(9,0,['Vehicle','Vehicle (make / model)','text']); // derived display only
+function esc(value) {
+ return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function rawText(value) {
+ if (value == null) return '';
+ if (typeof value === 'object') {
+  if ('ID' in value && !String(value.ID ?? '').trim()) return '';
+  const display = value.display_value ?? value.zc_display_value;
+  return typeof display === 'string' || typeof display === 'number' ? String(display).trim() : '';
+ }
+ return String(value).trim();
+}
+function projectRecord(raw) {
+ const safe = Object.create(null);
+ for (const [key] of FIELDS) safe[key] = rawText(raw[key]);
+ return safe;
+}
+const MONTHS = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+function parseDateVal(value) {
+ let y,m,d,match;
+ if ((match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value))) { y=+match[1];m=+match[2]-1;d=+match[3]; }
+ else if ((match = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(value))) { y=+match[3];m=MONTHS[match[2][0].toUpperCase()+match[2].slice(1).toLowerCase()];d=+match[1]; }
+ else return null;
+ const date = new Date(Date.UTC(y,m,d));
+ return date.getUTCFullYear()===y && date.getUTCMonth()===m && date.getUTCDate()===d ? +date : null;
+}
+function cellValue(row,key) { return key === 'Vehicle' ? [row.Vehicle_Brands,row.Vehicle_Models].filter(Boolean).join(' / ') : row[key] || ''; }
+function formatValue(row,col) {
+ const value = cellValue(row,col[0]);
+ if(col[2] !== 'money') return value || '—';
+ if(!value || !Number.isFinite(Number(value))) return '—';
+ return Number(value).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});
+}
+function applyFilters(rows,state) {
+ const q=state.search.trim().toLowerCase(),from=parseDateVal(state.from),to=parseDateVal(state.to);
+ return rows.filter(row=>{
+  if(q && !FIELDS.some(([key])=>(row[key] || '').toLowerCase().includes(q))) return false;
+  if(FILTER_KEYS.some(key=>state.filters[key] && row[key]!==state.filters[key])) return false;
+  const date=parseDateVal(row.Invoice_Date);
+  return (from===null && to===null) || (date!==null && (from===null || date>=from) && (to===null || date<=to));
+ });
+}
+function sortRows(rows,key,dir) {
+ const col=COLUMNS.find(c=>c[0]===key),factor=dir==='asc'?1:-1;
+ function val(row) { const v=cellValue(row,key);return col[2]==='date' ? (parseDateVal(v) ?? -Infinity) : col[2]==='money' ? (v && Number.isFinite(Number(v)) ? Number(v) : -Infinity) : v.toLowerCase(); }
+ return rows.slice().sort((a,b)=>{const x=val(a),y=val(b);return (x<y?-1:x>y?1:0)*factor;});
+}
+function isEmptyResponse(e) { return [9220,3100,9280].includes(Number(e && e.code)); }
+async function fetchAllPages(onPage) {
+ let cursor;const seen=new Set();
+ while(true) {
+  const params={app_name:APP_NAME,report_name:REPORT_NAME,max_records:1000};
+  if(cursor) params.record_cursor=cursor;
+  let resp;
+  try { resp=await ZOHO.CREATOR.DATA.getRecords(params); }
+  catch(e) { if(isEmptyResponse(e) && !cursor) return; throw new Error('Creator could not finish loading policies. Check report access and reload.'); }
+  if(isEmptyResponse(resp) && !cursor) return;
+  if(!resp || Number(resp.code)!==3000 || !Array.isArray(resp.data)) throw new Error('Creator returned an unexpected response. Reload to try again.');
+  // Project each page immediately; non-allowed fields never enter application state.
+  onPage(resp.data.map(projectRecord));
+  const next=resp.record_cursor;
+  if(next===undefined || next===null || next==='') return;
+  if(typeof next!=='string' || seen.has(next)) throw new Error('Paging stopped because Creator repeated or returned an invalid cursor.');
+  seen.add(next);cursor=next;
+ }
+}
+const $=id=>document.getElementById(id);
+let allRows=[],viewRows=[],page=1,pageSize=50,sortKey='Invoice_Date',sortDir='desc',loading=true,failed=false,started=false;
+let state={search:'',from:'',to:'',filters:{}};
+function renderHead() {
+ $('head').innerHTML=COLUMNS.map(col=>'<th scope="col" aria-sort="'+(sortKey===col[0]?(sortDir==='asc'?'ascending':'descending'):'none')+'"><button type="button" data-sort="'+esc(col[0])+'">'+esc(col[1])+(sortKey===col[0]?(sortDir==='asc'?' ▲':' ▼'):' ↕')+'</button></th>').join('');
+}
+function showDetail(row) {
+ $('detailFields').innerHTML=FIELDS.map(col=>'<dt>'+esc(col[1])+'</dt><dd>'+esc(formatValue(row,col))+'</dd>').join('');
+ $('detail').hidden=false;$('close').focus();
+}
+let detailTrigger=null;
+function renderTable() {
+ const pages=Math.max(1,Math.ceil(viewRows.length/pageSize));page=Math.min(page,pages);
+ const start=(page-1)*pageSize;
+ renderHead();
+ $('rows').innerHTML=viewRows.slice(start,start+pageSize).map((row,i)=>'<tr>'+COLUMNS.map(col=>{
+  const value=esc(formatValue(row,col));
+  return '<td class="'+(col[2]==='money'?'money':col[0]==='Insured_Name'?'name':'')+'">'+(col[0]==='Reference_Number'?'<button type="button" data-row="'+(start+i)+'" aria-label="Open policy '+value+'">'+value+'</button>':value)+'</td>';
+ }).join('')+'</tr>').join('') || '<tr><td colspan="'+COLUMNS.length+'">'+(loading?'Waiting for matching policies…':'No policies match these filters.')+'</td></tr>';
+ $('pageInfo').textContent='Page '+page+' of '+pages+' · '+viewRows.length+' matching';
+ $('prev').disabled=page<=1;$('next').disabled=page>=pages;
+ $('status').textContent='Loaded '+allRows.length+' · '+(failed?'Incomplete — see error above':loading?'Loading more policies…':'Complete')+' · '+viewRows.length+' matching';
+}
+function refresh(resetPage=true) {
+ if(resetPage)page=1;
+ viewRows=sortRows(applyFilters(allRows,state),sortKey,sortDir);renderTable();
+}
+function populateFilters() {
+ for(const key of FILTER_KEYS) {
+  const values=[...new Set(allRows.map(r=>r[key]).filter(Boolean))].sort();
+  $(key).innerHTML='<option value="">All</option>'+values.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');
+  $(key).value=state.filters[key] || '';
+ }
+}
+function showError(message) {failed=true;loading=false;$('error').textContent=message+' Loaded '+allRows.length+'; results may be incomplete.';$('error').hidden=false;$('progress').hidden=true;refresh(false);}
+function wireToolbar() {
+ $('search').addEventListener('input',()=>{state.search=$('search').value;refresh();});
+ for(const key of FILTER_KEYS) $(key).addEventListener('change',()=>{state.filters[key]=$(key).value;refresh();});
+ for(const key of ['from','to']) $(key).addEventListener('change',()=>{state[key]=$(key).value;refresh();});
+ $('reset').onclick=()=>{state={search:'',from:'',to:'',filters:{}};for(const key of ['search','from','to',...FILTER_KEYS])$(key).value='';refresh();};
+ $('size').onchange=()=>{pageSize=Number($('size').value);refresh();};
+ $('prev').onclick=()=>{page--;renderTable();};$('next').onclick=()=>{page++;renderTable();};
+ $('head').onclick=e=>{const button=e.target.closest('[data-sort]');if(!button)return;const key=button.dataset.sort;sortDir=sortKey===key && sortDir==='asc'?'desc':'asc';sortKey=key;refresh();};
+ $('rows').onclick=e=>{const button=e.target.closest('[data-row]');if(button){detailTrigger=button;showDetail(viewRows[Number(button.dataset.row)]);}};
+ $('close').onclick=()=>{$('detail').hidden=true;$('detailFields').innerHTML='';if(detailTrigger?.isConnected)detailTrigger.focus();};
+}
+async function boot() {
+ if(started)return;started=true;loading=true;failed=false;$('error').hidden=true;$('progress').hidden=false;
+ try {await fetchAllPages(rows=>{allRows.push(...rows);populateFilters();refresh(false);});loading=false;$('progress').hidden=true;refresh(false);}
+ catch(e) {showError(e.message);}
+}
+$('footnote').textContent='Search and filters apply to all loaded policies. Invoice dates use the app’s date values.'+(SHOW_PREMIUM?' Premium is shown in OMR.':'');
+wireToolbar();refresh(); // shell and controls paint before the SDK download or first data response
+const sdkTimeout=setTimeout(()=>{if(!started)showError('Creator SDK did not become ready. Open this widget inside Creator.');},15000);
+function sdkReady() {
+ try {
+  if(typeof SigmaSDK!=='undefined' && SigmaSDK.CREATOR?.init) SigmaSDK.CREATOR.init(()=>{clearTimeout(sdkTimeout);boot();});
+  else if(typeof ZOHO!=='undefined' && ZOHO.CREATOR?.DATA?.getRecords) {clearTimeout(sdkTimeout);boot();}
+  else {clearTimeout(sdkTimeout);showError('Creator SDK is unavailable.');}
+ } catch(e) {clearTimeout(sdkTimeout);showError('Creator SDK could not start.');}
+}
+if(typeof ZOHO!=='undefined' && ZOHO.CREATOR?.DATA?.getRecords) sdkReady();
+else {
+ const sdk=document.createElement('script');sdk.src='https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js';sdk.async=true;sdk.onload=sdkReady;sdk.onerror=()=>{clearTimeout(sdkTimeout);showError('Creator SDK could not be downloaded.');};document.head.appendChild(sdk);
+}
+</script></body></html>
