@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reconciliation health — INSPT</title>
+<link rel="stylesheet" href="inspt-widget.css">
+<style>
+  .rec-kpis{grid-template-columns:repeat(3,1fr)}
+  .rec-kpis .kpi{gap:10px;padding:22px 24px}
+  .rec-kpis .k-value{font-size:clamp(1.7rem,2.35vw,2.15rem)}
+  .checks{margin-top:34px}
+  .check{padding:24px 0;border-bottom:var(--hairline)}
+  .check:first-of-type{border-top:var(--hairline)}
+  .check-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+  .check-no{color:var(--muted);font-variant-numeric:var(--numerals);margin-right:9px;font-weight:500}
+  .verdict{display:inline-flex;align-items:center;gap:7px;font-size:var(--label);font-weight:600;white-space:nowrap}
+  .verdict .ic{width:16px;height:16px;stroke-width:2}
+  .verdict.pass{color:var(--credit)}
+  .verdict.fail{color:var(--debit)}
+  .verdict.na{color:var(--muted)}
+  .figures{display:grid;grid-template-columns:repeat(3,1fr);margin-top:18px;border-top:1px solid var(--rule-light)}
+  .fig{padding:13px 18px 13px 0;position:relative}
+  .fig+.fig{padding-left:20px}
+  .fig+.fig:before{content:"";position:absolute;left:0;top:13px;bottom:13px;width:1px;background:var(--rule-light)}
+  .fig dt{font-size:var(--meta);color:var(--muted);margin-bottom:5px}
+  .fig dd{margin:0;font-size:1.0625rem;font-weight:580;letter-spacing:-.02em;font-variant-numeric:var(--numerals)}
+  .fig dd .unit{font-size:.7rem}
+  .fig.variance dd{color:var(--debit)}
+  .fig.variance.nil dd{color:var(--credit)}
+  .finding{margin-top:15px;font-size:var(--label);color:var(--muted);line-height:1.55;max-width:116ch;
+    display:flex;gap:10px;align-items:flex-start}
+  .finding .ic{width:16px;height:16px;margin-top:3px;flex:none}
+  .finding.known .ic{color:var(--warning)}
+  .finding.ok .ic{color:var(--credit)}
+  @media(max-width:850px){.rec-kpis{grid-template-columns:1fr}.rec-kpis .kpi:nth-child(n+2){border-top:var(--hairline)}
+    .figures{grid-template-columns:1fr}.fig+.fig{padding-left:0;border-top:1px solid var(--rule-light)}.fig+.fig:before{display:none}}
+</style>
+</head>
+<body><main>
+
+<div class="mast">
+  <div class="identity">
+    <span class="signet"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></svg></span>
+    <span class="wordmark">INSPT</span>
+    <span class="brand-context">Insurance Spot</span>
+  </div>
+  <div class="context">
+    <span>Refreshed 21 Nov, 04:26</span>
+    <button type="button" class="btn primary"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M20 5v5h-5M4 19v-5h5"/><path d="M5 9a7.5 7.5 0 0 1 12-4l3 3M4 16l3 3a7.5 7.5 0 0 0 12-4"/></svg>Run checks</button>
+  </div>
+</div>
+
+<header class="title-row">
+  <div>
+    <h1>Reconciliation health</h1>
+    <p class="subtitle">Standing control panel between Books and Creator · run on demand</p>
+  </div>
+</header>
+
+<dl class="kpis rec-kpis">
+  <div class="kpi lead">
+    <dt class="k-label">Failing</dt>
+    <dd class="k-value">3</dd>
+    <dd class="k-note">Both are known, explained gaps &mdash; neither is new</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">Passing</dt>
+    <dd class="k-value collect">2</dd>
+    <dd class="k-note">Agreed exactly on this run</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">Not applicable</dt>
+    <dd class="k-value">1</dd>
+    <dd class="k-note">Nothing to compare yet</dd>
+  </div>
+</dl>
+
+<section class="checks">
+  <div class="section-head">
+    <div>
+      <h2>Checks</h2>
+      <p class="section-sub">Each check recomputes one figure independently and compares it with the other system</p>
+    </div>
+  </div>
+
+  <article class="check">
+    <div class="check-head">
+      <div>
+        <h3><span class="check-no">1</span>Premium reconciliation</h3>
+        <p class="section-sub">Books &ldquo;Premium Payable &mdash; Insurers&rdquo; against the Creator &ldquo;Premium pending remittance to insurer&rdquo; report</p>
+      </div>
+      <span class="verdict fail"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></svg>Fail</span>
+    </div>
+    <dl class="figures">
+      <div class="fig"><dt>Books balance</dt><dd>5,828.866<span class="unit"> OMR</span></dd></div>
+      <div class="fig"><dt>Creator report · 90 records</dt><dd>4,436.566<span class="unit"> OMR</span></dd></div>
+      <div class="fig variance"><dt>Variance</dt><dd>1,392.300<span class="unit"> OMR</span></dd></div>
+    </dl>
+    <p class="finding known"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M12 8v5m0 3v.2M10.3 3.9 2.6 17.1A2 2 0 0 0 4.3 20h15.4a2 2 0 0 0 1.7-2.9L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+    A real variance, not a rounding artefact. It matches the known OI-61 finding: records that have a posted Books premium journal but no Books_Premium_Journal_Status stamp are silently left out of the Creator report.</p>
+  </article>
+
+  <article class="check">
+    <div class="check-head">
+      <div>
+        <h3><span class="check-no">2</span>Agent payable reconciliation</h3>
+        <p class="section-sub">Books &ldquo;Agent Commission Payable&rdquo; against an independent recompute of the Agent Ledger logic</p>
+      </div>
+      <span class="verdict fail"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></svg>Fail</span>
+    </div>
+    <dl class="figures">
+      <div class="fig"><dt>Books balance</dt><dd>908.840<span class="unit"> OMR</span></dd></div>
+      <div class="fig"><dt>Recompute · 177 entries</dt><dd>1,225.822<span class="unit"> OMR</span></dd></div>
+      <div class="fig variance"><dt>Variance</dt><dd>316.982<span class="unit"> OMR</span></dd></div>
+    </dl>
+    <p class="finding known"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M12 8v5m0 3v.2M10.3 3.9 2.6 17.1A2 2 0 0 0 4.3 20h15.4a2 2 0 0 0 1.7-2.9L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+    A known and understood gap, not a new bug. The Agent Commission Payable account only holds journals posted since the July 2026 migration; unsettled agent commission from before that date was never migrated into it. See OI-65.</p>
+  </article>
+
+  <article class="check">
+    <div class="check-head">
+      <div>
+        <h3><span class="check-no">3</span>Agent receivable drift guard</h3>
+        <p class="section-sub">The Agent Receivable Summary report against a separately coded recompute over raw policy data &mdash; two implementations of one business rule</p>
+      </div>
+      <span class="verdict pass"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="m4 12 5 5L20 7"/></svg>Pass</span>
+    </div>
+    <dl class="figures">
+      <div class="fig"><dt>Report · 89 records</dt><dd>1,412.050<span class="unit"> OMR</span></dd></div>
+      <div class="fig"><dt>Independent recompute · 89 records</dt><dd>1,412.050<span class="unit"> OMR</span></dd></div>
+      <div class="fig variance nil"><dt>Variance</dt><dd>0.000<span class="unit"> OMR</span></dd></div>
+    </dl>
+    <p class="finding ok"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="m4 12 5 5L20 7"/></svg>
+    Report and recompute agree exactly, on both record count and total. The two implementations have not drifted apart.</p>
+  </article>
+
+  <article class="check">
+    <div class="check-head">
+      <div>
+        <h3><span class="check-no">4</span>Sync failures</h3>
+        <p class="section-sub">Expense entries with Books sync failed, plus policies with invoice sync failed</p>
+      </div>
+      <span class="verdict pass"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="m4 12 5 5L20 7"/></svg>Pass</span>
+    </div>
+    <dl class="figures">
+      <div class="fig"><dt>Expenses failed</dt><dd>0<span class="unit"> · 0.000 OMR</span></dd></div>
+      <div class="fig"><dt>Policies invoice-sync failed</dt><dd>0</dd></div>
+      <div class="fig variance nil"><dt>Variance</dt><dd>0.000<span class="unit"> OMR</span></dd></div>
+    </dl>
+    <p class="finding ok"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="m4 12 5 5L20 7"/></svg>
+    No sync failures on either form right now.</p>
+  </article>
+
+  <article class="check">
+    <div class="check-head">
+      <div>
+        <h3><span class="check-no">5</span>Commission income reconciliation</h3>
+        <p class="section-sub">Books commission income against accrued commission on recognisable policies in Creator</p>
+      </div>
+      <span class="verdict fail"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></svg>Fail</span>
+    </div>
+    <dl class="figures">
+      <div class="fig"><dt>Books income</dt><dd>15,262.784<span class="unit"> OMR</span></dd></div>
+      <div class="fig"><dt>Creator accrued</dt><dd>25,340.192<span class="unit"> OMR</span></dd></div>
+      <div class="fig variance"><dt>Variance</dt><dd>10,077.408<span class="unit"> OMR</span></dd></div>
+    </dl>
+    <p class="finding known"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M12 8v5m0 3v.2M10.3 3.9 2.6 17.1A2 2 0 0 0 4.3 20h15.4a2 2 0 0 0 1.7-2.9L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+    Known as audit theme T03. Six months of January to June entries never reached Books. Tracked under OI-111; this check will keep failing until that backfill is published.</p>
+  </article>
+
+  <article class="check">
+    <div class="check-head">
+      <div>
+        <h3><span class="check-no">6</span>Settlement reconciliation</h3>
+        <p class="section-sub">Agent settlements recorded in Creator against settlement journals in Books</p>
+      </div>
+      <span class="verdict na"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>Not applicable</span>
+    </div>
+    <dl class="figures">
+      <div class="fig"><dt>Settlements in Creator</dt><dd>0</dd></div>
+      <div class="fig"><dt>Settlement journals in Books</dt><dd>0</dd></div>
+      <div class="fig variance nil"><dt>Variance</dt><dd>0.000<span class="unit"> OMR</span></dd></div>
+    </dl>
+    <p class="finding"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8v.2"/></svg>
+    No real settlement has been recorded yet, so there is nothing to compare. This check becomes meaningful after the first one.</p>
+  </article>
+</section>
+
+</main></body>
+</html>

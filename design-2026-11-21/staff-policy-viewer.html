@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Policy entries — employee view — INSPT</title>
+<link rel="stylesheet" href="inspt-widget.css">
+<style>
+  .readonly{display:inline-flex;align-items:center;gap:7px;font-size:var(--meta);color:var(--muted)}
+  .readonly .ic{width:15px;height:15px}
+  .fgrid{display:grid;grid-template-columns:1.6fr repeat(5,1fr) auto;gap:16px 18px;align-items:end;
+    margin-top:22px;padding-bottom:22px;border-bottom:var(--hairline)}
+  .f label{display:block;font-size:var(--meta);color:var(--muted);margin-bottom:6px}
+  .count{margin:18px 0 10px;font-size:var(--label)}
+  .count b{font-weight:600}
+  .st-table{min-width:1330px}
+  .st-table tbody td{height:56px}
+  .st-table .nm{font-weight:580}
+  .st-table td:nth-child(2),.st-table td:nth-child(6),.st-table td:nth-child(7),
+  .st-table td:nth-child(8),.st-table td:nth-child(9){white-space:nowrap}
+  .ref{border:1px solid var(--rule);background:var(--paper);border-radius:var(--radius);
+    padding:5px 10px;color:var(--petrol);font-weight:540;font-size:var(--meta);
+    font-variant-numeric:var(--numerals);white-space:nowrap}
+  .ref:hover{border-color:var(--sea);background:var(--mist)}
+  .nil{color:var(--muted)}
+  @media(max-width:1250px){.fgrid{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:700px){.fgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body><main>
+
+<div class="mast">
+  <div class="identity">
+    <span class="signet"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></svg></span>
+    <span class="wordmark">INSPT</span>
+    <span class="brand-context">Employee workspace</span>
+  </div>
+  <div class="context">
+    <span class="readonly"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>Read only</span>
+  </div>
+</div>
+
+<header class="title-row">
+  <div>
+    <h1>Policy entries</h1>
+    <p class="subtitle">Open a reference to see the full policy. Nothing on this page can be changed here.</p>
+  </div>
+</header>
+
+<div class="fgrid">
+  <div class="f"><label for="s">Search policies</label><input id="s" type="search" placeholder="Reference, insured name, policy, vehicle"></div>
+  <div class="f"><label for="d1">Invoice date from</label><input id="d1" type="date"></div>
+  <div class="f"><label for="d2">Invoice date to</label><input id="d2" type="date"></div>
+  <div class="f"><label for="i1">Insurer</label><select id="i1"><option>All</option></select></div>
+  <div class="f"><label for="i2">Insurance type</label><select id="i2"><option>All</option></select></div>
+  <div class="f"><label for="i3">Policy status</label><select id="i3"><option>All</option></select></div>
+  <div class="f"><button type="button" class="btn">Reset</button></div>
+</div>
+
+<p class="count"><b>2,112</b> policies loaded &middot; <span class="muted">complete &middot; 2,112 matching the current filters</span></p>
+
+<div class="tscroll">
+<table class="st-table">
+  <thead><tr>
+    <th scope="col">Reference</th>
+    <th scope="col">Invoice date</th>
+    <th scope="col">Insured name</th>
+    <th scope="col">Policy number</th>
+    <th scope="col">Endorsement</th>
+    <th scope="col">Insurer</th>
+    <th scope="col">Type</th>
+    <th scope="col">Period from</th>
+    <th scope="col">Period to</th>
+    <th scope="col">Vehicle</th>
+  </tr></thead>
+  <tbody>
+    <tr><td><button class="ref" type="button">REF 624042</button></td><td>18 Nov 2026</td><td class="nm">Customer 01</td><td class="num">PO/004/01/26/2510/024089</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>Motor third party</td><td>19 Nov 2026</td><td>18 Nov 2027</td><td>Toyota / Yaris</td></tr>
+    <tr><td><button class="ref" type="button">REF 624032</button></td><td>18 Nov 2026</td><td class="nm">Customer 02 LLC</td><td class="num">PO/004/01/26/2510/024085</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>Motor third party</td><td>18 Nov 2026</td><td>17 Nov 2027</td><td>Mitsubishi / L200</td></tr>
+    <tr><td><button class="ref" type="button">REF 624022</button></td><td>18 Nov 2026</td><td class="nm">Customer 03</td><td class="num">P/004/01/26/2510/051539</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>Motor third party</td><td>18 Nov 2026</td><td>17 Nov 2027</td><td>Lexus / RX</td></tr>
+    <tr><td><button class="ref" type="button">REF 624012</button></td><td>18 Nov 2026</td><td class="nm">Customer 04</td><td class="num">PO/004/01/26/2510/024067</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>Motor third party</td><td>19 Nov 2026</td><td>18 Nov 2027</td><td>Toyota / Yaris</td></tr>
+    <tr><td><button class="ref" type="button">REF 624002</button></td><td>18 Nov 2026</td><td class="nm">Customer 05</td><td class="num">PO/004/01/26/2510/024040</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>Motor third party</td><td>20 Nov 2026</td><td>19 Nov 2027</td><td>Hyundai / Elantra</td></tr>
+    <tr><td><button class="ref" type="button">REF 618142</button></td><td>17 Nov 2026</td><td class="nm">Customer 06 Trading</td><td class="num">P/004/01/26/2514/001388</td><td class="num">END-004</td><td>AL MADINA</td><td>Motor third party</td><td>18 Nov 2026</td><td>17 Nov 2027</td><td>Zoomlion / Excavator</td></tr>
+    <tr><td><button class="ref" type="button">REF 618132</button></td><td>17 Nov 2026</td><td class="nm">Customer 07</td><td class="num">PO/004/01/26/2510/023985</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>Motor third party</td><td>17 Nov 2026</td><td>16 Nov 2027</td><td>Toyota / Camry</td></tr>
+    <tr><td><button class="ref" type="button">REF 618122</button></td><td>17 Nov 2026</td><td class="nm">Customer 08 Investment LLC</td><td class="num">PO/004/01/26/2514/000606</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>Motor third party</td><td>17 Nov 2026</td><td>16 Nov 2027</td><td>Other / XGMA</td></tr>
+    <tr><td><button class="ref" type="button">REF 618112</button></td><td>17 Nov 2026</td><td class="nm">Customer 09</td><td class="num">PO/004/01/26/2510/023951</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>Motor third party</td><td>18 Nov 2026</td><td>17 Nov 2027</td><td>Kia / Rio</td></tr>
+    <tr><td><button class="ref" type="button">REF 618102</button></td><td>17 Nov 2026</td><td class="nm">Customer 10 and Partners LLC</td><td class="num">P/004/01/26/2304/000415</td><td class="nil">&mdash;</td><td>AL MADINA</td><td>CPM</td><td>17 Nov 2026</td><td>16 Nov 2027</td><td>Zoomlion / Loader</td></tr>
+  </tbody>
+</table>
+</div>
+
+</main></body>
+</html>

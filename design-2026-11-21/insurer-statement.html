@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Insurer statement — INSPT</title>
+<link rel="stylesheet" href="inspt-widget.css">
+<style>
+  .ins-kpis{grid-template-columns:1.15fr 1fr 1fr}
+  .ins-kpis .kpi{gap:10px;padding:22px 24px}
+  .ins-kpis .k-value{font-size:clamp(1.7rem,2.35vw,2.15rem)}
+  .statement{margin-top:34px}
+  .ins-table{min-width:900px}
+  .ins-table th,.ins-table td{padding:10px 14px}
+  .ins-table tbody td{height:50px}
+  .ins-table td:first-child{width:18%;font-weight:590}
+  .ins-table thead tr:first-child th{background:var(--paper);border-bottom:0;padding-bottom:2px;
+    font-size:var(--meta);font-weight:600;color:var(--sea)}
+  .ins-table thead tr:first-child th.grp{border-bottom:1px solid var(--sea)}
+  .ins-table thead tr:nth-child(2) th{border-top:0}
+  .ins-table .sep{border-left:var(--hairline)}
+  .ins-table .nil{color:var(--muted)}
+  .ins-table tfoot td{height:48px}
+  .notes{margin-top:18px;font-size:var(--meta);color:var(--muted);line-height:1.6;max-width:112ch}
+  .notes b{color:var(--ink);font-weight:600}
+  .notes p+p{margin-top:7px}
+</style>
+</head>
+<body><main>
+
+<div class="mast">
+  <div class="identity">
+    <span class="signet"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></svg></span>
+    <span class="wordmark">INSPT</span>
+    <span class="brand-context">Insurance Spot</span>
+  </div>
+  <div class="context">
+    <span>Refreshed 21 Nov, 04:25</span>
+    <button type="button" class="btn"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M20 5v5h-5M4 19v-5h5"/><path d="M5 9a7.5 7.5 0 0 1 12-4l3 3M4 16l3 3a7.5 7.5 0 0 0 12-4"/></svg>Refresh</button>
+  </div>
+</div>
+
+<header class="title-row">
+  <div>
+    <h1>Insurer statement</h1>
+    <p class="subtitle">Per insurer · commission owed to INSPT, and premium INSPT still owes insurers</p>
+  </div>
+</header>
+
+<dl class="kpis ins-kpis">
+  <div class="kpi lead">
+    <dt class="k-label">Commission outstanding</dt>
+    <dd class="k-value">26,303.426<span class="unit"> OMR</span></dd>
+    <dd class="k-note">Insurers still owe INSPT · 0.000 received of 26,303.426</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">Net commission retained</dt>
+    <dd class="k-value">21,553.295<span class="unit"> OMR</span></dd>
+    <dd class="k-note">After agent share, on accrued commission</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">Premium outstanding</dt>
+    <dd class="k-value">6,016.459<span class="unit"> OMR</span></dd>
+    <dd class="k-note">INSPT still owes insurers · 36,350.823 remitted of 42,367.282</dd>
+  </div>
+</dl>
+
+<section class="statement">
+  <div class="section-head">
+    <div>
+      <h2>By insurer</h2>
+      <p class="section-sub">2,027 of 2,112 records · commission-recognisable only (named insurer, not cancelled, commission above zero) · sorted by commission outstanding</p>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>Download Excel</button>
+    </div>
+  </div>
+
+  <div class="tscroll">
+  <table class="ins-table">
+    <thead>
+      <tr>
+        <th></th><th></th>
+        <th class="r grp" colspan="3">Commission &nbsp;insurer &rarr; INSPT</th>
+        <th class="r grp" colspan="3">Premium &nbsp;INSPT &rarr; insurer</th>
+      </tr>
+      <tr>
+        <th scope="col">Insurer</th>
+        <th scope="col" class="r">Policies</th>
+        <th scope="col" class="r sep">Accrued</th>
+        <th scope="col" class="r">Received</th>
+        <th scope="col" class="r">Outstanding</th>
+        <th scope="col" class="r sep">Held</th>
+        <th scope="col" class="r">Remitted</th>
+        <th scope="col" class="r">Outstanding</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>AL MADINA</td><td class="r num">1,849</td><td class="r num sep">22,303.890</td><td class="r nil">—</td><td class="r num"><b>22,303.890</b></td><td class="r num sep">42,044.042</td><td class="r num">36,027.583</td><td class="r num"><b>6,016.459</b></td></tr>
+      <tr><td>GIG</td><td class="r num">12</td><td class="r num sep">1,050.757</td><td class="r nil">—</td><td class="r num"><b>1,050.757</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>OUIC</td><td class="r num">19</td><td class="r num sep">1,003.323</td><td class="r nil">—</td><td class="r num"><b>1,003.323</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>ORIENT</td><td class="r num">24</td><td class="r num sep">880.923</td><td class="r nil">—</td><td class="r num"><b>880.923</b></td><td class="r num sep">323.240</td><td class="r num">323.240</td><td class="r nil">—</td></tr>
+      <tr><td>NIA</td><td class="r num">18</td><td class="r num sep">232.152</td><td class="r nil">—</td><td class="r num"><b>232.152</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>ARABIA FALCON</td><td class="r num">6</td><td class="r num sep">220.822</td><td class="r nil">—</td><td class="r num"><b>220.822</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>DOFAR INSURANCE</td><td class="r num">43</td><td class="r num sep">197.442</td><td class="r nil">—</td><td class="r num"><b>197.442</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>Other</td><td class="r num">15</td><td class="r num sep">152.327</td><td class="r nil">—</td><td class="r num"><b>152.327</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>LIVA</td><td class="r num">5</td><td class="r num sep">92.557</td><td class="r nil">—</td><td class="r num"><b>92.557</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>MIC</td><td class="r num">23</td><td class="r num sep">73.633</td><td class="r nil">—</td><td class="r num"><b>73.633</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>OQIC</td><td class="r num">8</td><td class="r num sep">51.085</td><td class="r nil">—</td><td class="r num"><b>51.085</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>IRAN INSURANCE</td><td class="r num">4</td><td class="r num sep">37.515</td><td class="r nil">—</td><td class="r num"><b>37.515</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+      <tr><td>OMAN TAKAFUL</td><td class="r num">1</td><td class="r num sep">7.000</td><td class="r nil">—</td><td class="r num"><b>7.000</b></td><td class="r nil sep">—</td><td class="r nil">—</td><td class="r nil">—</td></tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>Total · 13 insurers</td>
+        <td class="r num">2,027</td>
+        <td class="r num sep">26,303.426</td>
+        <td class="r num">0.000</td>
+        <td class="r num">26,303.426</td>
+        <td class="r num sep">42,367.282</td>
+        <td class="r num">36,350.823</td>
+        <td class="r num">6,016.459</td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+
+  <div class="notes">
+    <p><b>Commission.</b> Accrued is gross commission on recognisable policies (commission above zero, not cancelled). Received is those policies marked &ldquo;Commission received from insurer&rdquo;. Outstanding is accrued less received &mdash; what insurers still owe INSPT.</p>
+    <p><b>Premium.</b> Held is premium on policies marked &ldquo;Paid to INSPT&rdquo;. Remitted is those marked &ldquo;Premium paid to insurer&rdquo;. Outstanding is held less remitted &mdash; what INSPT still owes insurers.</p>
+  </div>
+</section>
+
+</main></body>
+</html>

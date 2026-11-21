@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>INSPT widget design — 21 Nov 2026</title>
+<link rel="stylesheet" href="inspt-widget.css">
+<style>
+  .lead-note{max-width:78ch;margin-top:10px;font-size:var(--label);color:var(--muted);line-height:1.6}
+  .screens{margin-top:34px;border-top:var(--hairline)}
+  .screen{display:flex;justify-content:space-between;align-items:baseline;gap:20px;
+    padding:17px 0;border-bottom:1px solid var(--rule-light)}
+  .screen:last-child{border-bottom:var(--hairline)}
+  .screen a{font-weight:580;color:var(--petrol);text-decoration:underline;
+    text-decoration-color:#b3a89a;text-underline-offset:4px}
+  .screen a:hover{text-decoration-color:currentColor}
+  .screen .d{color:var(--muted);font-size:var(--label);flex:1}
+  .origin{font-size:var(--meta);color:var(--muted);white-space:nowrap}
+  .origin.new{color:var(--sea);font-weight:580}
+  .swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;
+    margin-top:34px;border-top:var(--hairline);border-bottom:var(--hairline)}
+  .sw{padding:16px 18px 16px 0;position:relative}
+  .sw+.sw{padding-left:18px}
+  .sw+.sw:before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:1px;background:var(--rule-light)}
+  .chip{width:100%;height:30px;border-radius:var(--radius);margin-bottom:9px;border:1px solid rgba(0,0,0,.08)}
+  .sw b{display:block;font-size:var(--label);font-weight:580}
+  .sw span{display:block;font-size:var(--meta);color:var(--muted);font-variant-numeric:var(--numerals)}
+  .warnbox{margin-top:30px;border-left:2px solid var(--warning);background:var(--mist);
+    padding:14px 18px;font-size:var(--label);line-height:1.6;max-width:92ch}
+</style>
+</head>
+<body><main>
+
+<div class="mast">
+  <div class="identity">
+    <span class="signet"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></svg></span>
+    <span class="wordmark">INSPT</span>
+    <span class="brand-context">Widget design</span>
+  </div>
+  <div class="context"><span>21 November 2026</span></div>
+</div>
+
+<header class="title-row">
+  <div>
+    <h1>Widget design</h1>
+    <p class="subtitle">One look for all nine INSPT widgets</p>
+  </div>
+</header>
+
+<p class="lead-note">These are design mockups with sample figures, not working widgets. Four screens came from
+ChatGPT and were recoloured to the INSPT palette; five were drawn here from the same system. No real customer,
+agent or policy data appears on any of them &mdash; every name is invented.</p>
+
+<div class="screens">
+  <div class="screen"><a href="executive-dashboard.html">Executive dashboard</a><span class="d">Month to date, net commission, business source split, agent balances</span><span class="origin">recoloured</span></div>
+  <div class="screen"><a href="agent-statement.html">Agent statement</a><span class="d">Who owes whom, by agent</span><span class="origin">recoloured</span></div>
+  <div class="screen"><a href="policy-upload.html">Policy upload</a><span class="d">Three PDFs in, policy form prefilled</span><span class="origin">recoloured</span></div>
+  <div class="screen"><a href="employee-home.html">Employee home</a><span class="d">Staff landing page and quick actions</span><span class="origin">recoloured</span></div>
+  <div class="screen"><a href="insurer-statement.html">Insurer statement</a><span class="d">Commission owed to INSPT, premium owed to insurers</span><span class="origin new">new</span></div>
+  <div class="screen"><a href="reconciliation-health.html">Reconciliation health</a><span class="d">Standing checks between Books and Creator</span><span class="origin new">new</span></div>
+  <div class="screen"><a href="renewals-command-center.html">Renewals</a><span class="d">Expiry curve and the renewal book</span><span class="origin new">new</span></div>
+  <div class="screen"><a href="ms-entries-viewer.html">Policy entries &mdash; MS view</a><span class="d">Search, filter and export the whole book</span><span class="origin new">new</span></div>
+  <div class="screen"><a href="staff-policy-viewer.html">Policy entries &mdash; employee view</a><span class="d">Read-only list for staff</span><span class="origin new">new</span></div>
+</div>
+
+<div class="swatches">
+  <div class="sw"><div class="chip" style="background:#412a16"></div><b>Dark</b><span>#412a16 · fills, buttons</span></div>
+  <div class="sw"><div class="chip" style="background:#804a1c"></div><b>Accent</b><span>#804a1c · INSPT theme brown</span></div>
+  <div class="sw"><div class="chip" style="background:#a9743a"></div><b>Mid</b><span>#a9743a</span></div>
+  <div class="sw"><div class="chip" style="background:#ddc9b0"></div><b>Light</b><span>#ddc9b0</span></div>
+  <div class="sw"><div class="chip" style="background:#23634e"></div><b>Money in</b><span>#23634e · paid, pass</span></div>
+  <div class="sw"><div class="chip" style="background:#ab3225"></div><b>Money out</b><span>#ab3225 · overdue, fail</span></div>
+  <div class="sw"><div class="chip" style="background:#8a6000"></div><b>Warning</b><span>#8a6000</span></div>
+</div>
+
+<div class="warnbox">
+  <b>The rule.</b> Decoration is brown. Green and red are not decoration &mdash; they carry meaning and never
+  change: green is money in, paid, or a check that passed; red is money out, overdue, or a check that failed.
+</div>
+
+</main></body>
+</html>

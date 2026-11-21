@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Renewals — INSPT</title>
+<link rel="stylesheet" href="inspt-widget.css">
+<style>
+  .ren-kpis{grid-template-columns:1.1fr repeat(5,1fr)}
+  .ren-kpis .k-value{font-size:clamp(1.35rem,1.75vw,1.7rem)}
+  .curve{margin-top:34px}
+  .chart{margin-top:20px;border-top:var(--hairline);border-bottom:var(--hairline);padding:22px 0 0;
+    display:grid;grid-template-columns:repeat(12,1fr);gap:clamp(6px,1vw,16px);align-items:end;height:270px}
+  .bar{display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:8px;text-align:center}
+  .bar .col{background:var(--sea-light);border-radius:2px 2px 0 0;min-height:2px}
+  .bar.soon .col{background:var(--sea)}
+  .bar.late .col{background:var(--debit)}
+  .bar .n{font-size:var(--meta);font-variant-numeric:var(--numerals);color:var(--muted)}
+  .bar .m{font-size:var(--meta);color:var(--muted);padding:9px 0 12px;border-top:1px solid var(--rule-light)}
+  .bar.soon .n,.bar.late .n{color:var(--ink);font-weight:600}
+  .book{margin-top:34px}
+  .buckets{display:flex;flex-wrap:wrap;gap:0;border-bottom:var(--hairline);margin-bottom:18px}
+  .bucket{border:0;background:none;padding:10px 16px 11px;font-size:var(--label);color:var(--muted);
+    border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;gap:8px;align-items:baseline}
+  .bucket:hover{color:var(--ink)}
+  .bucket[aria-pressed="true"]{color:var(--petrol);font-weight:620;border-bottom-color:var(--sea)}
+  .bucket .c{font-size:var(--meta);color:var(--muted);font-variant-numeric:var(--numerals)}
+  .bucket[aria-pressed="true"] .c{color:var(--sea)}
+  .searchrow{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+  .searchrow input{max-width:420px}
+  .ren-table{min-width:950px}
+  .ren-table tbody td{height:54px}
+  .ren-table .insured{font-weight:590;display:block}
+  .ren-table .pol{font-size:var(--meta);color:var(--muted);font-variant-numeric:var(--numerals)}
+  .days{font-variant-numeric:var(--numerals);font-weight:580}
+  .days.over{color:var(--debit)}
+  .days.near{color:var(--warning)}
+  .state{font-size:var(--meta);font-weight:570}
+  .state.never{color:var(--debit)}
+  .state.done{color:var(--credit)}
+  .state.open{color:var(--muted)}
+  @media(max-width:1100px){.ren-kpis{grid-template-columns:repeat(3,1fr)}.ren-kpis .kpi:nth-child(n+4){border-top:var(--hairline)}}
+  @media(max-width:700px){.ren-kpis{grid-template-columns:repeat(2,1fr)}.chart{height:200px}}
+</style>
+</head>
+<body><main>
+
+<div class="mast">
+  <div class="identity">
+    <span class="signet"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></svg></span>
+    <span class="wordmark">INSPT</span>
+    <span class="brand-context">Insurance Spot</span>
+  </div>
+  <div class="context">
+    <span>Refreshed 21 Nov, 04:27</span>
+    <button type="button" class="btn"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M20 5v5h-5M4 19v-5h5"/><path d="M5 9a7.5 7.5 0 0 1 12-4l3 3M4 16l3 3a7.5 7.5 0 0 0 12-4"/></svg>Refresh</button>
+  </div>
+</div>
+
+<header class="title-row">
+  <div>
+    <h1>Renewals</h1>
+    <p class="subtitle">Derived live from policy entries, whether or not the nightly schedule has made a renewal record yet</p>
+  </div>
+</header>
+
+<dl class="kpis ren-kpis">
+  <div class="kpi lead">
+    <dt class="k-label">Overdue</dt>
+    <dd class="k-value">32</dd>
+    <dd class="k-note">303.238 OMR commission</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">Due in 30 days</dt>
+    <dd class="k-value">15</dd>
+    <dd class="k-note">Immediate action</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">31&ndash;60 days</dt>
+    <dd class="k-value">57</dd>
+    <dd class="k-note">Quoting window</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">61&ndash;90 days</dt>
+    <dd class="k-value">74</dd>
+    <dd class="k-note">Early engagement</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">Next 12 months</dt>
+    <dd class="k-value">2,054</dd>
+    <dd class="k-note">Total renewable book</dd>
+  </div>
+  <div class="kpi">
+    <dt class="k-label">Commission at risk</dt>
+    <dd class="k-value">1,950.625<span class="unit"> OMR</span></dd>
+    <dd class="k-note">Expiring within 90 days</dd>
+  </div>
+</dl>
+
+<section class="curve">
+  <div class="section-head">
+    <div>
+      <h2>Expiry curve</h2>
+      <p class="section-sub">Policies reaching their end date, by month &mdash; the workload before it arrives. 2,054 policies over twelve months.</p>
+    </div>
+  </div>
+  <div class="chart">
+    <div class="bar late"><span class="n">8</span><div class="col" style="height:2.6%"></div><span class="m">Nov</span></div>
+    <div class="bar soon"><span class="n">15</span><div class="col" style="height:4.8%"></div><span class="m">Dec</span></div>
+    <div class="bar"><span class="n">112</span><div class="col" style="height:36%"></div><span class="m">Jan</span></div>
+    <div class="bar"><span class="n">78</span><div class="col" style="height:25%"></div><span class="m">Feb</span></div>
+    <div class="bar"><span class="n">182</span><div class="col" style="height:59%"></div><span class="m">Mar</span></div>
+    <div class="bar"><span class="n">134</span><div class="col" style="height:43%"></div><span class="m">Apr</span></div>
+    <div class="bar"><span class="n">230</span><div class="col" style="height:74%"></div><span class="m">May</span></div>
+    <div class="bar"><span class="n">200</span><div class="col" style="height:65%"></div><span class="m">Jun</span></div>
+    <div class="bar"><span class="n">225</span><div class="col" style="height:73%"></div><span class="m">Jul</span></div>
+    <div class="bar"><span class="n">310</span><div class="col" style="height:100%"></div><span class="m">Aug</span></div>
+    <div class="bar"><span class="n">290</span><div class="col" style="height:94%"></div><span class="m">Sep</span></div>
+    <div class="bar"><span class="n">270</span><div class="col" style="height:87%"></div><span class="m">Oct</span></div>
+  </div>
+</section>
+
+<section class="book">
+  <div class="section-head">
+    <div>
+      <h2>Renewal book</h2>
+      <p class="section-sub">Every policy reaching its end date, soonest first</p>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn"><svg aria-hidden="true" class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>Download Excel</button>
+    </div>
+  </div>
+
+  <div class="buckets">
+    <button type="button" class="bucket" aria-pressed="true">All <span class="c">2,086</span></button>
+    <button type="button" class="bucket" aria-pressed="false">Overdue <span class="c">32</span></button>
+    <button type="button" class="bucket" aria-pressed="false">30 days <span class="c">15</span></button>
+    <button type="button" class="bucket" aria-pressed="false">31&ndash;60 days <span class="c">57</span></button>
+    <button type="button" class="bucket" aria-pressed="false">61&ndash;90 days <span class="c">74</span></button>
+    <button type="button" class="bucket" aria-pressed="false">3&ndash;6 months <span class="c">502</span></button>
+    <button type="button" class="bucket" aria-pressed="false">6&ndash;12 months <span class="c">1,406</span></button>
+  </div>
+
+  <div class="searchrow">
+    <label class="visually-hidden" for="q">Search the renewal book</label>
+    <input id="q" type="search" placeholder="Search name, policy number, insurer or type">
+    <span class="meta">2,086 policies</span>
+  </div>
+
+  <div class="tscroll">
+  <table class="ren-table">
+    <thead>
+      <tr>
+        <th scope="col">Insured</th>
+        <th scope="col">Insurer</th>
+        <th scope="col">Type</th>
+        <th scope="col">Expires</th>
+        <th scope="col" class="r">Days left</th>
+        <th scope="col" class="r">Premium</th>
+        <th scope="col" class="r">Commission</th>
+        <th scope="col">Renewal</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="insured">Customer 01</span><span class="pol">P/004/01/25/2510/002297</span></td><td>AL MADINA</td><td>Motor comprehensive</td><td>13 Jan 2026</td><td class="r"><span class="days over">312d ago</span></td><td class="r num">5.250</td><td class="r num">0.614</td><td><span class="state never">Never actioned</span></td></tr>
+      <tr><td><span class="insured">Customer 02</span><span class="pol">P/004/01/25/2510/001922</span></td><td>AL MADINA</td><td>Motor comprehensive</td><td>14 Jan 2026</td><td class="r"><span class="days over">311d ago</span></td><td class="r num">2.139</td><td class="r num">0.000</td><td><span class="state never">Never actioned</span></td></tr>
+      <tr><td><span class="insured">Customer 03</span><span class="pol">P/004/01/26/2510/009553</span></td><td>AL MADINA</td><td>Motor comprehensive</td><td>29 Jan 2026</td><td class="r"><span class="days over">296d ago</span></td><td class="r num">9.507</td><td class="r num">0.986</td><td><span class="state never">Never actioned</span></td></tr>
+      <tr><td><span class="insured">Customer 04</span><span class="pol">P/004/01/26/2514/001204</span></td><td>ORIENT</td><td>Motor third party</td><td>02 Dec 2026</td><td class="r"><span class="days near">11d</span></td><td class="r num">34.800</td><td class="r num">4.176</td><td><span class="state open">Quoted</span></td></tr>
+      <tr><td><span class="insured">Customer 05</span><span class="pol">P/004/01/26/2510/011880</span></td><td>AL MADINA</td><td>Motor comprehensive</td><td>09 Dec 2026</td><td class="r"><span class="days near">18d</span></td><td class="r num">128.450</td><td class="r num">15.414</td><td><span class="state done">Renewed</span></td></tr>
+      <tr><td><span class="insured">Customer 06</span><span class="pol">P/004/01/26/2304/000731</span></td><td>DOFAR INSURANCE</td><td>CPM</td><td>21 Dec 2026</td><td class="r"><span class="days near">30d</span></td><td class="r num">76.200</td><td class="r num">9.144</td><td><span class="state open">Contacted</span></td></tr>
+      <tr><td><span class="insured">Customer 07</span><span class="pol">P/004/01/26/2510/012044</span></td><td>AL MADINA</td><td>Motor third party</td><td>14 Jan 2027</td><td class="r"><span class="days">54d</span></td><td class="r num">21.350</td><td class="r num">2.562</td><td><span class="state open">Not started</span></td></tr>
+      <tr><td><span class="insured">Customer 08</span><span class="pol">P/004/01/26/2514/001588</span></td><td>GIG</td><td>Medical</td><td>03 Feb 2027</td><td class="r"><span class="days">74d</span></td><td class="r num">410.000</td><td class="r num">49.200</td><td><span class="state open">Not started</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</main></body>
+</html>
