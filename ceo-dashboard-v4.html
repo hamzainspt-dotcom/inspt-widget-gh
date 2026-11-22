@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Executive dashboard · INSPT</title>
+<!-- INSPT-CEO-DASHBOARD-v4-2026-11-23 | = v3 + the agent table split into two labelled groups that match Agent SOA v21
+     exactly (OI-159): Source agents = premium pending minus commission owed (D26); Placement agencies =
+     commission owed to INSPT. The old mixed "receivable/payable" table is gone from view; buildDashboard()
+     is still byte-identical to v2 and still computes it, it is just not shown.
+     v3 notes: | Speed + lead figure (Hamza 23-Nov: "continue with what you think is best").
+     1. The page frame paints at once with placeholder figures and a progress line; the numbers fill in
+        when the data is in. No figure is shown until it is complete, so nothing partial is ever displayed.
+     2. Records are fetched 1,000 per call instead of 200 (falls back to 200 if Zoho refuses).
+        Paging follows Zoho's record_cursor.
+     3. Net commission is the dark lead figure (ChatGPT's approved layout); the six figures are unchanged.
+     Everything between CORE-START and CORE-END (every calculation) is byte-identical to v2. -->
+<link rel="stylesheet" href="inspt-widget-v1.css">
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<style>
+  main{padding-top:var(--s5)}
+  #errorBox,#warnBox{display:none;margin-bottom:18px}
+  #loading{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:var(--label);margin:-8px 0 18px}
+  .spinner{width:14px;height:14px;border:2px solid var(--rule);border-top-color:var(--sea);
+           border-radius:50%;animation:sp 1s linear infinite;flex:none}
+  .kpi .value.wait{color:var(--rule)}
+  .kpis .kpi:first-child .value.wait{color:var(--on-dark-muted);opacity:.5}
+  .empty-mini.wait{min-height:120px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;white-space:nowrap}
+  .today{font-size:var(--label)}
+  .refreshed{font-size:var(--meta);color:var(--muted)}
+  .nav-btn{margin-top:6px;color:var(--petrol);text-decoration:underline;
+           text-decoration-color:#b3a89a;text-underline-offset:4px;font-size:var(--label);font-weight:550}
+
+  #alertStrip{display:none;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .alert-pill{display:inline-flex;align-items:center;gap:8px;font-size:var(--label);font-weight:560}
+  .alert-pill.red{color:var(--debit)}
+  .alert-pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+  /* five headline figures in one ruled strip, the first in the dark block */
+  .kpis{grid-template-columns:repeat(6,1fr);margin-bottom:34px}
+  .kpi .label{font-size:var(--label);font-weight:510;line-height:1.3}
+  .kpi .value{font-size:1.3rem;font-weight:570;letter-spacing:-.035em;line-height:1.14;
+              font-variant-numeric:var(--numerals);white-space:nowrap}
+  .kpi .value.warn{color:var(--warning)}
+  .kpi .meta{font-size:var(--meta);color:var(--muted);line-height:1.35}
+  .kpis .kpi:first-child{background:var(--petrol);color:var(--on-dark)}
+  .kpis .kpi:first-child .meta,.kpis .kpi:first-child .hint,
+  .kpis .kpi:first-child .delta{color:var(--on-dark-muted)}
+  .kpis .kpi:first-child+.kpi:before{display:none}
+  .delta.up{color:var(--credit)} .delta.down{color:var(--debit)} .delta.flat{color:var(--muted)}
+  .hint{color:var(--muted)}
+
+  .row{display:grid;gap:clamp(26px,3.4vw,52px);margin-bottom:38px}
+  .row.charts{grid-template-columns:1.6fr 1fr}
+  .row.tables{grid-template-columns:1.4fr 1fr}
+  @media(max-width:1300px){.kpis{grid-template-columns:repeat(3,1fr)}
+    .kpis .kpi:nth-child(n+4){border-top:1px solid var(--rule-light)}}
+  @media(max-width:1000px){.row.charts,.row.tables{grid-template-columns:1fr}}
+  @media(max-width:620px){.kpis{grid-template-columns:1fr}
+    .kpi+.kpi:before{display:none}}
+  .card-head{margin-bottom:18px}
+  .card-head h2{font-size:var(--section);font-weight:570;letter-spacing:-.035em}
+  .card-head .subtitle{font-size:var(--label);color:var(--muted);margin-top:5px;line-height:1.45}
+
+  /* monthly bars */
+  .bars{display:flex;align-items:flex-end;gap:clamp(8px,1.4vw,20px);height:210px;
+        padding-top:8px;border-bottom:var(--hairline)}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;min-width:0}
+  .bar-val{font-size:var(--meta);color:var(--muted);margin-bottom:6px;font-variant-numeric:var(--numerals)}
+  .bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+  .bar{width:100%;max-width:46px;background:var(--sea-light);height:0;
+       transition:height .55s cubic-bezier(.22,.61,.36,1)}
+  .bar.current{background:var(--sea)}
+  .bar-label{font-size:var(--meta);color:var(--muted);padding:8px 0 0}
+  .bar-label.current{color:var(--petrol);font-weight:620}
+
+  /* donut */
+  .donut-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .donut-center-num{font-size:21px;font-weight:600;fill:var(--ink)}
+  .donut-center-lbl{font-size:9px;fill:var(--muted);letter-spacing:.08em}
+  .legend{flex:1;min-width:180px;display:flex;flex-direction:column}
+  .legend .li{display:grid;grid-template-columns:11px 1fr auto auto;gap:9px;align-items:center;
+              padding:8px 0;border-bottom:1px solid var(--rule-light);font-size:var(--meta)}
+  .legend .sw{width:9px;height:9px;border-radius:2px}
+  .legend .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .legend .amt{font-variant-numeric:var(--numerals)}
+  .legend .pct{color:var(--muted);min-width:32px;text-align:right}
+
+  /* agent table */
+  #agentTable table{font-size:var(--label)}
+  #agentTable th{background:var(--mist);color:var(--muted);font-weight:500;font-size:var(--meta)}
+  .num{text-align:right;font-variant-numeric:var(--numerals);white-space:nowrap}
+  .agent-name{font-weight:560;white-space:nowrap}
+  .grp{font-size:var(--meta);font-weight:600;color:var(--muted);padding:16px 0 6px}
+  .grp:first-child{padding-top:0}
+  .grp b{color:var(--ink);font-weight:600}
+  .net.pos{color:var(--credit);font-weight:620}
+  .net.neg{color:var(--debit);font-weight:620}
+  .chip{font-size:var(--meta);font-weight:600;white-space:nowrap}
+  .chip.owes-us{color:var(--credit)}
+  .chip.we-owe{color:var(--debit)}
+  .chip.settled{color:var(--muted);font-weight:500}
+
+  /* insurer bars */
+  .ins-row{display:grid;grid-template-columns:minmax(90px,1.1fr) 2fr auto;gap:12px;align-items:center;
+           padding:9px 0;border-bottom:1px solid var(--rule-light);font-size:var(--label)}
+  .ins-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ins-track{height:7px;background:var(--rule-light)}
+  .ins-fill{height:100%;width:0;background:var(--sea);transition:width .55s cubic-bezier(.22,.61,.36,1)}
+  .ins-amt{font-variant-numeric:var(--numerals);white-space:nowrap}
+  .empty-mini{color:var(--muted);font-size:var(--label);padding:22px 0}
+</style>
+</head>
+<body>
+<main>
+
+<div id="errorBox" class="notice bad"></div>
+
+<div id="app">
+  <header class="title-row">
+    <div>
+      <h1>Executive dashboard</h1>
+      <p class="subtitle">Insurance Spot — performance at a glance</p>
+    </div>
+    <div class="right">
+      <span class="today" id="todayLbl"></span>
+      <span class="refreshed" id="refreshedAt"></span>
+      <a class="nav-btn" id="reconHealthBtn" href="https://creatorapp.zoho.com/mohammadhamza383/inspt-policy-accounting-system#Page:Reconciliation_Health" target="_top" title="Open the Reconciliation Health control panel">Reconciliation health &rarr;</a>
+    </div>
+  </header>
+
+  <div id="loading"><div class="spinner"></div><div id="loadingMsg">Loading policies…</div></div>
+  <div id="warnBox" class="notice"></div>
+  <div id="alertStrip"></div>
+
+  <div class="kpis" id="kpiGrid"></div>
+
+  <div class="row charts">
+    <section>
+      <div class="card-head">
+        <h2>Net commission — last 6 months</h2>
+        <div class="subtitle">Monthly net commission in OMR (cancelled entries excluded)</div>
+      </div>
+      <div class="bars" id="barChart"></div>
+    </section>
+    <section>
+      <div class="card-head">
+        <h2>Business source split</h2>
+        <div class="subtitle">Premium by source — last 6 months</div>
+      </div>
+      <div class="donut-wrap" id="donutWrap"></div>
+    </section>
+  </div>
+
+  <div class="row tables">
+    <section>
+      <div class="card-head">
+        <h2>Agent net balances</h2>
+        <div class="subtitle">Open entries from 1 May 2026 · same figures as the Agent SOA screen</div>
+      </div>
+      <div id="agentTable"></div>
+    </section>
+    <section>
+      <div class="card-head">
+        <h2>Net commission by insurer</h2>
+        <div class="subtitle">Last 6 months · top insurers (net commission)</div>
+      </div>
+      <div id="insurerList"></div>
+    </section>
+  </div>
+
+  <div class="footnote" id="footNote"></div>
+</div>
+</main>
+
+<script>
+/* =====================================================================
+   CEO Dashboard Widget v8 — INSPT (2026-06-11: CR1 same-period MoM, CR2 6-card grid)
+   Zoho Creator Widget SDK v2 (SigmaSDK boot, snake_case, cursor paging)
+   ===================================================================== */
+
+/*CORE-START*/
+function lookupVal(field) {
+  if (field === null || field === undefined) return '';
+  if (typeof field === 'object') {
+    var dv = field.display_value !== undefined ? field.display_value : field.zc_display_value;
+    return String(dv || '').trim();
+  }
+  return String(field).trim();
+}
+
+function num(v) {
+  var n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// "dd-MMM-yyyy" -> {y, m, d} or null
+function parseMonth(s) {
+  if (!s) return null;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(String(s).trim());
+  if (!m) return null;
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  if (mon === undefined) return null;
+  return { y: parseInt(m[3], 10), m: mon, d: parseInt(m[1], 10) };
+}
+
+function monthKey(y, m) { return y * 12 + m; }
+
+// OI-42 fix (2026-07-10): same go-live cutoff as agent-ledger.html's CUTOFF_TS
+// (new Date(2026,4,1) = 01-May-2026). {y,m,d} from parseMonth(), month 0-based.
+var CUTOFF_Y = 2026, CUTOFF_M = 4, CUTOFF_D = 1;
+function inAgentScope(pm) {
+  if (!pm) return false;
+  if (pm.y !== CUTOFF_Y) return pm.y > CUTOFF_Y;
+  if (pm.m !== CUTOFF_M) return pm.m > CUTOFF_M;
+  return pm.d >= CUTOFF_D;
+}
+
+function fmtOMR(v) {
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  var parts = abs.toFixed(3).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + parts[0] + '.' + parts[1] + ' OMR';
+}
+
+function fmtCompact(v) {
+  var abs = Math.abs(v);
+  if (abs >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+  if (abs >= 10000) return (v / 1000).toFixed(1) + 'K';
+  return Math.round(v).toLocaleString('en-US');
+}
+
+// MoM % vs same period of previous month (CR1). Returns null when prev is 0.
+function momPct(cur, prev) {
+  if (!prev) return null;
+  return (cur - prev) / Math.abs(prev) * 100;
+}
+
+// Build all dashboard data. `now` = {y, m, d} — d enables same-period
+// prev-month comparison (CR1): prev sums only include entries with day <= now.d.
+function buildDashboard(policies, settlements, now) {
+  var curKey = monthKey(now.y, now.m);
+  var prevKey = curKey - 1;
+  var sixStart = curKey - 5;
+
+  var k = {
+    premiumMTD: 0, premiumPrev: 0,
+    commissionMTD: 0, commissionPrev: 0,
+    netCommMTD: 0, netCommPrev: 0,
+    policiesMTD: 0, policiesPrev: 0,
+    receiptPendingMTD: 0,
+    premiumOutstanding: 0, outstandingCount: 0,
+    syncFailed: 0
+  };
+
+  var monthly = {};   // key -> premium
+  var source = {};    // name -> premium (6 months)
+  var insurers = {};  // name -> premium (6 months)
+  var agents = {};    // name -> {recv, pay, settle}
+
+  function agentFor(name) {
+    if (!agents[name]) agents[name] = { recv: 0, pay: 0, settle: 0 };
+    return agents[name];
+  }
+
+  (policies || []).forEach(function (p) {
+    var pm = parseMonth(p.Invoice_Date);
+    var mk = pm ? monthKey(pm.y, pm.m) : null;
+    var premStatus = String(p.Dropdown1 || '').trim();
+    var cancelled = premStatus === 'Cancelled';
+    var premium = num(p.Premium);
+
+    // --- KPIs ---
+    if (!cancelled && mk === curKey) {
+      k.premiumMTD += premium;
+      k.commissionMTD += num(p.Commission);
+      k.netCommMTD += num(p.Net_Commission);
+      k.policiesMTD += 1;
+    }
+    // CR1: same-period comparison — only prev-month entries up to the same
+    // day of month. Months shorter than now.d are naturally fully included.
+    if (!cancelled && mk === prevKey && pm && pm.d <= now.d) {
+      k.premiumPrev += premium;
+      k.commissionPrev += num(p.Commission);
+      k.netCommPrev += num(p.Net_Commission);
+      k.policiesPrev += 1;
+    }
+    if (mk === curKey && String(p.Receipt_Approval_Status || '').trim() === 'Pending Approval') {
+      k.receiptPendingMTD += 1;
+    }
+    if (premStatus === 'Pending' || premStatus === 'Partially Paid' || premStatus === 'Credit') {
+      k.premiumOutstanding += premium;
+      k.outstandingCount += 1;
+    }
+    if (String(p.Policy_Status || '').trim() === 'Invoice Sync Failed' ||
+        String(p.Zoho_Books_Sync_Status || '').trim() === 'Failed') {
+      k.syncFailed += 1;
+    }
+
+    // --- 6-month aggregates (cancelled excluded) ---
+    if (!cancelled && mk !== null && mk >= sixStart && mk <= curKey) {
+      // v10 (Hamza, dad): monthly trend + insurer breakdown now track NET COMMISSION
+      // (gross commission looked overstated). Business Source Split below stays premium.
+      monthly[mk] = (monthly[mk] || 0) + num(p.Net_Commission);
+      var src = lookupVal(p.Sources_of_Business) || 'Other';
+      source[src] = (source[src] || 0) + premium;
+      var ins = lookupVal(p.Insurers);
+      if (ins) insurers[ins] = (insurers[ins] || 0) + num(p.Net_Commission);
+    }
+
+    // --- Agent balances (v11, OI-42 fix 2026-07-10) ---
+    // Matched exactly to agent-ledger.html's buildLedger(): receivable and payable
+    // are cleared by their OWN independent flag, and only policies on/after the
+    // 01-May-2026 go-live cutoff are counted (same as the Ledger's CUTOFF_TS).
+    if (inAgentScope(pm)) {
+      var placement = lookupVal(p.Insurer_Agents);
+      var commission = num(p.Commission);
+      var claimed = String(p.Commission_Claimed || '').trim();
+      var recvOpen = claimed !== 'Yes' && claimed !== 'Not Applicable';
+      if (placement && placement !== 'Direct' && commission !== 0 && recvOpen) {
+        agentFor(placement).recv += commission;
+      }
+      var srcType = lookupVal(p.Sources_of_Business);
+      var refAgent = String(p.Agent_Source_Details || '').trim();
+      var shared = num(p.Commission_Shared);
+      var payOpen = String(p.Agent_Commission_Status || '').trim() !== 'Settled';
+      if (srcType === 'Agent' && refAgent && shared !== 0 && payOpen) {
+        agentFor(refAgent).pay += shared;
+      }
+    }
+  });
+
+  (settlements || []).forEach(function (s) {
+    var agent = lookupVal(s.Agent);
+    if (!agent) return;
+    var amount = num(s.Amount);
+    if (amount === 0) return;
+    var dir = String(s.Direction || '').trim();
+    if (dir === 'Agent pays INSPT') agentFor(agent).settle -= amount;
+    else if (dir === 'INSPT pays Agent') agentFor(agent).settle += amount;
+  });
+
+  // monthly array oldest -> newest
+  var months = [];
+  for (var i = sixStart; i <= curKey; i++) {
+    var y = Math.floor(i / 12), m = i % 12;
+    months.push({ label: MONTH_NAMES[m] + ' ' + String(y).slice(2), premium: monthly[i] || 0, current: i === curKey });
+  }
+
+  var agentRows = Object.keys(agents).map(function (n) {
+    var a = agents[n];
+    return { name: n, recv: a.recv, pay: a.pay, settle: a.settle, net: a.recv - a.pay + a.settle };
+  }).filter(function (a) {
+    return Math.abs(a.recv) > 0.0005 || Math.abs(a.pay) > 0.0005 || Math.abs(a.settle) > 0.0005;
+  }).sort(function (a, b) { return Math.abs(b.net) - Math.abs(a.net); });
+
+  var insurerRows = Object.keys(insurers).map(function (n) {
+    return { name: n, premium: insurers[n] };
+  }).sort(function (a, b) { return b.premium - a.premium; });
+
+  return { kpis: k, months: months, source: source, insurers: insurerRows, agents: agentRows };
+}
+/*CORE-END*/
+
+// ---------------- DOM / SDK layer ----------------
+
+var APP_NAME = 'inspt-policy-accounting-system';
+var booted = false;
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  var el = document.getElementById('errorBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function showWarn(msg) {
+  var el = document.getElementById('warnBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+// v3: ask for 1,000 records per call (Zoho allows 200/500/1000); if the first call is refused,
+// start again at 200, which is what v2 always used. Pages are followed by record_cursor: Zoho sends
+// one only while more records remain. A refusal AFTER the first page means "no more records".
+async function fetchAllPagesAt(reportName, size, onPage) {
+  var all = [];
+  var cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: reportName, max_records: size };
+    if (cursor) params.record_cursor = cursor;
+    var resp;
+    try { resp = await ZOHO.CREATOR.DATA.getRecords(params); }
+    catch (e) { if (!cursor) throw e; break; }
+    if (!resp || resp.code !== 3000 || !resp.data || resp.data.length === 0) {
+      if (!cursor && resp && resp.code !== 3000) throw resp;
+      break;
+    }
+    all = all.concat(resp.data);
+    if (onPage) onPage(all.length);
+    if (!resp.record_cursor || resp.record_cursor === cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return all;
+}
+
+async function fetchAllPages(reportName, onPage) {
+  try { return await fetchAllPagesAt(reportName, 1000, onPage); }
+  catch (e) { return await fetchAllPagesAt(reportName, 200, onPage); }
+}
+
+var SETTLEMENT_REPORT_CANDIDATES = ['All_Agent_Settlements', 'Agent_Settlements', 'Agent_Settlements_Report'];
+
+async function fetchSettlementsSafe() {
+  for (var i = 0; i < SETTLEMENT_REPORT_CANDIDATES.length; i++) {
+    try {
+      return await fetchAllPages(SETTLEMENT_REPORT_CANDIDATES[i]);
+    } catch (e) {
+      var es = String(e && e.message || '') + ' ' + ((e && e.code) || '') + ' ' + JSON.stringify(e);
+      if (/9220|3100|no data/i.test(es)) return [];
+    }
+  }
+  return null;
+}
+
+function animateCounter(el, target, formatter) {
+  var start = null, dur = 700;
+  function step(t) {
+    if (start === null) start = t;
+    var p = Math.min((t - start) / dur, 1);
+    var eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = formatter(target * eased);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function deltaChip(cur, prev, prevLabel) {
+  var pct = momPct(cur, prev);
+  if (pct === null) return '<span class="delta flat">— vs ' + esc(prevLabel) + '</span>';
+  var up = pct >= 0;
+  var cls = Math.abs(pct) < 0.05 ? 'flat' : (up ? 'up' : 'down');
+  var arrow = Math.abs(pct) < 0.05 ? '•' : (up ? '▲' : '▼');
+  return '<span class="delta ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(0) + '% vs ' + esc(prevLabel) + '</span>';
+}
+
+function renderKPIs(k, monthLbl, prevLbl) {
+  var defs = [
+    { label: 'Net Commission (' + monthLbl + ')', val: k.netCommMTD, fmt: fmtOMR, meta: deltaChip(k.netCommMTD, k.netCommPrev, prevLbl) },
+    { label: 'Premium Written (' + monthLbl + ')', val: k.premiumMTD, fmt: fmtOMR, meta: deltaChip(k.premiumMTD, k.premiumPrev, prevLbl) },
+    { label: 'Commission Earned (' + monthLbl + ')', val: k.commissionMTD, fmt: fmtOMR, meta: deltaChip(k.commissionMTD, k.commissionPrev, prevLbl) },
+    { label: 'Policies Issued (' + monthLbl + ')', val: k.policiesMTD, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); }, meta: deltaChip(k.policiesMTD, k.policiesPrev, prevLbl) },
+    { label: 'Receipts Pending (' + monthLbl + ')', val: k.receiptPendingMTD, fmt: function (v) { return Math.round(v).toLocaleString('en-US'); }, meta: '<span class="hint">awaiting approval</span>', cls: k.receiptPendingMTD > 0 ? 'warn' : '' },
+    { label: 'Premium Outstanding', val: k.premiumOutstanding, fmt: fmtOMR, meta: '<span class="hint">' + k.outstandingCount + ' entries pending / partial / credit</span>', cls: 'warn' }
+  ]; // CR2: Invoice Sync Failed card removed — failures surface via red alert pill only
+  var grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '';
+  defs.forEach(function (d, i) {
+    var div = document.createElement('div');
+    div.className = 'kpi fade-up';
+    div.style.animationDelay = (0.06 + i * 0.045) + 's';
+    div.innerHTML = '<div class="label">' + d.label + '</div>' +
+      '<div class="value ' + (d.cls || '') + '"></div>' +
+      '<div class="meta">' + d.meta + '</div>';
+    grid.appendChild(div);
+    animateCounter(div.querySelector('.value'), d.val, d.fmt);
+  });
+}
+
+function renderBars(months) {
+  var max = Math.max.apply(null, months.map(function (m) { return m.premium; }).concat([1]));
+  var wrap = document.getElementById('barChart');
+  wrap.innerHTML = '';
+  months.forEach(function (m) {
+    var col = document.createElement('div');
+    col.className = 'bar-col';
+    col.innerHTML =
+      '<div class="bar-val">' + fmtCompact(m.premium) + '</div>' +
+      '<div class="bar-wrap"><div class="bar' + (m.current ? ' current' : '') + '" title="' + esc(m.label) + ': ' + fmtOMR(m.premium) + '"></div></div>' +
+      '<div class="bar-label' + (m.current ? ' current' : '') + '">' + esc(m.label) + '</div>';
+    wrap.appendChild(col);
+  });
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      var bars = wrap.querySelectorAll('.bar');
+      months.forEach(function (m, i) {
+        bars[i].style.height = Math.max(m.premium / max * 100, m.premium > 0 ? 3 : 0) + '%';
+      });
+    });
+  });
+}
+
+var DONUT_COLORS = ['#6B3A2A', '#C9954A', '#B5622A', '#8B6B5A'];
+
+function renderDonut(source) {
+  var entries = Object.keys(source).map(function (n) { return { name: n, val: source[n] }; })
+    .filter(function (e) { return e.val > 0; })
+    .sort(function (a, b) { return b.val - a.val; });
+  var total = entries.reduce(function (a, e) { return a + e.val; }, 0);
+  var wrap = document.getElementById('donutWrap');
+  if (!total) { wrap.innerHTML = '<div class="empty-mini">No premium recorded in this period.</div>'; return; }
+
+  var R = 54, C = 2 * Math.PI * R;
+  var svg = '<svg class="donut-svg" width="150" height="150" viewBox="0 0 150 150">';
+  var acc = 0;
+  entries.forEach(function (e, i) {
+    var frac = e.val / total;
+    svg += '<circle cx="75" cy="75" r="' + R + '" fill="none" stroke="' + DONUT_COLORS[i % DONUT_COLORS.length] + '"' +
+      ' stroke-width="17"' +
+      ' stroke-dasharray="' + (frac * C).toFixed(2) + ' ' + C.toFixed(2) + '"' +
+      ' stroke-dashoffset="' + (C * 0.25 - acc).toFixed(2) + '"></circle>';
+    acc += frac * C;
+  });
+  svg += '<text x="75" y="71" text-anchor="middle" class="donut-center-num">' + fmtCompact(total) + '</text>';
+  svg += '<text x="75" y="86" text-anchor="middle" class="donut-center-lbl">OMR · 6 MO</text>';
+  svg += '</svg>';
+
+  var legend = '<div class="legend">';
+  entries.forEach(function (e, i) {
+    legend += '<div class="li"><span class="sw" style="background:' + DONUT_COLORS[i % DONUT_COLORS.length] + '"></span>' +
+      '<span class="nm">' + esc(e.name) + '</span>' +
+      '<span class="amt">' + fmtOMR(e.val) + '</span>' +
+      '<span class="pct">' + (e.val / total * 100).toFixed(0) + '%</span></div>';
+  });
+  legend += '</div>';
+  wrap.innerHTML = svg + legend;
+}
+
+// v4: two groups, same rules as Agent SOA v21 (copied from it, not shared, so a change there must be mirrored).
+var SOA_CUTOFF_TS = new Date(2026, 4, 1).getTime();     // 01-May-2026
+var SOA_ALIASES = { 'bhatti': 'Attaullah' };
+function soaLookup(f) {
+  if (f === null || f === undefined) return '';
+  if (typeof f === 'object') {
+    var dv = f.display_value !== undefined ? f.display_value : f.zc_display_value;
+    if (dv === undefined) { for (var k in f) { if (k !== 'ID' && typeof f[k] === 'string') { dv = f[k]; break; } } }
+    return String(dv || '').trim();
+  }
+  return String(f).trim();
+}
+function soaNum(v) { var n = parseFloat(String(v === undefined || v === null ? '' : v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
+function soaR3(v) { return Math.round(v * 1000) / 1000; }
+function soaTs(s) { var pm = parseMonth(s); return pm ? new Date(pm.y, pm.m, pm.d).getTime() : 0; }
+function soaCanon(n) { n = String(n || '').trim().replace(/\s+/g, ' '); if (!n) return ''; return SOA_ALIASES[n.toLowerCase()] || n; }
+function buildAgentGroups(policies) {
+  var src = {}, plc = {};
+  (policies || []).forEach(function (p) {
+    var ts = soaTs(p.Invoice_Date);
+    // source agents (Agent SOA buildParties)
+    var agent = soaLookup(p.Agent_Source_Details);
+    if (soaLookup(p.Sources_of_Business) === 'Agent' && agent && ts >= SOA_CUTOFF_TS) {
+      var k = soaCanon(agent).toLowerCase();
+      if (!src[k]) src[k] = { name: soaCanon(agent), prem: 0, comm: 0, count: 0 };
+      var premStatus = String(p.Dropdown1 || '').trim(), prem = soaNum(p.Premium);
+      if (prem !== 0 && premStatus === 'Pending') { src[k].prem += prem; src[k].count++; }
+      var sh = soaNum(p.Commission_Shared), acs = String(p.Agent_Commission_Status || '').trim();
+      if (sh !== 0 && acs !== 'Settled') { src[k].comm += sh; src[k].count++; }
+    }
+    // placement agencies (Agent SOA buildPlacement)
+    var agency = soaLookup(p.Insurer_Agents), commission = soaNum(p.Commission);
+    var claimed = String(p.Commission_Claimed || '').trim();
+    if (ts >= SOA_CUTOFF_TS && agency && agency !== 'Direct' && commission !== 0 && claimed !== 'Yes' && claimed !== 'Not Applicable') {
+      var q = agency.toLowerCase();
+      if (!plc[q]) plc[q] = { name: agency, total: 0, count: 0 };
+      plc[q].total += commission; plc[q].count++;
+    }
+  });
+  var source = Object.keys(src).map(function (k) { var a = src[k]; a.prem = soaR3(a.prem); a.comm = soaR3(a.comm); a.net = soaR3(a.prem - a.comm); return a; })
+    .filter(function (a) { return a.count; }).sort(function (a, b) { return Math.abs(b.net) - Math.abs(a.net); });
+  var placement = Object.keys(plc).map(function (k) { plc[k].total = soaR3(plc[k].total); return plc[k]; })
+    .sort(function (a, b) { return b.total - a.total; });
+  return { source: source, placement: placement };
+}
+
+function renderAgents(groups) {
+  var el = document.getElementById('agentTable');
+  var html = '';
+  html += '<div class="grp"><b>Source agents</b> · bring customers · premium pending minus commission INSPT owes them</div>';
+  if (!groups.source.length) html += '<div class="empty-mini">Nothing open.</div>';
+  else {
+    html += '<table><thead><tr><th>Agent</th><th class="num">Premium pending</th><th class="num">Commission owed</th><th class="num">Net</th><th></th></tr></thead><tbody>';
+    groups.source.forEach(function (a) {
+      var pos = a.net >= 0;
+      var chip = Math.abs(a.net) < 0.0005 ? '<span class="chip settled">Nothing to pay</span>'
+        : (pos ? '<span class="chip owes-us">Pays INSPT</span>' : '<span class="chip we-owe">INSPT pays</span>');
+      html += '<tr><td class="agent-name">' + esc(a.name) + '</td><td class="num">' + fmtOMR(a.prem) + '</td><td class="num">' + fmtOMR(a.comm) + '</td>' +
+        '<td class="num net ' + (pos ? 'pos' : 'neg') + '">' + fmtOMR(Math.abs(a.net)) + '</td><td>' + chip + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '<div class="grp"><b>Placement agencies</b> · policies placed through them · commission they owe INSPT</div>';
+  if (!groups.placement.length) html += '<div class="empty-mini">Nothing open.</div>';
+  else {
+    html += '<table><thead><tr><th>Agency</th><th class="num">Open policies</th><th class="num">Owes INSPT</th></tr></thead><tbody>';
+    groups.placement.forEach(function (a) {
+      html += '<tr><td class="agent-name">' + esc(a.name) + '</td><td class="num">' + a.count + '</td><td class="num net pos">' + fmtOMR(a.total) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  el.innerHTML = html;
+}
+
+function renderInsurers(insurers) {
+  var el = document.getElementById('insurerList');
+  if (!insurers.length) { el.innerHTML = '<div class="empty-mini">No insurer data in this period.</div>'; return; }
+  var rows = insurers.slice(0, 8);
+  var max = rows[0].premium || 1;
+  var html = '';
+  rows.forEach(function (r) {
+    html += '<div class="ins-row">' +
+      '<div class="ins-name" title="' + esc(r.name) + '">' + esc(r.name) + '</div>' +
+      '<div class="ins-track"><div class="ins-fill" data-w="' + (r.premium / max * 100).toFixed(1) + '"></div></div>' +
+      '<div class="ins-amt">' + fmtOMR(r.premium) + '</div>' +
+      '</div>';
+  });
+  el.innerHTML = html;
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      el.querySelectorAll('.ins-fill').forEach(function (f) { f.style.width = f.getAttribute('data-w') + '%'; });
+    });
+  });
+}
+
+function renderAlerts(k) {
+  // CR2: amber receipts pill removed. Red sync-failure pill kept —
+  // renders only when failures exist, so the layout stays clean on good days.
+  var strip = document.getElementById('alertStrip');
+  if (k.syncFailed > 0) {
+    strip.innerHTML = '<span class="alert-pill red"><span class="dot"></span>' + k.syncFailed + ' invoice' + (k.syncFailed === 1 ? '' : 's') + ' failed to sync to Zoho Books</span>';
+    strip.style.display = 'flex';
+  }
+}
+
+// v3: paint the frame at once. Placeholders only - no figure appears until all data is in.
+function renderSkeleton() {
+  var nowD = new Date();
+  var mL = MONTH_NAMES[nowD.getMonth()];
+  var labels = ['Net Commission (' + mL + ')', 'Premium Written (' + mL + ')', 'Commission Earned (' + mL + ')',
+                'Policies Issued (' + mL + ')', 'Receipts Pending (' + mL + ')', 'Premium Outstanding'];
+  document.getElementById('kpiGrid').innerHTML = labels.map(function (l) {
+    return '<div class="kpi"><div class="label">' + esc(l) + '</div><div class="value wait">—</div><div class="meta">&nbsp;</div></div>';
+  }).join('');
+  ['barChart', 'donutWrap', 'agentTable', 'insurerList'].forEach(function (id) {
+    document.getElementById(id).innerHTML = '<div class="empty-mini wait"></div>';
+  });
+  document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+}
+renderSkeleton();
+
+async function boot() {
+  booted = true;
+  try {
+    var results = await Promise.all([
+      fetchAllPages('All_Policy_Entries', function (n) {
+        document.getElementById('loadingMsg').textContent = 'Loading policies… ' + n.toLocaleString('en-US') + ' so far';
+      }).catch(function (e) {
+        throw new Error('All_Policy_Entries: ' + (e && e.message ? e.message : JSON.stringify(e)));
+      }),
+      fetchSettlementsSafe()
+    ]);
+    var settlements = results[1];
+    if (settlements === null) {
+      settlements = [];
+      showWarn('Settlements report not found — agent balances exclude settlements.');
+    }
+
+    var nowD = new Date();
+    var now = { y: nowD.getFullYear(), m: nowD.getMonth(), d: nowD.getDate() };
+    var monthLbl = MONTH_NAMES[now.m];
+    var prevMonthLbl = MONTH_NAMES[(now.m + 11) % 12];
+    // CR1: chips compare same period, e.g. "vs May 1-11"
+    var prevLbl = prevMonthLbl + ' 1–' + now.d;
+
+    var dash = buildDashboard(results[0], settlements, now);
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('todayLbl').textContent = nowD.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+    document.getElementById('refreshedAt').textContent = 'Refreshed ' + nowD.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('footNote').textContent =
+      'MoM compares ' + monthLbl + ' 1–' + now.d + ' against ' + prevLbl + ' (same period) · Cancelled entries excluded from revenue · Agent balances use the same rules as the Agent SOA screen (from 1 May 2026)';
+
+    renderAlerts(dash.kpis);
+    renderKPIs(dash.kpis, monthLbl, prevLbl);
+    renderBars(dash.months);
+    renderDonut(dash.source);
+    renderAgents(buildAgentGroups(results[0]));
+    renderInsurers(dash.insurers);
+  } catch (e) {
+    showError('Failed to load data: ' + (e && e.message ? e.message : JSON.stringify(e)));
+  }
+}
+
+// ---------- Reconciliation Health link (v12.1, OI-75) ----------
+// Plain anchor with target="_top" — the widget iframe has no sandbox attribute, so native
+// top-level navigation works without any SDK call. (navigateParentURL was a silent no-op
+// on the live embed despite matching the documented v2 config shape — do not reintroduce.)
+
+// ---------- Boot pattern (SDK v2 — do not change) ----------
+setTimeout(function () {
+  if (!booted) showError('Widget timed out. Not embedded in Creator?');
+}, 15000);
+
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) {
+    SigmaSDK.CREATOR.init(function () { if (!booted) boot(); });
+  } else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) {
+    boot();
+  } else {
+    showError('Zoho Creator SDK not found.');
+  }
+} catch (e) {
+  showError('SDK error: ' + e.message);
+}
+</script>
+</body>
+</html>
