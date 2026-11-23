@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent statement of account · INSPT</title>
+<!-- INSPT-AGENT-SOA-v24-2026-11-23 | = v23 with every table heading the same brown (screen, PDF, Excel). ONE STATEMENT PER PARTY (MS/Hamza 23-Nov): commission payable, commission receivable,
+     premium payable and premium receivable on one row per policy, for source agents and placement agencies together
+     (supersedes D26). Premium payable counts only when Premium Status = Paid to INSPT and it is not passed on yet.
+     One net settlement over all four columns. Designed PDF (jsPDF) and formatted Excel (ExcelJS), both load on click.
+     Kept from v22: fresh-data check before saving, record first, Finish closing, Retry, history, refresh. -->
+<link rel="stylesheet" href="inspt-widget-v1.css">
+<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+<style>
+  main{padding-top:var(--s5)}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+          flex-wrap:wrap;margin-bottom:24px}
+  .header h1{font-size:var(--title);font-weight:570;line-height:1.09;letter-spacing:-.055em}
+  .header .sub{font-size:var(--label);color:var(--muted);margin-top:8px;max-width:80ch;line-height:1.45}
+  .header .refreshed{font-size:var(--meta);color:var(--muted);text-align:right;
+                     display:flex;flex-direction:column;align-items:flex-end;gap:7px;white-space:nowrap}
+  .header button{min-height:var(--control);border:1px solid #bdb3a6;border-radius:var(--radius);
+                 background:var(--paper);color:var(--ink);padding:7px 12px;
+                 font-size:var(--label);font-weight:540}
+  .header button:hover{background:var(--mist);border-color:var(--sea)}
+
+  .kpis{grid-template-columns:1.15fr 1fr 1fr .75fr;margin-bottom:34px}
+  .kpis .kpi{gap:10px;padding:22px 24px}
+  .kpis .kpi .value{font-size:clamp(1.7rem,2.35vw,2.15rem)}
+  .kpi.lead .value.pos,.kpi.lead .value.neg{color:var(--on-dark)!important}
+  .kpi .unit{font-size:.68rem;font-weight:470;margin-left:3px;letter-spacing:0;color:var(--muted)}
+  .kpi.lead .unit,.kpi.lead .hint{color:var(--on-dark-muted)}
+  .kpi .label{font-size:var(--label);font-weight:510;line-height:1.3}
+  .kpi .value{font-size:var(--figure);font-weight:570;letter-spacing:-.035em;line-height:1.12;
+              font-variant-numeric:var(--numerals);white-space:nowrap}
+  .kpi .hint{font-size:var(--meta);color:var(--muted);line-height:1.35}
+  .pos{color:var(--credit)!important}
+  .neg{color:var(--debit)!important}
+
+  .card{margin-bottom:38px}
+  .card-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;
+             flex-wrap:wrap;margin-bottom:16px}
+  .card-head h2{font-size:var(--section);font-weight:570;letter-spacing:-.035em}
+  .card-head .section-sub{font-size:var(--label);color:var(--muted);margin-top:5px}
+  .card-head .tools{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .chkline{font-size:var(--label);color:var(--muted);display:inline-flex;gap:8px;
+           align-items:center;cursor:pointer;white-space:nowrap}
+  .chkline input{width:auto}
+
+  .btn{min-height:var(--control);border:1px solid var(--petrol);background:var(--petrol);color:#fff;
+       border-radius:var(--radius);padding:7px 12px;font-size:var(--label);font-weight:540}
+  .btn:hover{background:var(--petrol-hover);border-color:var(--petrol-hover)}
+  .btn.ghost{background:var(--paper);color:var(--petrol);border-color:#bdb3a6}
+  .btn.ghost:hover{background:var(--mist);border-color:var(--sea)}
+  .btn.go{background:var(--credit);border-color:var(--credit);color:#fff}
+  .btn.go:hover{background:#1b4e3d;border-color:#1b4e3d}
+
+  .table-wrap{overflow-x:auto}
+  table{font-size:var(--label)}
+  th{text-align:left;font-size:var(--meta);color:var(--muted);font-weight:500;
+     padding:9px 12px;background:var(--mist);white-space:nowrap}
+  td{padding:10px 12px;border-bottom:1px solid var(--rule-light);vertical-align:top}
+  .soa th{border-top:var(--hairline);vertical-align:bottom}
+  .soa th span{display:block;font-size:.75rem;font-weight:400}
+  .soa th,.soa td{padding:10px 16px}
+  .soa{min-width:750px}
+  #overviewBody td{height:54px;vertical-align:middle}
+  #overviewBody td:first-child{width:21%}
+  #overviewBody td.who{font-size:var(--meta);font-weight:500}
+  #overviewBody .btn.ghost{min-height:0;padding:4px 11px;font-size:var(--meta);border-color:var(--rule)}
+  #overviewBody td:last-child{text-align:right}
+  #placeBody td{height:54px;vertical-align:middle}
+  #placeBody td:first-child{width:21%}
+  #placeBody td:last-child{text-align:right}
+  #placeBody .btn.ghost{min-height:0;padding:4px 11px;font-size:var(--meta);border-color:var(--rule)}
+  #placeBody td.net-cell{color:var(--credit)}
+  th.num,td.num{text-align:right;font-variant-numeric:var(--numerals);white-space:nowrap}
+  tr.click{cursor:pointer}
+  tr.sel{background:var(--mist)!important}
+  .muted{color:var(--muted);font-size:var(--meta)}
+  .roles span{display:inline-block;font-size:var(--meta);font-weight:550;margin-right:9px;
+              color:var(--muted)}
+  .net-cell{font-weight:590}
+  .who{font-size:var(--meta);font-weight:600}
+  .note{font-size:var(--meta);color:var(--muted);padding:12px 0 0;line-height:1.55;max-width:96ch}
+  .note.info{display:flex;align-items:flex-start;gap:9px;padding-top:17px}
+  .note.info svg{width:16px;height:16px;flex:none;margin-top:2px;fill:none;stroke:currentColor;
+                 stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+  .leg{padding:0 0 8px}
+  .leg-head{display:flex;justify-content:space-between;align-items:baseline;
+            padding:22px 0 10px;gap:12px;flex-wrap:wrap;border-bottom:var(--hairline);margin-bottom:4px}
+  .leg-head .t{font-weight:600;font-size:1rem;letter-spacing:-.02em}
+  .leg-head .s{font-size:var(--meta);color:var(--muted)}
+  .leg-head .amt{font-weight:650;font-variant-numeric:var(--numerals)}
+  td.chk,th.chk{width:34px;text-align:center}
+  .tag{display:inline-block;font-size:var(--meta);font-weight:620;color:var(--warning);margin-left:8px}
+
+  .netbar{position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;
+          gap:16px;flex-wrap:wrap;padding:16px 0;background:var(--paper);
+          border-top:2px solid var(--sea)}
+  .netbar .lines{font-size:var(--label);color:var(--muted);line-height:1.6}
+  .netbar .lines b{color:var(--ink);font-variant-numeric:var(--numerals)}
+  .netbar .big{font-size:1.5rem;font-weight:650;font-variant-numeric:var(--numerals);
+               letter-spacing:-.035em}
+  .empty{padding:36px 0;text-align:center;color:var(--muted)}
+
+  #loading{padding:70px 20px;text-align:center;color:var(--muted);font-size:var(--label)}
+  .spinner{width:24px;height:24px;border:2px solid var(--rule);border-top-color:var(--sea);
+           border-radius:50%;margin:0 auto 14px;animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #errorBox,#warnBox{display:none;padding:12px 14px;margin-bottom:16px;font-size:var(--label);
+                     background:var(--mist);border-left:3px solid var(--rule)}
+  #errorBox{border-left-color:var(--debit)}
+  #warnBox{border-left-color:var(--warning)}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(36,28,22,.44);display:none;
+                 align-items:center;justify-content:center;z-index:50;padding:16px}
+  .modal-overlay.show{display:flex}
+  .modal{background:#fff;border:1px solid var(--rule);border-radius:6px;max-width:560px;width:100%;
+         max-height:90vh;overflow:auto;padding:26px 28px}
+  .modal h3{font-size:1.25rem;font-weight:570;letter-spacing:-.035em;margin-bottom:14px}
+  .modal .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;
+              font-size:var(--label);border-bottom:1px solid var(--rule-light)}
+  .modal .row b{font-variant-numeric:var(--numerals)}
+  .modal .result{margin:18px 0;padding:16px;background:var(--mist);border-left:3px solid var(--sea);
+                 font-size:1.0625rem;font-weight:650;text-align:center;
+                 font-variant-numeric:var(--numerals)}
+  .modal label{display:block;font-size:var(--meta);font-weight:550;color:var(--muted);margin:14px 0 6px}
+  .modal textarea{width:100%;border:1px solid #c8bfb2;border-radius:var(--radius);padding:8px 10px;
+                  font:inherit;min-height:66px;color:var(--ink)}
+  .modal .warnline{font-size:var(--meta);color:var(--muted);margin-top:14px;line-height:1.55}
+  .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+
+  .toast{position:fixed;right:18px;bottom:18px;background:var(--credit);color:#fff;
+         padding:11px 16px;border-radius:var(--radius);font-size:var(--label);opacity:0;
+         transform:translateY(10px);transition:all .25s;z-index:60;max-width:420px}
+  .toast.show{opacity:1;transform:none}
+  .toast.err{background:var(--debit)}
+  @media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.kpis .kpi{padding:16px}
+    .kpis .kpi:nth-child(n+3){border-top:1px solid var(--rule-light)}}
+  @media(max-width:640px){.kpis{grid-template-columns:1fr}.kpi+.kpi:before{display:none}}
+
+  .kpis{grid-template-columns:1.25fr repeat(4,1fr);margin-bottom:12px}
+  .kpis .kpi{padding:20px 18px}
+  .kpis .kpi .value{font-size:clamp(1.25rem,1.75vw,1.7rem)}
+  .kpis .kpi.lead .value{font-size:clamp(1.6rem,2.2vw,2.1rem)}
+  .rec{color:var(--credit)} .pay{color:var(--debit)} .nil{color:#b9ad9f}
+  .kfoot{font-size:var(--label);color:var(--muted);margin-bottom:34px}
+  #overviewFoot td{font-weight:620;background:var(--mist);border-top:2px solid var(--sea);border-bottom:0}
+  #overviewBody td:first-child{width:24%}
+  .soa th,.soa td{padding:10px 12px}
+  #partyCard{scroll-margin-top:12px;border:1px solid var(--rule);border-radius:6px;padding:26px 26px 22px;background:var(--paper)}
+  .st-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .st-head .tools{display:flex;gap:10px;flex-wrap:wrap}
+  .st-k{font-size:var(--meta);color:var(--sea);font-weight:560}
+  .st-head h2{font-size:clamp(1.8rem,2.6vw,2.3rem);letter-spacing:-.05em;line-height:1.1;margin-top:2px}
+  .st-head .section-sub{font-size:var(--label);color:var(--muted);margin-top:6px}
+  .st-sum{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:22px 0 18px}
+  .side{background:var(--mist);padding:16px 18px;border-top:3px solid var(--rule)}
+  .side.r{border-top-color:var(--credit)} .side.p{border-top-color:var(--debit)}
+  .side-t{font-size:var(--label);font-weight:600;margin-bottom:8px}
+  .side.r .side-t,.side.r .tot b{color:var(--credit)} .side.p .side-t,.side.p .tot b{color:var(--debit)}
+  .side-r{display:flex;justify-content:space-between;font-size:var(--label);padding:4px 0;color:var(--muted)}
+  .side-r b{font-weight:500;color:var(--ink)} .side-r.tot{border-top:1px solid var(--rule);margin-top:5px;padding-top:8px;color:var(--ink);font-weight:600} .side-r.tot b{font-weight:640}
+  .side.net{background:var(--petrol);border-top-color:var(--copper);color:var(--on-dark);display:flex;flex-direction:column}
+  .side-net{font-size:clamp(1.7rem,2.5vw,2.25rem);font-weight:600;letter-spacing:-.04em;margin-top:auto;white-space:nowrap} .side-net span{font-size:.8rem;font-weight:450;letter-spacing:0;color:var(--on-dark-muted)}
+  .side-who{font-size:var(--label);color:var(--on-dark-muted);margin-top:2px}
+  .alert{background:#fbf4e6;color:#5d4200;font-size:var(--label);line-height:1.5;padding:10px 14px;margin-bottom:8px;border-radius:var(--radius)}
+  .alert .btn{margin-left:8px}
+  .st-tools{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 12px}
+  .seg{display:inline-flex;border:1px solid #bdb3a6;border-radius:var(--radius);overflow:hidden}
+  .seg button{border:0;background:var(--paper);padding:7px 14px;font-size:var(--label);color:var(--muted);min-height:34px}
+  .seg button[aria-pressed=true]{background:var(--petrol);color:#fff} .seg i{font-style:normal;opacity:.75;margin-left:4px}
+  #q{min-height:36px;width:290px;max-width:100%;border:1px solid #bdb3a6;border-radius:var(--radius);padding:6px 11px;font-size:var(--label);color:var(--ink);background:var(--paper)}
+  .st-wrap{max-height:66vh;overflow:auto;border:1px solid var(--rule)}
+  .st{min-width:1200px;font-size:.8125rem;border-collapse:separate;border-spacing:0;width:100%}
+  .st th{position:sticky;top:0;z-index:2;background:var(--petrol);color:var(--on-dark);font-size:.75rem;font-weight:520;padding:9px 7px;line-height:1.25;vertical-align:bottom}
+  .st th.rec,.st th.pay{color:var(--on-dark)}
+  .st td{padding:8px 7px;vertical-align:middle;border-bottom:1px solid var(--rule-light);line-height:1.35}
+  .st tbody tr:hover td{background:var(--mist)} .st .cust{font-weight:540;min-width:150px} .st .wrap{overflow-wrap:anywhere;min-width:104px;max-width:150px} .st .nw{white-space:nowrap} .st td.refno{font-size:.75rem} .table-wrap{position:relative}
+  .st tfoot td{position:sticky;bottom:0;background:#eee4d6;font-weight:640;border-top:2px solid var(--sea);border-bottom:0}
+  .st tr.closed td{color:#8b8075;font-weight:400} .st .done{color:#9a8f83}
+  .amt{border:1px solid transparent;background:none;padding:3px 7px;margin-right:-7px;border-radius:var(--radius);font:inherit;font-weight:560;font-variant-numeric:var(--numerals)}
+  .amt.rec{color:var(--credit)} .amt.pay{color:var(--debit)} .amt:hover{border-color:currentColor}
+  .amt.rec.on{background:var(--credit);color:#fff} .amt.pay.on{background:var(--debit);color:#fff} .amt.chk:not(.on){color:var(--warning)}
+  .st .tag{display:block;margin:0;font-weight:560;cursor:help}
+  .chip{font-size:.75rem;font-weight:560;padding:2px 8px;border-radius:20px;background:#f0ebe4;color:var(--muted);white-space:nowrap} .chip.yes{background:#e2efe9;color:var(--credit)} .chip.part{background:#fbf0d8;color:var(--warning)}
+  .netbar{z-index:4;padding:14px 0;border-top:0} .netgo{display:flex;align-items:center;gap:20px;text-align:right}
+  .toast{bottom:auto;top:18px;pointer-events:none}
+  .past{margin-top:26px}.past h2{font-size:1rem}
+  @media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.kpis .kpi.lead{grid-column:1/-1}.st-sum{grid-template-columns:1fr}}
+  @media(max-width:640px){#partyCard{padding:18px 14px}.st-wrap{max-height:none}.netgo{width:100%;justify-content:space-between}}
+</style>
+</head>
+<body>
+<main>
+<div class="header">
+  <div><h1>Agent statement of account</h1>
+    <div class="sub">Everything receivable and payable with each agent and agency, in one statement · From 1 May 2026 · OMR</div></div>
+  <div class="refreshed"><div id="refreshedAt">Loading…</div><button id="refreshBtn" type="button">Refresh</button></div>
+</div>
+<div id="errorBox"></div>
+<div id="warnBox"></div>
+<div id="loading"><div class="spinner"></div>Loading policies…</div>
+<div id="app" style="display:none">
+  <div class="kpis">
+    <div class="kpi lead"><div class="label">Overall net</div><div><span class="value" id="kNet">0.000</span><span class="unit"> OMR</span></div><div class="hint" id="kNetHint"></div></div>
+    <div class="kpi"><div class="label">Commission payable</div><div><span class="value pay" id="k_COMM_OUT">0.000</span></div><div class="hint">INSPT owes agents</div></div><div class="kpi"><div class="label">Commission receivable</div><div><span class="value rec" id="k_COMM_IN">0.000</span></div><div class="hint">Agencies owe INSPT</div></div><div class="kpi"><div class="label">Premium payable</div><div><span class="value pay" id="k_PREM_OUT">0.000</span></div><div class="hint">INSPT owes agencies</div></div><div class="kpi"><div class="label">Premium receivable</div><div><span class="value rec" id="k_PREM_IN">0.000</span></div><div class="hint">Agents owe INSPT</div></div>
+  </div>
+  <p class="kfoot" id="kFoot"></p>
+  <div class="card">
+    <div class="card-head">
+      <div><h2>Who owes whom</h2><p class="section-sub">Agents and placement agencies together · open a name for its full statement</p></div>
+      <div class="tools"><label class="chkline"><input type="checkbox" id="showAll"> Show parties with nothing open</label>
+        <button class="btn ghost" id="excelAllBtn" type="button">Download all (Excel)</button></div>
+    </div>
+    <div class="table-wrap"><table class="soa"><thead><tr><th>Party</th><th class="num">Commission payable<span>INSPT owes</span></th><th class="num">Commission receivable<span>Owed to INSPT</span></th><th class="num">Premium payable<span>INSPT owes</span></th><th class="num">Premium receivable<span>Owed to INSPT</span></th><th class="num">Net</th><th>Settlement direction</th><th><span class="visually-hidden">Details</span></th></tr></thead>
+      <tbody id="overviewBody"></tbody><tfoot id="overviewFoot"></tfoot></table></div>
+  </div>
+  <div class="card" id="partyCard" style="display:none"></div>
+  <div class="note"><b>How each column is worked out.</b> Commission payable: the agent's share, until it is marked Settled. Commission receivable: the full commission on policies placed through the agency, until Commission Claimed is Yes or Not Applicable (Partially Claimed still counts in full). Premium payable: only premium INSPT has received and not yet passed to the agency. Premium receivable: premium still Pending on policies the agent brought. Net is receivable less payable.</div>
+</div>
+<div class="modal-overlay" id="modal"><div class="modal" id="modalBody"></div></div>
+<div class="toast" id="toast" role="status"></div>
+</main>
+
+<script>
+/*CORE-START*/
+var APP_NAME = 'inspt-policy-accounting-system';
+var CUTOFF_TS = new Date(2026, 4, 1).getTime();          // 01-May-2026
+var ALIASES = { 'bhatti': 'Attaullah' };                  // D10: same real agent
+// The four money columns, in MS's order. sign +1 = the party owes INSPT, -1 = INSPT owes the party.
+var LEG = {
+  COMM_OUT: { label: 'Commission payable',    sub: 'INSPT owes', sign: -1, field: 'Agent_Commission_Status', value: 'Settled' },
+  COMM_IN:  { label: 'Commission receivable', sub: 'Owed to INSPT', sign: +1, field: 'Commission_Claimed', value: 'Yes' },
+  PREM_OUT: { label: 'Premium payable',       sub: 'INSPT owes', sign: -1, field: 'Premium_Paid_to_Insurer', value: 'Paid' },
+  PREM_IN:  { label: 'Premium receivable',    sub: 'Owed to INSPT', sign: +1, field: 'Dropdown1', value: 'Paid to INSPT' }
+};
+var LEGS = ['COMM_OUT', 'COMM_IN', 'PREM_OUT', 'PREM_IN'];
+var PLACE_SUFFIX = ' (placement agency)';                 // v22 settlements used this party name
+
+function lookupVal(f) {
+  if (f === null || f === undefined) return '';
+  if (typeof f === 'object') {
+    var dv = f.display_value !== undefined ? f.display_value : f.zc_display_value;
+    if (dv === undefined) { for (var k in f) { if (k !== 'ID' && typeof f[k] === 'string') { dv = f[k]; break; } } }
+    return String(dv || '').trim();
+  }
+  return String(f).trim();
+}
+function num(v) { var n = parseFloat(String(v === undefined || v === null ? '' : v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
+function r3(v) { return Math.round(v * 1000) / 1000; }
+var MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+var MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function parseDMY(s) {
+  if (!s) return 0;
+  var m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})/.exec(String(s).trim());
+  if (!m) { var d = new Date(s); return isNaN(d.getTime()) ? 0 : d.getTime(); }
+  var mon = MONTHS[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  return mon === undefined ? 0 : new Date(+m[3], mon, +m[1]).getTime();
+}
+function fmtDMY(d) { return ('0' + d.getDate()).slice(-2) + '-' + MON_NAMES[d.getMonth()] + '-' + d.getFullYear(); }
+function fmt(v) {
+  var s = v < 0 ? '-' : ''; var p = Math.abs(v).toFixed(3).split('.');
+  return s + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + p[1];
+}
+function canonName(n) { n = String(n || '').trim().replace(/\s+/g, ' '); if (!n) return ''; return ALIASES[n.toLowerCase()] || n; }
+function partyKey(n) { return canonName(n).toLowerCase(); }
+
+
+function blankTotals() { return { COMM_OUT: 0, COMM_IN: 0, PREM_OUT: 0, PREM_IN: 0, receivable: 0, payable: 0, net: 0, count: 0 }; }
+function sumItems(items) {
+  var t = blankTotals();
+  items.forEach(function (i) { t[i.leg] += i.amount; t.count++; });
+  LEGS.forEach(function (l) { t[l] = r3(t[l]); });
+  t.receivable = r3(t.PREM_IN + t.COMM_IN); t.payable = r3(t.PREM_OUT + t.COMM_OUT);
+  t.net = r3(t.receivable - t.payable);
+  return t;
+}
+
+// One row per policy per party, carrying up to four legs. Every leg is 'open', 'check' or 'settled'.
+//  COMM_OUT  party brought the customer:  Commission Shared, until Agent Commission Status = Settled
+//  PREM_IN   party brought the customer:  Premium, while Premium Status = Pending (Partially Paid = check, not counted)
+//  COMM_IN   policy placed through party: Commission, until Commission Claimed = Yes / Not Applicable
+//  PREM_OUT  policy placed through party: Premium, only if Premium Status = Paid to INSPT and not yet passed on
+function buildParties(policies, settlements) {
+  var parties = {};
+  function getP(name, role) {
+    var k = partyKey(name);
+    if (!parties[k]) parties[k] = { key: k, name: canonName(name), roles: {}, rows: [], rowById: {} };
+    parties[k].roles[role] = true;
+    return parties[k];
+  }
+  function rowFor(pt, p, ts) {
+    var id = String(p.ID || '');
+    if (!pt.rowById[id]) {
+      pt.rowById[id] = { id: id, ts: ts, date: String(p.Invoice_Date || ''), insured: String(p.Insured_Name || '').trim(),
+        policyNo: String(p.Policy_Number || '').trim(), insurer: lookupVal(p.Insurers), ref: String(p.Reference_Number || '').trim(),
+        premium: num(p.Premium), claimed: String(p.Commission_Claimed || '').trim(), legs: {}, mismatch: false };
+      pt.rows.push(pt.rowById[id]);
+    }
+    return pt.rowById[id];
+  }
+  (policies || []).forEach(function (p) {
+    var ts = parseDMY(p.Invoice_Date);
+    var agent = lookupVal(p.Sources_of_Business) === 'Agent' ? lookupVal(p.Agent_Source_Details) : '';
+    var agency = lookupVal(p.Insurer_Agents); if (agency === 'Direct') agency = '';
+    var prem = num(p.Premium), comm = num(p.Commission), share = num(p.Commission_Shared);
+    var ps = String(p.Dropdown1 || '').trim(), passed = String(p.Premium_Paid_to_Insurer || '').trim();
+    var claimed = String(p.Commission_Claimed || '').trim();
+    function put(row, leg, amount, st) { if (amount !== 0) row.legs[leg] = { amount: r3(amount), state: st }; }
+    if (agent) {
+      var pa = getP(agent, 'agent');                       // every agent ever seen stays listed
+      if (ts >= CUTOFF_TS) {
+        var r = rowFor(pa, p, ts);
+        put(r, 'COMM_OUT', share, String(p.Agent_Commission_Status || '').trim() === 'Settled' ? 'settled' : 'open');
+        if (ps === 'Pending') put(r, 'PREM_IN', prem, 'open');
+        else if (ps === 'Partially Paid') put(r, 'PREM_IN', prem, 'check');
+        else if (ps === 'Paid to INSPT') put(r, 'PREM_IN', prem, 'settled');
+      }
+    }
+    if (agency && ts >= CUTOFF_TS) {
+      var pg = getP(agency, 'agency'), g = rowFor(pg, p, ts);
+      if (claimed !== 'Not Applicable') put(g, 'COMM_IN', comm, claimed === 'Yes' ? 'settled' : 'open');
+      if (ps === 'Paid to INSPT') put(g, 'PREM_OUT', prem, passed === 'Paid' ? 'settled' : 'open');
+      g.mismatch = ps === 'Paid Directly to Insurer' && passed === 'Pending' && prem !== 0;
+    }
+  });
+  (settlements || []).forEach(function (s) {               // a party with only history stays readable
+    var n = settlementParty(s); if (n) getP(n, 'history');
+  });
+  var list = Object.keys(parties).map(function (k) {
+    var pt = parties[k];
+    pt.rows.sort(function (a, b) { return a.ts - b.ts || (a.id < b.id ? -1 : 1); });
+    pt.items = [];
+    pt.rows.forEach(function (r) {
+      LEGS.forEach(function (l) {
+        var g = r.legs[l]; if (!g || g.state === 'settled') return;
+        pt.items.push({ uid: r.id + ':' + l, id: r.id, leg: l, amount: g.amount, ref: r.ref, needsCheck: g.state === 'check', row: r });
+      });
+      r.open = LEGS.some(function (l) { return r.legs[l] && r.legs[l].state !== 'settled'; });
+    });
+    var chk = pt.items.filter(function (i) { return i.needsCheck; });
+    pt.totals = sumItems(pt.items.filter(function (i) { return !i.needsCheck; }));
+    pt.checkCount = chk.length;
+    pt.checkAmount = r3(chk.reduce(function (a, i) { return a + i.amount; }, 0));
+    pt.openRows = pt.rows.filter(function (r) { return r.open; });
+    pt.mismatch = pt.rows.filter(function (r) { return r.mismatch; });
+    unfinishedFor(pt, settlements).forEach(function (i) { i.stuck = true; });
+    return pt;
+  });
+  list.sort(function (a, b) { return Math.abs(b.totals.net) - Math.abs(a.totals.net) || a.name.localeCompare(b.name); });
+  return { parties: parties, list: list };
+}
+
+function buildUpdates(items) {                             // one update per policy
+  var byId = {}, order = [];
+  items.forEach(function (i) {
+    if (!byId[i.id]) { byId[i.id] = {}; order.push(i.id); }
+    byId[i.id][LEG[i.leg].field] = LEG[i.leg].value;
+  });
+  return order.map(function (id) { return { id: id, data: byId[id] }; });
+}
+function directionFor(net) { return net > 0 ? 'Agent pays INSPT' : 'INSPT pays Agent'; }
+function whoText(name, net) {
+  if (net > 0) return name + ' pays INSPT';
+  if (net < 0) return 'INSPT pays ' + name;
+  return 'Nothing to pay, fully netted';
+}
+function buildNotes(party, t, items, userNote) {
+  return 'Party: ' + party.name + ' | Net settlement (Statement of account) | ' + t.count + ' item(s) | ' +
+    LEGS.map(function (l) { return LEG[l].label + ' ' + fmt(t[l]); }).join(' | ') + ' | NET ' + fmt(t.net) + ' = ' + whoText(party.name, t.net) +
+    (userNote ? '\nNote: ' + userNote : '') + '\nItems: ' + items.map(function (i) { return i.id + ' ' + i.leg + ' ' + fmt(i.amount); }).join('; ');
+}
+function settlementParty(s) {
+  var n = String(s.Party_Name || '').trim();
+  if (!n) n = lookupVal(s.Agent);
+  if (!n) { var m = /^Party: ([^|\n]+)/.exec(String(s.Notes || '')); if (m) n = m[1].trim(); }
+  if (n.slice(-PLACE_SUFFIX.length) === PLACE_SUFFIX) n = n.slice(0, -PLACE_SUFFIX.length);
+  return canonName(n);
+}
+// Open items a saved settlement already lists: closing was interrupted. Never settled a second time.
+function parseSettledItems(s) {
+  var m = /\nItems: ([^\n]*)/.exec(String(s.Notes || '')); if (!m) return [];
+  return m[1].split('; ').map(function (x) {
+    var r = /^(.+) (PREM_IN|PREM_OUT|COMM_IN|COMM_OUT) (-?[\d,]+\.\d{3})$/.exec(x.trim()); return r ? { key: r[1].trim(), leg: r[2] } : null;
+  }).filter(Boolean);
+}
+function historyOf(p, settlements) {
+  return (settlements || []).filter(function (s) { return partyKey(settlementParty(s)) === p.key; })
+    .sort(function (a, b) { return parseDMY(b.Settlement_Date) - parseDMY(a.Settlement_Date); });
+}
+function unfinishedFor(p, settlements) {
+  var out = [];
+  historyOf(p, settlements).forEach(function (s) {
+    parseSettledItems(s).forEach(function (x) {
+      p.items.forEach(function (i) { if (i.leg === x.leg && (i.id === x.key || i.ref === x.key) && out.indexOf(i) < 0) out.push(i); });
+    });
+  });
+  return out;
+}
+/*CORE-END*/
+
+// ---------------- UI ----------------
+var state = { data: null, settlements: [], selectedKey: null, sel: {}, showAll: false, rowsAll: false, q: '' };
+var booted = false;
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function $(id) { return document.getElementById(id); }
+function showError(msg) { $('loading').style.display = 'none'; $('errorBox').style.display = 'block'; $('errorBox').textContent = msg; }
+function showWarn(msg) { $('warnBox').style.display = msg ? 'block' : 'none'; $('warnBox').textContent = msg || ''; }
+var toastTimer;
+function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 6000); }
+
+async function fetchAll(report) {
+  var out = [], cursor = null;
+  while (true) {
+    var params = { app_name: APP_NAME, report_name: report, max_records: 200 };
+    if (cursor) params.record_cursor = cursor;
+    var resp;
+    try { resp = await ZOHO.CREATOR.DATA.getRecords(params); }
+    catch (e) {
+      var es = JSON.stringify(e || {}) + String(e && e.message || '');
+      if (/9220|3100|no data/i.test(es)) break;          // empty report
+      throw e;
+    }
+    if (!resp || resp.code !== 3000 || !resp.data || !resp.data.length) break;
+    out = out.concat(resp.data);
+    if (resp.data.length < 200 || !resp.record_cursor) break;
+    cursor = resp.record_cursor;
+  }
+  return out;
+}
+
+
+
+async function loadData() {
+  var res = await Promise.all([fetchAll('All_Policy_Entries'), fetchAll('All_Agent_Settlements').catch(function () { return null; })]);
+  showWarn(res[1] === null ? 'Past settlements could not be loaded, so settling is switched off until you refresh.' : '');
+  state.noHistory = res[1] === null;
+  state.settlements = res[1] || [];
+  state.data = buildParties(res[0], state.settlements);
+  $('refreshedAt').textContent = 'Refreshed ' + new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function grandTotals() {
+  var t = blankTotals(), o = { oweUs: 0, weOwe: 0, parties: 0 };
+  state.data.list.forEach(function (p) {
+    LEGS.forEach(function (l) { t[l] += p.totals[l]; }); t.count += p.totals.count;
+    if (p.totals.net > 0) o.oweUs += p.totals.net; else o.weOwe -= p.totals.net;
+    if (p.totals.count) o.parties++;
+  });
+  LEGS.forEach(function (l) { t[l] = r3(t[l]); });
+  t.receivable = r3(t.PREM_IN + t.COMM_IN); t.payable = r3(t.PREM_OUT + t.COMM_OUT); t.net = r3(t.receivable - t.payable);
+  o.t = t; o.oweUs = r3(o.oweUs); o.weOwe = r3(o.weOwe); return o;
+}
+function renderKPIs() {
+  var g = grandTotals(), t = g.t;
+  $('kNet').textContent = fmt(Math.abs(t.net));
+  $('kNetHint').textContent = t.net >= 0 ? 'Overall, owed to INSPT' : 'Overall, INSPT owes';
+  LEGS.forEach(function (l) { $('k_' + l).textContent = fmt(t[l]); });
+  $('kFoot').textContent = g.parties + ' parties with ' + t.count + ' open amounts. After netting each party: they owe INSPT ' + fmt(g.oweUs) + ', INSPT owes them ' + fmt(g.weOwe) + '.';
+}
+function roleText(p) {
+  if (p.roles.agent && p.roles.agency) return 'Source agent and placement agency';
+  return p.roles.agency ? 'Placement agency' : p.roles.agent ? 'Source agent' : '';
+}
+function cell(v, cls) { return '<td class="num ' + (v ? cls : 'nil') + '">' + (v ? fmt(v) : '–') + '</td>'; }
+function legCls(l) { return LEG[l].sign > 0 ? 'rec' : 'pay'; }
+function renderOverview() {
+  var rows = state.data.list.filter(function (p) { return state.showAll || p.totals.count || p.checkCount; });
+  if (!rows.length) { $('overviewBody').innerHTML = '<tr><td colspan="8" class="empty">Nothing open. Everyone is settled.</td></tr>'; $('overviewFoot').innerHTML = ''; return; }
+  $('overviewBody').innerHTML = rows.map(function (p) {
+    var t = p.totals, cls = t.net > 0 ? 'pos' : (t.net < 0 ? 'neg' : '');
+    return '<tr class="click' + (p.key === state.selectedKey ? ' sel' : '') + '" data-key="' + esc(p.key) + '">' +
+      '<td><b>' + esc(p.name) + '</b><div class="muted">' + esc(roleText(p)) + (p.checkCount ? ' · ' + p.checkCount + ' partly paid, ' + fmt(p.checkAmount) + ' not counted' : '') + '</div></td>' +
+      LEGS.map(function (l) { return cell(t[l], legCls(l)); }).join('') +
+      '<td class="num net-cell">' + fmt(Math.abs(t.net)) + '</td>' +
+      '<td class="who ' + cls + '">' + esc(t.count ? whoText(p.name, t.net) : 'Nothing open') + '</td>' +
+      '<td><button class="btn ghost" type="button">Open</button></td></tr>';
+  }).join('');
+  var g = grandTotals().t;
+  $('overviewFoot').innerHTML = '<tr><td>Total</td>' + LEGS.map(function (l) { return '<td class="num">' + fmt(g[l]) + '</td>'; }).join('') +
+    '<td class="num">' + fmt(Math.abs(g.net)) + '</td><td class="who">' + (g.net >= 0 ? 'Owed to INSPT' : 'INSPT owes') + '</td><td></td></tr>';
+  each('#overviewBody tr.click', function (tr) { tr.addEventListener('click', function () { openParty(tr.getAttribute('data-key')); }); });
+}
+function each(sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
+function openParty(key, keepPlace) {
+  if (key !== state.selectedKey) { state.q = ''; state.rowsAll = false; }
+  state.selectedKey = key; state.sel = {};
+  renderOverview(); renderParty();
+  if (!keepPlace) setTimeout(function () { $('partyCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
+}
+function party() { return state.data.parties[state.selectedKey]; }
+function selectedItems(p) { return p.items.filter(function (i) { return state.sel[i.uid] && !i.stuck; }); }
+function shownRows(p) {
+  var rows = state.rowsAll ? p.rows : p.openRows, q = state.q.trim().toLowerCase();
+  if (!q) return rows;
+  return rows.filter(function (r) { return [r.insured, r.policyNo, r.insurer, r.ref, r.date].join(' ').toLowerCase().indexOf(q) >= 0; });
+}
+// Ticking a whole row never ticks a "check" amount or one already inside a saved settlement.
+function autoItems(p, rows) { var ids = {}; rows.forEach(function (r) { ids[r.id] = 1; }); return p.items.filter(function (i) { return ids[i.id] && !i.needsCheck && !i.stuck; }); }
+function claimedText(r) { return r.claimed || (r.legs.COMM_IN ? 'No' : '–'); }
+function claimedChip(r) {
+  var c = claimedText(r); if (c === '–') return '<span class="nil">–</span>';
+  return '<span class="chip ' + (c === 'Yes' ? 'yes' : c === 'Partially Claimed' ? 'part' : 'no') + '">' + esc(c === 'Partially Claimed' ? 'Partially' : c === 'Not Applicable' ? 'N/A' : c) + '</span>';
+}
+function legCell(r, l) {
+  var g = r.legs[l];
+  if (!g) return '<td class="num nil">–' + (l === 'PREM_OUT' && r.mismatch ? '<span class="tag" title="Marked not passed on, but Premium Status says the customer paid the insurer directly. Not counted.">check</span>' : '') + '</td>';
+  if (g.state === 'settled') return '<td class="num done" title="Settled, not counted">' + fmt(g.amount) + '</td>';
+  var uid = r.id + ':' + l, it = party().items.filter(function (i) { return i.uid === uid; })[0] || {};
+  return '<td class="num"><button type="button" class="amt ' + legCls(l) + (state.sel[uid] ? ' on' : '') + (g.state === 'check' ? ' chk' : '') + '" data-uid="' + esc(uid) + '"' +
+    (it.stuck ? ' disabled title="Already in a saved settlement that did not finish closing"' : ' aria-pressed="' + !!state.sel[uid] + '"') + '>' + fmt(g.amount) + '</button>' +
+    (g.state === 'check' ? '<span class="tag" title="Partially Paid: the unpaid part is not recorded, so this is not counted">check</span>' : '') + '</td>';
+}
+function historyHtml(p) {
+  var hs = historyOf(p, state.settlements);
+  if (!hs.length) return '<div class="note">No settlements recorded yet for ' + esc(p.name) + '.</div>';
+  return '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Direction</th><th class="num">Net amount</th><th>Details</th></tr></thead><tbody>' +
+    hs.map(function (s) {
+      var notes = String(s.Notes || ''), un = (/\nNote: ([^\n]*)/.exec(notes) || [])[1] || '';
+      return '<tr><td>' + esc(s.Settlement_Date || '') + '</td><td>' + esc(String(s.Direction || '').replace('Agent', p.name)) + '</td><td class="num"><b>' + fmt(num(s.Amount)) +
+        '</b></td><td class="muted">' + esc((un ? un + '. ' : '') + notes.split('\n')[0].replace(/^Party: [^|]*\|\s*/, '')) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+function sideHtml(title, cls, t, legs, total) {
+  return '<div class="side ' + cls + '"><div class="side-t">' + title + '</div>' +
+    legs.map(function (l) { return '<div class="side-r"><span>' + LEG[l].label.replace(/ (pay|receiv)able/, '') + '</span><b>' + fmt(t[l]) + '</b></div>'; }).join('') +
+    '<div class="side-r tot"><span>Total</span><b>' + fmt(total) + '</b></div></div>';
+}
+function renderParty() {
+  var p = party(), card = $('partyCard');
+  if (!p) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  var t = p.totals, stuck = p.items.filter(function (i) { return i.stuck; });
+  card.innerHTML =
+    '<div class="st-head"><div><div class="st-k">Statement of account</div><h2>' + esc(p.name) + '</h2><p class="section-sub">' + esc(roleText(p)) + ' · 1 May 2026 to ' + esc(fmtDMY(new Date())) + ' · amounts in OMR</p></div>' +
+    '<div class="tools"><button class="btn" id="pdfBtn" type="button">Download PDF</button><button class="btn ghost" id="excelPartyBtn" type="button">Download Excel</button><button class="btn ghost" id="closeParty" type="button">Close</button></div></div>' +
+    '<div class="st-sum">' + sideHtml('Receivable by INSPT', 'r', t, ['COMM_IN', 'PREM_IN'], t.receivable) + sideHtml('Payable by INSPT', 'p', t, ['COMM_OUT', 'PREM_OUT'], t.payable) +
+      '<div class="side net"><div class="side-t">Net balance</div><div class="side-net">' + fmt(Math.abs(t.net)) + '<span> OMR</span></div><div class="side-who">' + esc(t.count ? whoText(p.name, t.net) : 'Nothing open') + '</div></div></div>' +
+    (stuck.length ? '<div class="alert">' + stuck.length + ' amount(s) are already in an earlier settlement but did not close. They cannot be settled twice. <button class="btn go" id="finishBtn" type="button">Finish closing these ' + stuck.length + '</button></div>' : '') +
+    (p.checkCount ? '<div class="alert">' + p.checkCount + ' premium(s) marked Partially Paid, ' + fmt(p.checkAmount) + ': the unpaid part is not recorded, so they are not counted. Tick one only if the full premium is being settled.</div>' : '') +
+    (p.mismatch.length ? '<div class="alert">' + p.mismatch.length + ' polic' + (p.mismatch.length === 1 ? 'y' : 'ies') + ' marked "check": Premium Paid to Insurer says Pending, but Premium Status says the customer paid the insurer directly. Premium ' +
+      fmt(r3(p.mismatch.reduce(function (a, r) { return a + r.premium; }, 0))) + ' is not counted as payable.</div>' : '') +
+    '<div class="st-tools"><div class="seg" role="group" aria-label="Rows to show"><button type="button" id="segOpen" aria-pressed="' + !state.rowsAll + '">Open <i>' + p.openRows.length + '</i></button><button type="button" id="segAll" aria-pressed="' + state.rowsAll + '">All <i>' + p.rows.length + '</i></button></div>' +
+      '<input type="search" id="q" placeholder="Find customer, policy or reference" aria-label="Find in this statement" value="' + esc(state.q) + '"><span class="muted">Tick a row, or click one amount, to settle it.</span></div>' +
+    '<div id="rowsBox"></div><div class="netbar" id="netbar"></div>' +
+    '<div class="card-head past"><h2>Past settlements</h2></div>' + historyHtml(p);
+  $('closeParty').onclick = function () { state.selectedKey = null; renderOverview(); renderParty(); };
+  $('pdfBtn').onclick = function () { exportPdf(p); };
+  $('excelPartyBtn').onclick = function () { exportParty(p); };
+  $('segOpen').onclick = function () { state.rowsAll = false; renderParty(); };
+  $('segAll').onclick = function () { state.rowsAll = true; renderParty(); };
+  $('q').oninput = function () { state.q = this.value; renderRows(); };
+  if ($('finishBtn')) $('finishBtn').onclick = async function () {
+    this.disabled = true;
+    var failed = await runUpdates(buildUpdates(stuck), this);
+    if (failed.length) toast(failed.length + ' policies still could not be closed (' + String(failed[0].err) + '). Try again later.', true);
+    else toast(stuck.length + ' amount(s) closed. No new settlement record was created.', false);
+    await refresh();
+  };
+  renderRows();
+}
+function renderRows() {
+  var p = party(), rows = shownRows(p);
+  if (!rows.length) { $('rowsBox').innerHTML = '<div class="empty">' + (state.q ? 'No policy matches.' : 'Nothing open for ' + esc(p.name) + '.') + '</div>'; renderNetbar(); return; }
+  var shownTot = sumItems(autoAll(p, rows));
+  $('rowsBox').innerHTML = '<div class="table-wrap st-wrap"><table class="st"><thead><tr><th class="chk"><input type="checkbox" id="tickAll" aria-label="Tick all rows shown"></th><th>Agency</th><th>Date</th><th>Customer</th><th>Policy No</th><th>Insurer</th><th>Reference</th><th class="num">Premium</th>' +
+    LEGS.map(function (l) { return '<th class="num ' + legCls(l) + '">' + LEG[l].label.replace(' ', '<br>') + '</th>'; }).join('') + '<th>Commission<br>Claimed</th></tr></thead><tbody>' +
+    rows.map(function (r) {
+      var au = autoItems(p, [r]), on = au.length && au.every(function (i) { return state.sel[i.uid]; });
+      return '<tr class="' + (r.open ? '' : 'closed') + '" data-id="' + esc(r.id) + '"><td class="chk">' + (au.length ? '<input type="checkbox" class="rchk" data-id="' + esc(r.id) + '"' + (on ? ' checked' : '') + ' aria-label="Tick ' + esc(r.insured) + '">' : '') + '</td>' +
+        '<td>' + esc(p.name) + '</td><td class="nw">' + esc(r.date) + '</td><td class="cust">' + esc(r.insured || '–') + '</td><td class="wrap">' + esc(r.policyNo || '–') + '</td><td>' + esc(r.insurer || '–') + '</td><td class="nw muted refno" title="' + esc(r.ref) + '">' + esc(r.ref.replace(/^REF\s*-\s*/i, '') || '–') + '</td>' +
+        '<td class="num">' + fmt(r.premium) + '</td>' + LEGS.map(function (l) { return legCell(r, l); }).join('') + '<td>' + claimedChip(r) + '</td></tr>';
+    }).join('') + '</tbody><tfoot><tr><td></td><td colspan="6">' + (state.q ? 'Total of rows found' : 'Total open') + '</td><td class="num nil"></td>' +
+    LEGS.map(function (l) { return '<td class="num ' + legCls(l) + '">' + fmt(shownTot[l]) + '</td>'; }).join('') + '<td></td></tr></tfoot></table></div>';
+  each('.rchk', function (c) { c.addEventListener('change', function () { autoItems(p, [p.rowById[c.getAttribute('data-id')]]).forEach(function (i) { state.sel[i.uid] = c.checked; }); syncRows(p); }); });
+  each('.amt', function (b) { b.addEventListener('click', function () { var u = b.getAttribute('data-uid'); state.sel[u] = !state.sel[u]; syncRows(p); }); });
+  $('tickAll').onchange = function () { var on = this.checked; autoItems(p, shownRows(p)).forEach(function (i) { state.sel[i.uid] = on; }); syncRows(p); };
+  syncRows(p);
+}
+function autoAll(p, rows) { var ids = {}; rows.forEach(function (r) { ids[r.id] = 1; }); return p.items.filter(function (i) { return ids[i.id] && !i.needsCheck; }); }
+function syncRows(p) {
+  each('.amt', function (b) { var on = !!state.sel[b.getAttribute('data-uid')]; b.classList.toggle('on', on); if (!b.disabled) b.setAttribute('aria-pressed', on); });
+  each('.rchk', function (c) {
+    var au = autoItems(p, [p.rowById[c.getAttribute('data-id')]]), n = au.filter(function (i) { return state.sel[i.uid]; }).length;
+    c.checked = n > 0 && n === au.length; c.indeterminate = n > 0 && n < au.length;
+  });
+  var all = autoItems(p, shownRows(p)), k = all.filter(function (i) { return state.sel[i.uid]; }).length;
+  if ($('tickAll')) { $('tickAll').checked = all.length > 0 && k === all.length; $('tickAll').indeterminate = k > 0 && k < all.length; }
+  renderNetbar();
+}
+function renderNetbar() {
+  var p = party(), bar = $('netbar'); if (!p.items.length) { bar.style.display = 'none'; return; }
+  var t = sumItems(selectedItems(p)), cls = t.net > 0 ? 'pos' : (t.net < 0 ? 'neg' : '');
+  bar.innerHTML = '<div class="lines">' + (t.count ? '<b>' + t.count + '</b> amount(s) ticked<br>' + LEGS.filter(function (l) { return t[l]; }).map(function (l) { return LEG[l].label + ' <b>' + fmt(t[l]) + '</b>'; }).join(' · ') : 'Nothing ticked yet') + '</div>' +
+    '<div class="netgo"><div><div class="big ' + cls + '">' + fmt(Math.abs(t.net)) + ' OMR</div><div class="who ' + cls + '">' + esc(t.count ? whoText(p.name, t.net) : '') + '</div></div>' +
+    '<button class="btn go" id="settleBtn" type="button"' + (t.count && !state.noHistory ? '' : ' disabled') + '>Record settlement</button></div>';
+  $('settleBtn').onclick = function () { openConfirm(p); };
+}
+function todayISO() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function openConfirm(p) {
+  var items = selectedItems(p), t = sumItems(items); if (!items.length) return;
+  var part = items.filter(function (i) { return i.leg === 'COMM_IN' && i.row.claimed === 'Partially Claimed'; }).length;
+  var says = [];
+  if (t.COMM_IN || has(items, 'COMM_IN')) says.push('Commission receivable: marked Commission Claimed = Yes. The money received is not recorded in Zoho Books.');
+  if (has(items, 'COMM_OUT')) says.push('Commission payable: marked Settled and cleared in Zoho Books.');
+  if (has(items, 'PREM_IN')) says.push('Premium receivable: marked Paid to INSPT and recorded in Zoho Books as premium collected.');
+  if (has(items, 'PREM_OUT')) says.push('Premium payable: marked Paid and recorded in Zoho Books as passed on.');
+  if (part) says.push(part + ' ticked polic' + (part === 1 ? 'y is' : 'ies are') + ' Partially Claimed and counted at the full commission: check the amount.');
+  $('modalBody').innerHTML = '<h3>Record settlement: ' + esc(p.name) + '</h3>' +
+    LEGS.filter(function (l) { return has(items, l); }).map(function (l) { return '<div class="row"><span>' + LEG[l].label + ' (' + items.filter(function (i) { return i.leg === l; }).length + ')</span><b class="' + (LEG[l].sign > 0 ? 'pos' : 'neg') + '">' + (LEG[l].sign > 0 ? '+ ' : '− ') + fmt(t[l]) + '</b></div>'; }).join('') +
+    '<div class="result ' + (t.net > 0 ? 'pos' : t.net < 0 ? 'neg' : '') + '">' + esc(whoText(p.name, t.net)) + (t.net ? ': ' + fmt(Math.abs(t.net)) + ' OMR' : '') + '</div>' +
+    '<label for="sDate">Settlement date</label><input type="date" id="sDate" value="' + todayISO() + '">' +
+    '<label for="sNote">Note (optional, e.g. cheque no. or bank ref)</label><textarea id="sNote" maxlength="400"></textarea>' +
+    '<div class="warnline">Saves one settlement record and closes the ticked amounts. It does not move money.<br>' + says.map(esc).join('<br>') + '</div>' +
+    '<div class="actions"><button class="btn ghost" id="mCancel" type="button">Cancel</button><button class="btn go" id="mGo" type="button">Confirm settlement</button></div>';
+  $('modal').classList.add('show');
+  $('mCancel').onclick = closeModal;
+  $('mGo').onclick = function () { performSettle(p, items, t); };
+}
+function has(items, l) { return items.some(function (i) { return i.leg === l; }); }
+function closeModal() { $('modal').classList.remove('show'); }
+async function performSettle(p, items, t) {
+  var go = $('mGo'), dv = $('sDate').value, d = dv ? new Date(dv + 'T00:00:00') : new Date();
+  var userNote = String($('sNote').value || '').trim().replace(/\s*\n\s*/g, ' ');
+  function stop(msg) { go.disabled = false; $('mCancel').disabled = false; go.textContent = 'Confirm settlement'; toast(msg, true); }
+  go.disabled = true; $('mCancel').disabled = true; go.textContent = 'Checking latest data…';
+  // Re-read live data. If anything ticked changed, closed or was settled meanwhile, nothing is saved.
+  try {
+    var got = await Promise.all([fetchAll('All_Policy_Entries'), fetchAll('All_Agent_Settlements')]);
+    var fresh = buildParties(got[0], got[1]).parties[p.key], open = {};
+    (fresh ? fresh.items : []).forEach(function (i) { if (!i.stuck) open[i.uid] = i.amount + '|' + i.needsCheck; });
+    var gone = items.filter(function (i) { return open[i.uid] !== i.amount + '|' + i.needsCheck; });
+    if (gone.length) {
+      closeModal();
+      toast(gone.length + ' ticked amount(s) changed or were already settled since this page loaded (e.g. ' + (gone[0].ref || gone[0].id) + '). Nothing was saved. Please check and tick again.', true);
+      await refresh(); return;
+    }
+  } catch (e) { stop('Could not check the latest data (' + ((e && e.message) || 'error') + '). Nothing was saved.'); return; }
+  go.textContent = 'Saving…';
+  var resp;
+  try {
+    resp = await ZOHO.CREATOR.DATA.addRecords({ app_name: APP_NAME, form_name: 'Agent_Settlements', payload: { data: {
+      Party_Name: p.name, Settlement_Date: fmtDMY(d), Amount: Math.abs(t.net).toFixed(3), Direction: directionFor(t.net), Notes: buildNotes(p, t, items, userNote) } } });
+  } catch (e) { resp = { code: 'ERR', message: (e && e.message) || JSON.stringify(e) }; }
+  if (!resp || resp.code !== 3000) { stop('Could not save the settlement record (' + ((resp && (resp.message || resp.code)) || 'unknown error') + '). No policy was changed.'); return; }
+  var failed = await runUpdates(buildUpdates(items), go);
+  closeModal();
+  if (!failed.length) toast('Settlement saved. ' + items.length + ' amount(s) closed for ' + p.name + '.', false);
+  else showRetry(p, failed);
+  await refresh();
+}
+async function runUpdates(updates, btn) {
+  var failed = [];
+  for (var i = 0; i < updates.length; i++) {
+    if (btn) btn.textContent = 'Closing items ' + (i + 1) + ' / ' + updates.length + '…';
+    var u = updates[i], resp;
+    try {
+      resp = await ZOHO.CREATOR.DATA.updateRecordById({ app_name: APP_NAME, report_name: 'All_Policy_Entries', id: String(u.id), payload: { data: u.data } });
+    } catch (e) { resp = { code: 'ERR', message: (e && e.message) || JSON.stringify(e) }; }
+    if (!resp || (resp.code !== 3000 && resp.code !== 0)) failed.push({ u: u, err: (resp && (resp.message || resp.code)) || 'unknown' });
+  }
+  return failed;
+}
+
+function showRetry(p, failed) {
+  $('modalBody').innerHTML = '<h3>Settlement saved, but ' + failed.length + ' item(s) did not close</h3>' +
+    '<div class="warnline">The settlement record is saved. These policies could not be updated (first error: ' + esc(String(failed[0].err)) + '). ' +
+    'Press Retry to close only these — it will not create a second settlement record.</div>' +
+    '<div class="actions"><button class="btn ghost" id="mCancel" type="button">Close</button><button class="btn go" id="mGo" type="button">Retry</button></div>';
+  $('modal').classList.add('show');
+  $('mCancel').onclick = closeModal;
+  $('mGo').onclick = async function () {
+    $('mGo').disabled = true;
+    var again = await runUpdates(failed.map(function (f) { return f.u; }), $('mGo'));
+    closeModal();
+    if (again.length) showRetry(p, again); else toast('All remaining items closed.', false);
+    await refresh();
+  };
+}
+
+
+
+// ---------- Downloads (libraries load on the first click only) ----------
+var CDN = 'https://cdnjs.cloudflare.com/ajax/libs/', libs = {};
+function lib(path, sri) {
+  if (!libs[path]) libs[path] = new Promise(function (ok, no) {
+    var s = document.createElement('script'); s.src = CDN + path; s.integrity = 'sha512-' + sri; s.crossOrigin = 'anonymous';
+    s.onload = ok; s.onerror = function () { delete libs[path]; no(new Error('could not load')); }; document.head.appendChild(s);
+  });
+  return libs[path];
+}
+var SRI = { x: 'dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw==', p: 'qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==', t: '2/YdOMV+YNpanLCF5MdQwaoFRVbTmrJ4u4EpqS/USXAQNUDgI5uwYi6J98WVtJKcfe1AbgerygzDFToxAlOGEQ==' };
+async function run(label, fn) {
+  toast('Preparing the ' + label + '…', false);
+  try { await fn(); toast(label + ' downloaded.', false); } catch (e) { toast('Could not make the ' + label + ' (' + ((e && e.message) || 'error') + '). Check the connection and try again.', true); }
+}
+function exportParty(p) { return run('Excel', async function () { await lib('exceljs/4.4.0/exceljs.min.js', SRI.x); save(await xlsxParty(p), fileName(p) + '.xlsx', XLSX_TYPE); }); }
+function exportAll() { return run('Excel', async function () { await lib('exceljs/4.4.0/exceljs.min.js', SRI.x); save(await xlsxAll(), 'INSPT_Statement_of_Account_All_' + fmtDMY(new Date()) + '.xlsx', XLSX_TYPE); }); }
+function exportPdf(p) {
+  return run('PDF', async function () {
+    await lib('jspdf/2.5.1/jspdf.umd.min.js', SRI.p); await lib('jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js', SRI.t);
+    save(pdfParty(p).output('arraybuffer'), fileName(p) + '.pdf', 'application/pdf');
+  });
+}
+var XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+function fileName(p) { return 'INSPT_Statement_' + p.name.replace(/[^A-Za-z0-9]+/g, '_') + '_' + fmtDMY(new Date()); }
+function save(buf, name, type) {
+  var u = URL.createObjectURL(new Blob([buf], { type: type })), a = document.createElement('a');
+  a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+}
+var COLS = ['Agency', 'Date', 'Customer', 'Policy No', 'Insurer', 'Reference', 'Premium', 'Commission payable', 'Commission receivable', 'Premium payable', 'Premium receivable', 'Commission Claimed'];
+function openAmt(r, l) { var g = r.legs[l]; return g && g.state === 'open' ? g.amount : 0; }
+function countedRows(p) { return p.openRows.filter(function (r) { return LEGS.some(function (l) { return openAmt(r, l); }); }); }
+function netLine(p) { var t = p.totals; return t.net ? whoText(p.name, t.net) + ' OMR ' + fmt(Math.abs(t.net)) : 'Nothing to pay'; }
+
+// Excel: open rows only, formatted, with live totals.
+function xlsxSheet(wb, name, p) {
+  var ws = wb.addWorksheet(name.replace(/[\\\/*?:\[\]]/g, ' ').slice(0, 31), { views: [{ state: 'frozen', ySplit: 9, showGridLines: false }],
+    pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '9:9', margins: { left: .4, right: .4, top: .5, bottom: .6, header: .2, footer: .3 } },
+    headerFooter: { oddFooter: '&L&8INSPT - Insurance Spot&R&8Page &P of &N' } });
+  var t = p.totals, F = 'Calibri', fill = function (c) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + c } }; };
+  [16, 13, 34, 26, 16, 27, 13, 15, 15, 15, 15, 14].forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+  for (var c = 1; c <= 12; c++) { ws.getCell(1, c).fill = ws.getCell(2, c).fill = fill('412A16'); }
+  ws.getCell('A1').value = 'INSPT'; ws.getCell('A1').font = { name: F, size: 20, bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getCell('A2').value = 'Statement of account'; ws.getCell('A2').font = { name: F, size: 11, color: { argb: 'FFE6D9C8' } };
+  ws.getCell('L1').value = 'As at ' + fmtDMY(new Date()); ws.getCell('L2').value = 'Amounts in OMR';
+  ['L1', 'L2'].forEach(function (k) { ws.getCell(k).alignment = { horizontal: 'right' }; ws.getCell(k).font = { name: F, size: 10, color: { argb: 'FFE6D9C8' } }; });
+  ws.getRow(1).height = 30; ws.getRow(2).height = 20;
+  ws.getCell('A4').value = p.name; ws.getCell('A4').font = { name: F, size: 16, bold: true, color: { argb: 'FF241C16' } };
+  ws.getCell('A5').value = roleText(p) + ' - open items from 01-May-2026'; ws.getCell('A5').font = { name: F, size: 10, color: { argb: 'FF6E6257' } };
+  ws.getRow(4).height = 24;
+  var first = 10, rows = countedRows(p), last = Math.max(first, first + rows.length - 1), totRow = last + 1;
+  function sum(col) { return { formula: 'SUM(' + col + first + ':' + col + last + ')' }; }
+  [['H', 'Total payable', 'H' + totRow + '+J' + totRow, t.payable, 'AB3225'], ['J', 'Total receivable', 'I' + totRow + '+K' + totRow, t.receivable, '23634E'], ['L', 'Net', 'I' + totRow + '+K' + totRow + '-H' + totRow + '-J' + totRow, t.net, '412A16']].forEach(function (b) {
+    var a = ws.getCell(b[0] + 4), v = ws.getCell(b[0] + 5);
+    a.value = b[1]; a.font = { name: F, size: 9, color: { argb: 'FF6E6257' } }; a.alignment = v.alignment = { horizontal: 'right' };
+    v.value = { formula: b[2], result: b[3] }; v.numFmt = '#,##0.000;-#,##0.000'; v.font = { name: F, size: 14, bold: true, color: { argb: 'FF' + b[4] } };
+  });
+  ws.getCell('A7').value = netLine(p); ws.getCell('A7').font = { name: F, size: 12, bold: true, color: { argb: t.net >= 0 ? 'FF23634E' : 'FFAB3225' } };
+  for (c = 1; c <= 12; c++) ws.getCell(7, c).fill = fill('FAF7F3');
+  COLS.forEach(function (h, i) {
+    var x = ws.getCell(9, i + 1); x.value = h; x.font = { name: F, size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    x.fill = fill('412A16');
+    x.alignment = { wrapText: true, vertical: 'middle', horizontal: i > 5 && i < 11 ? 'right' : i === 11 ? 'center' : 'left' };
+  });
+  ws.getRow(9).height = 32;
+  rows.forEach(function (r, n) {
+    var d = parseDMY(r.date), vals = [p.name, d ? Math.round((Date.UTC(new Date(d).getFullYear(), new Date(d).getMonth(), new Date(d).getDate()) - Date.UTC(1899, 11, 30)) / 86400000) : r.date, r.insured, r.policyNo, r.insurer, r.ref, r.premium]
+      .concat(LEGS.map(function (l) { return openAmt(r, l) || null; }), [claimedText(r) === '–' ? '' : claimedText(r)]);
+    vals.forEach(function (v, i) {
+      var x = ws.getCell(first + n, i + 1); x.value = v; x.font = { name: F, size: 10, color: { argb: i === 7 || i === 9 ? 'FFAB3225' : i === 8 || i === 10 ? 'FF23634E' : 'FF241C16' } };
+      x.border = { bottom: { style: 'hair', color: { argb: 'FFDED6CB' } } }; x.alignment = { vertical: 'middle', horizontal: i > 5 && i < 11 ? 'right' : i === 11 ? 'center' : 'left', wrapText: i === 2 };
+      if (i === 1) x.numFmt = 'dd-mmm-yyyy'; if (i > 5 && i < 11) x.numFmt = '#,##0.000;-#,##0.000';
+      if (n % 2) x.fill = fill('FAF7F3');
+    });
+  });
+  for (c = 1; c <= 12; c++) { var z = ws.getCell(totRow, c); z.fill = fill('EEE4D6'); z.font = { name: F, size: 11, bold: true, color: { argb: 'FF241C16' } }; z.border = { top: { style: 'medium', color: { argb: 'FF412A16' } } }; }
+  ws.getCell(totRow, 1).value = 'Total';
+  ['G', 'H', 'I', 'J', 'K'].forEach(function (k, i) { var x = ws.getCell(k + totRow), f = sum(k); f.result = i ? t[LEGS[i - 1]] : r3(rows.reduce(function (a, r) { return a + r.premium; }, 0)); x.value = f; x.numFmt = '#,##0.000;-#,##0.000'; x.alignment = { horizontal: 'right' }; });
+  ws.autoFilter = { from: { row: 9, column: 1 }, to: { row: last, column: 12 } };
+  return ws;
+}
+async function xlsxParty(p) { var wb = new ExcelJS.Workbook(); wb.calcProperties.fullCalcOnLoad = true; xlsxSheet(wb, p.name, p); return wb.xlsx.writeBuffer(); }
+async function xlsxAll() {
+  var wb = new ExcelJS.Workbook(); wb.calcProperties.fullCalcOnLoad = true;
+  var ws = wb.addWorksheet('Summary', { views: [{ state: 'frozen', ySplit: 3, showGridLines: false }], pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  var head = ['Party', 'Role', 'Commission payable', 'Commission receivable', 'Premium payable', 'Premium receivable', 'Net (+ owed to INSPT)', 'Who pays', 'Partly paid, not counted'];
+  [22, 34, 18, 18, 18, 18, 20, 30, 18].forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+  ws.getCell('A1').value = 'INSPT - statement of account, all parties'; ws.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FF412A16' } };
+  ws.getCell('A2').value = 'Open items from 01-May-2026, as at ' + fmtDMY(new Date()) + ', in OMR';
+  head.forEach(function (h, i) { var x = ws.getCell(3, i + 1); x.value = h; x.font = { bold: true, color: { argb: 'FFFFFFFF' } }; x.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF412A16' } }; x.alignment = { wrapText: true, vertical: 'middle' }; });
+  ws.getRow(3).height = 32;
+  var ps = state.data.list.filter(function (p) { return p.totals.count || p.checkCount; });
+  ps.forEach(function (p, n) {
+    var t = p.totals; [p.name, roleText(p)].concat(LEGS.map(function (l) { return t[l]; }), [t.net, whoText(p.name, t.net), p.checkAmount]).forEach(function (v, i) {
+      var x = ws.getCell(4 + n, i + 1); x.value = v; if (typeof v === 'number') x.numFmt = '#,##0.000;-#,##0.000'; x.border = { bottom: { style: 'hair', color: { argb: 'FFDED6CB' } } };
+    });
+  });
+  var tr = 4 + ps.length, g = grandTotals().t;
+  ws.getCell(tr, 1).value = 'Total';
+  ['C', 'D', 'E', 'F', 'G'].forEach(function (k, i) { var x = ws.getCell(k + tr); x.value = { formula: 'SUM(' + k + '4:' + k + (tr - 1) + ')', result: i < 4 ? g[LEGS[i]] : g.net }; x.numFmt = '#,##0.000;-#,##0.000'; });
+  ws.getRow(tr).font = { bold: true };
+  ps.forEach(function (p) { xlsxSheet(wb, p.name, p); });
+  var ck = wb.addWorksheet('To check (not counted)'); [20, 34, 13, 34, 26, 27, 14].forEach(function (w, i) { ck.getColumn(i + 1).width = w; });
+  ck.addRow(['Party', 'Why', 'Date', 'Customer', 'Policy No', 'Reference', 'Premium']).font = { bold: true };
+  state.data.list.forEach(function (p) {
+    p.rows.forEach(function (r) {
+      var why = r.legs.PREM_IN && r.legs.PREM_IN.state === 'check' ? 'Premium partly paid, unpaid part unknown' : r.mismatch ? 'Not passed on, yet paid directly to insurer' : '';
+      if (why) ck.addRow([p.name, why, r.date, r.insured, r.policyNo, r.ref, r.premium]).getCell(7).numFmt = '#,##0.000';
+    });
+  });
+  return wb.xlsx.writeBuffer();
+}
+
+// PDF: A4 landscape statement that can be sent to the party.
+function pdfParty(p) {
+  var doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }), W = 297, t = p.totals, M = 12;
+  var INK = [36, 28, 22], MUT = [110, 98, 87], BR = [65, 42, 22], GR = [35, 99, 78], RD = [171, 50, 37], MIST = [250, 247, 243];
+  function tx(s, x, y, size, col, st, al) { doc.setFont('helvetica', st || 'normal'); doc.setFontSize(size); doc.setTextColor(col[0], col[1], col[2]); doc.text(String(s), x, y, al ? { align: al } : undefined); }
+  doc.setFillColor(BR[0], BR[1], BR[2]); doc.rect(0, 0, W, 25, 'F'); doc.setFillColor(169, 116, 58); doc.rect(0, 25, W, 1.2, 'F');
+  tx('INSPT', M, 12.5, 20, [255, 255, 255], 'bold'); tx('Insurance Spot', M, 19, 9.5, [230, 217, 200]);
+  tx('Statement of account', W - M, 12.5, 15, [255, 255, 255], 'bold', 'right'); tx('As at ' + fmtDMY(new Date()) + '   |   Amounts in OMR', W - M, 19, 9, [230, 217, 200], 'normal', 'right');
+  tx(p.name, M, 39, 18, INK, 'bold'); tx(roleText(p), M, 45.5, 9.5, MUT); tx('Open items from 01-May-2026   |   ' + countedRows(p).length + ' policies', M, 51, 9.5, MUT);
+  function box(x, w, title, col, rows, total) {
+    doc.setFillColor(MIST[0], MIST[1], MIST[2]); doc.rect(x, 31, w, 25, 'F'); doc.setFillColor(col[0], col[1], col[2]); doc.rect(x, 31, w, .9, 'F');
+    tx(title, x + 4, 37, 8.5, col, 'bold');
+    rows.forEach(function (r, i) { tx(r[0], x + 4, 42.5 + i * 4.8, 8.5, MUT); tx(fmt(r[1]), x + w - 4, 42.5 + i * 4.8, 8.5, INK, 'normal', 'right'); });
+    doc.setDrawColor(222, 214, 203); doc.line(x + 4, 49.3, x + w - 4, 49.3); tx('Total', x + 4, 53.5, 9, INK, 'bold'); tx(fmt(total), x + w - 4, 53.5, 9.5, col, 'bold', 'right');
+  }
+  box(105, 56, 'Receivable by INSPT', GR, [['Commission', t.COMM_IN], ['Premium', t.PREM_IN]], t.receivable);
+  box(165, 56, 'Payable by INSPT', RD, [['Commission', t.COMM_OUT], ['Premium', t.PREM_OUT]], t.payable);
+  doc.setFillColor(BR[0], BR[1], BR[2]); doc.rect(225, 31, 60, 25, 'F');
+  tx('Net balance', 229, 37, 8.5, [230, 217, 200], 'bold'); tx(fmt(Math.abs(t.net)), 229, 46, 16, [255, 255, 255], 'bold');
+  var who = whoText(p.name, t.net); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  tx(t.count ? doc.splitTextToSize(who, 52)[0] : 'Nothing open', 229, 52.5, 8.5, [230, 217, 200], 'bold');
+  var body = countedRows(p).map(function (r) {
+    return [p.name, r.date, r.insured, r.policyNo, r.insurer, r.ref.replace(/^REF\s*-\s*/i, ''), fmt(r.premium)].concat(LEGS.map(function (l) { var v = openAmt(r, l); return v ? fmt(v) : '-'; }), [claimedText(r) === '–' ? '-' : claimedText(r) === 'Partially Claimed' ? 'Partially' : claimedText(r)]);
+  });
+  var tp = r3(countedRows(p).reduce(function (a, r) { return a + r.premium; }, 0)), rt = { halign: 'right' };
+  doc.autoTable({ startY: 61, margin: { left: M, right: M, top: 14, bottom: 15 }, head: [COLS], body: body,
+    foot: [[{ content: 'Total', colSpan: 6 }, fmt(tp)].concat(LEGS.map(function (l) { return fmt(t[l]); }), [''])], showFoot: 'lastPage', rowPageBreak: 'avoid', theme: 'plain',
+    styles: { font: 'helvetica', fontSize: 7, cellPadding: { top: 1.7, bottom: 1.7, left: 1.4, right: 1.4 }, textColor: INK, lineColor: [222, 214, 203], lineWidth: { bottom: .1 }, overflow: 'linebreak', valign: 'middle' },
+    headStyles: { fillColor: BR, textColor: 255, fontStyle: 'bold', fontSize: 7 }, footStyles: { fillColor: [238, 228, 214], textColor: INK, fontStyle: 'bold', fontSize: 7.5 }, alternateRowStyles: { fillColor: MIST },
+    columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: 17 }, 2: { cellWidth: 'auto' }, 3: { cellWidth: 35 }, 4: { cellWidth: 19 }, 5: { cellWidth: 29 }, 6: rt, 7: rt, 8: rt, 9: rt, 10: rt, 11: { halign: 'center', cellWidth: 18 } },
+    didParseCell: function (d) {
+      var i = d.column.index; if (i > 5 && i < 11) { d.cell.styles.halign = 'right'; d.cell.styles.cellWidth = i === 6 ? 18 : 20.5; }
+      if (d.section === 'head' && i === 11) d.cell.styles.halign = 'center';
+      if (d.section !== 'head' && i > 6 && i < 11) { var nil = d.cell.raw === '-'; d.cell.styles.textColor = nil ? [190, 180, 168] : (i === 7 || i === 9) ? RD : GR; }
+    } });
+  var n = doc.internal.getNumberOfPages();
+  for (var k = 1; k <= n; k++) { doc.setPage(k); tx('INSPT - ' + p.name + ' - ' + fmtDMY(new Date()), M, 203, 7.5, MUT); tx('Page ' + k + ' of ' + n, W - M, 203, 7.5, MUT, 'normal', 'right'); }
+  return doc;
+}
+
+// ---------- Boot ----------
+function renderAll() { renderKPIs(); renderOverview(); renderParty(); }
+async function refresh() {
+  try { await loadData(); state.sel = {}; renderAll(); }
+  catch (e) { toast('Refresh failed: ' + ((e && e.message) || JSON.stringify(e)), true); }
+}
+async function boot() {
+  booted = true;
+  try {
+    await loadData();
+    $('loading').style.display = 'none'; $('app').style.display = 'block';
+    $('showAll').addEventListener('change', function () { state.showAll = this.checked; renderOverview(); });
+    $('excelAllBtn').addEventListener('click', exportAll);
+    $('refreshBtn').addEventListener('click', refresh);
+    renderAll();
+  } catch (e) { showError('Failed to load data: ' + ((e && e.message) || JSON.stringify(e))); }
+}
+setTimeout(function () { if (!booted) showError('Widget timed out. Not embedded in Creator?'); }, 15000);
+try {
+  if (typeof SigmaSDK !== 'undefined' && SigmaSDK.CREATOR && SigmaSDK.CREATOR.init) SigmaSDK.CREATOR.init(function () { if (!booted) boot(); });
+  else if (typeof ZOHO !== 'undefined' && ZOHO.CREATOR && ZOHO.CREATOR.DATA) boot();
+  else showError('Zoho Creator SDK not found.');
+} catch (e) { showError('SDK error: ' + e.message); }
+
+</script>
+</body>
+</html>
